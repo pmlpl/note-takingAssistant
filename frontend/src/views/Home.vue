@@ -1,0 +1,1595 @@
+<template>
+  <Layout>
+    <div class="home-container">
+      <el-container class="main-layout">
+        <!-- 左侧：笔记管理 -->
+        <el-aside width="240px" class="left-sidebar">
+          <div class="sidebar-header">
+            <h3><IconNotebook :size="32" color="#409eff" />笔记管理</h3>
+          </div>
+          <div class="sidebar-actions">
+            <el-button type="primary" @click="createNewNote" class="action-btn">
+              <IconPlus :size="18" />
+              新建笔记
+            </el-button>
+            <el-button @click="importNote" class="action-btn">
+              <IconUpload :size="18" />
+              导入笔记
+            </el-button>
+          </div>
+          <div class="notes-list">
+            <div class="list-title">最近笔记</div>
+            <!-- 显示所有最近笔记 -->
+            <div v-for="note in recentNotes" :key="note.id" class="note-item" @click="viewNote(note)">
+              <IconDocument :size="16" color="#909399" />
+              <span class="note-title">{{ note.title }}</span>
+            </div>
+            <!-- 如果超过10个，显示省略号并跳转到历史笔记页面 -->
+            <div v-if="recentNotes.length > 10" class="more-notes" @click="goToHistory">
+              <span class="more-text">... 更多 ({{ recentNotes.length - 10 }})</span>
+            </div>
+            <div v-if="recentNotes.length === 0" class="empty-notes">
+              <p>暂无笔记</p>
+            </div>
+          </div>
+        </el-aside>
+
+        <!-- 中间：笔记预览区 -->
+        <el-main class="center-preview">
+          <div v-if="currentNote" class="preview-content">
+            <div class="preview-header">
+              <h2>{{ currentNote.title }}</h2>
+              <div class="preview-actions">
+                <el-button 
+                  v-if="!currentNote.is_favorite" 
+                  size="small" 
+                  type="success"
+                  @click="addToMyNotes(currentNote)"
+                >
+                  加入我的笔记
+                </el-button>
+                <el-button size="small" @click="editNote(currentNote)">
+                  <IconEdit :size="16" />
+                  编辑
+                </el-button>
+              </div>
+            </div>
+            <div class="preview-body" v-html="renderedContent"></div>
+          </div>
+          <div v-else class="empty-preview">
+            <IconDocument :size="80" color="#d9d9d9" />
+            <h3>选择一个笔记开始预览</h3>
+            <p>从左侧选择笔记，或创建新笔记</p>
+          </div>
+        </el-main>
+
+        <!-- 右侧：AI 助手 -->
+        <el-aside width="480px" class="right-ai-panel">
+          <div class="ai-header">
+            <h3><IconAI :size="24"/>AI 助手</h3>
+            <p>智能问答与辅助</p>
+          </div>
+          
+          <div class="ai-chat-area">
+            <!-- 聊天记录区域 -->
+            <div class="chat-messages" ref="chatMessagesRef">
+              <div v-if="chatHistory.length === 0" class="welcome-message">
+                <div class="welcome-icon">👋</div>
+                <h4>您好！我是您的 AI 笔记助手</h4>
+                <p>我可以帮您：</p>
+                <ul>
+                  <li>💡 解答学习问题</li>
+                  <li>📝 优化笔记内容</li>
+                  <li>🎯 提供学习建议</li>
+                  <li>📚 解释复杂概念</li>
+                </ul>
+              </div>
+              
+              <!-- 聊天消息列表 -->
+              <div v-for="(message, index) in chatHistory" :key="index" 
+                   :class="['message-item', message.role]">
+                <div class="message-avatar">
+                  <IconAI v-if="message.role === 'assistant'" :size="20" color="#409eff" />
+                  <span v-else class="user-avatar">👤</span>
+                </div>
+                <div class="message-content">
+                  <div class="message-text" v-html="renderMessage(message.content)"></div>
+                  <div class="message-time">{{ formatTime(message.timestamp) }}</div>
+                </div>
+              </div>
+              
+              <!-- 加载中提示 -->
+              <div v-if="isAiThinking" class="message-item assistant">
+                <div class="message-avatar">
+                  <IconAI :size="20" color="#409eff" />
+                </div>
+                <div class="message-content">
+                  <div class="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 输入框区域 -->
+            <div class="input-section">
+              <!-- 笔记选择下拉框（显示在已上传笔记的位置） -->
+              <div v-if="showNoteSelector" class="note-selector-dropdown">
+                <div class="selector-header">
+                  <span>选择笔记作为上下文 ({{ filteredNotes.length }}个笔记)</span>
+                  <el-button size="small" link @click="closeNoteSelector">取消</el-button>
+                </div>
+                <div class="note-list-container">
+                  <div 
+                    v-for="note in filteredNotes" 
+                    :key="note.id" 
+                    class="note-option"
+                    @click="selectNoteForContext(note)"
+                  >
+                    <IconDocument :size="16" color="#409eff" />
+                    <div class="note-info">
+                      <div class="note-title">{{ note.title }}</div>
+                    </div>
+                  </div>
+                  <div v-if="filteredNotes.length === 0" class="empty-note-list">
+                    <p>暂无笔记</p>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 已上传笔记提示 -->
+              <div v-else-if="uploadedNoteContent" class="uploaded-note-banner">
+                <IconDocument :size="16" color="#409eff" />
+                <span class="note-name">{{ uploadedNoteName }}</span>
+                <el-button 
+                  size="small" 
+                  link 
+                  type="danger"
+                  @click="clearUploadedNote"
+                >
+                  清除
+                </el-button>
+              </div>
+              
+              <!-- 快捷操作按钮 -->
+              <div class="quick-actions">
+                <el-button size="small" @click="sendQuickMessage('分析笔记制作思维导图')">
+                  思维导图
+                </el-button>
+                <el-button size="small" @click="sendQuickMessage('给我一些学习建议')">
+                  学习建议
+                </el-button>
+                <el-button size="small" @click="sendQuickMessage('解释一下这个概念')">
+                  概念解释
+                </el-button>
+              </div>
+
+              <!-- 输入框 -->
+              <div class="input-wrapper">
+                <div class="input-container">
+                  <el-input
+                    v-model="aiMessage"
+                    type="textarea"
+                    :rows="3"
+                    placeholder="输入您的问题...（输入 /note 可选择笔记）"
+                    @keydown.enter.prevent="sendMessage"
+                    @input="handleInput"
+                    resize="none"
+                    class="ai-input"
+                  />
+                  <!-- 上传笔记按钮 -->
+                  <el-button 
+                    class="upload-note-btn"
+                    size="small"
+                    circle
+                    @click="uploadNoteToAI"
+                    title="上传笔记"
+                  >
+                    <IconPlus :size="16" />
+                  </el-button>
+                </div>
+                <el-button 
+                  type="primary" 
+                  @click="sendMessage"
+                  :disabled="!aiMessage.trim() || isAiThinking"
+                  :loading="isAiThinking"
+                  class="send-btn"
+                  circle
+                >
+                  <IconEdit :size="18" />
+                </el-button>
+              </div>
+            </div>
+          </div>
+        </el-aside>
+      </el-container>
+    </div>
+  </Layout>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useNoteStore } from '@/store'
+import Layout from '@/components/Layout.vue'
+import {IconPlus, IconUpload, IconDocument, IconEdit, IconAI, IconNotebook} from '@/components/icons'
+import { noteApi } from '@/api/note'
+import { aiApi } from '@/api/ai'
+import { ElMessage } from 'element-plus'
+import { marked } from 'marked'
+import { MESSAGE_DURATION } from '@/utils/common'
+import mammoth from 'mammoth'
+
+defineOptions({
+  name: 'Home'
+})
+
+const router = useRouter()
+const noteStore = useNoteStore()
+
+const recentNotes = ref([])
+const currentNote = ref(null)
+const aiMessage = ref('')
+const chatHistory = ref([])  // 聊天历史
+const isAiThinking = ref(false)  // AI 是否正在思考
+const chatMessagesRef = ref(null)  // 聊天消息容器引用
+const uploadedNoteContent = ref(null)  // 上传的笔记内容（给AI看，不显示在输入框）
+const uploadedNoteName = ref('')  // 上传的笔记文件名
+const showNoteSelector = ref(false)  // 是否显示笔记选择器
+const allNotes = ref([])  // 所有笔记列表
+
+// 过滤后的笔记列表（用于搜索）
+const filteredNotes = computed(() => {
+  return allNotes.value
+})
+
+// 渲染当前笔记的 Markdown 内容
+const renderedContent = computed(() => {
+  if (!currentNote.value?.content) return ''
+  return marked.parse(currentNote.value.content)
+})
+
+onMounted(async () => {
+  // 1. 从 localStorage 恢复聊天历史
+  loadChatHistory()
+  
+  // 2. 从 localStorage 恢复当前笔记
+  await loadCurrentNoteFromCache()
+  
+  // 3. 检查是否有笔记ID参数，如果有则自动加载该笔记（覆盖缓存）
+  const noteId = router.currentRoute.value.query.noteId
+  
+  if (noteId) {
+    try {
+      ElMessage.success({ message: '加载成功', duration: MESSAGE_DURATION.SHORT })
+      
+      // 确保 noteId 是字符串类型（URL参数始终是字符串）
+      const fullNote = await noteApi.getNote(String(noteId))
+      
+      currentNote.value = fullNote
+      
+      // 缓存到 localStorage
+      saveCurrentNoteToCache(fullNote)
+      
+      // 重新加载最近笔记列表
+      await loadRecentNotes()
+      
+      // 将当前查看的笔记移到列表最前面（如果不在列表中则添加）
+      updateRecentNotesWithCurrent(fullNote)
+      
+      // 清除URL中的query参数
+      router.replace({ path: '/home' })
+    } catch (error) {
+      ElMessage.error({ message: '加载笔记失败', duration: MESSAGE_DURATION.SHORT })
+    }
+  } else {
+    // 没有noteId参数，正常加载最近笔记
+    await loadRecentNotes()
+  }
+  
+  // 4. 加载所有笔记用于 /note 命令
+  await loadAllNotes()
+})
+
+// 监听路由query参数变化（解决从其他页面跳转回来时不刷新的问题）
+watch(
+  () => router.currentRoute.value.query.noteId,
+  async (newNoteId) => {
+    if (newNoteId) {
+      try {
+        // 获取完整的笔记内容
+        const fullNote = await noteApi.getNote(String(newNoteId))
+        
+        // 更新当前笔记
+        currentNote.value = fullNote
+        
+        // 重新加载最近笔记列表
+        await loadRecentNotes()
+        
+        // 将当前查看的笔记移到列表最前面
+        updateRecentNotesWithCurrent(fullNote)
+        
+        // 清除URL中的query参数
+        router.replace({ path: '/home' })
+        
+        ElMessage.success({ message: '加载成功', duration: MESSAGE_DURATION.SHORT })
+      } catch (error) {
+        console.error('加载笔记失败:', error)
+        ElMessage.error({ message: '加载笔记失败', duration: MESSAGE_DURATION.SHORT })
+      }
+    }
+  }
+)
+
+async function loadRecentNotes() {
+  try {
+    // 使用新的 API 获取最近笔记（从 Redis 缓存）
+    const notes = await noteApi.getRecentNotes()
+    recentNotes.value = notes
+  } catch (error) {
+    ElMessage.error('加载最近笔记失败')
+  }
+}
+
+// 加载所有笔记
+async function loadAllNotes() {
+  try {
+    const notes = await noteApi.getNotes()
+    allNotes.value = notes
+  } catch (error) {
+  }
+}
+
+// 更新最近笔记列表，将当前笔记移到最前面
+async function updateRecentNotesWithCurrent(note) {
+  if (!note || !note.id) return
+  
+  // 查找当前笔记在列表中的位置
+  const index = recentNotes.value.findIndex(n => n.id === note.id)
+  
+  if (index > -1) {
+    // 如果已存在，移除并添加到最前面
+    recentNotes.value.splice(index, 1)
+    recentNotes.value.unshift(note)
+  } else {
+    // 如果不存在，直接添加到最前面
+    recentNotes.value.unshift(note)
+    
+    // 保持列表最多20个笔记（解除5个限制）
+    if (recentNotes.value.length > 20) {
+      recentNotes.value = recentNotes.value.slice(0, 20)
+    }
+  }
+  
+  // 异步同步到后端Redis缓存（不阻塞UI）
+  // 使用 setTimeout 确保在下一个事件循环执行
+  setTimeout(async () => {
+    try {
+      const noteIds = recentNotes.value.map(n => n.id)
+      await noteApi.updateRecentNotesOrder(noteIds)
+    } catch (error) {
+      console.error('❌ 同步最近笔记顺序失败:', error)
+      // 不显示错误提示，避免影响用户体验
+    }
+  }, 0)
+}
+
+function createNewNote() {
+  router.push('/notes/edit')
+}
+
+function importNote() {
+  // 创建文件输入元素
+  const input = document.createElement('input')
+  input.type = 'file'
+  // 只允许选择支持的格式
+  input.accept = '.txt,.md,.docx'
+  
+  input.onchange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    
+    // 验证文件大小（限制为20MB）
+    if (file.size > 20 * 1024 * 1024) {
+      ElMessage.error({ message: '文件大小不能超过20MB', duration: MESSAGE_DURATION.SHORT })
+      return
+    }
+    
+    try {
+      ElMessage.info({ message: '正在读取文件...', duration: MESSAGE_DURATION.SHORT })
+      
+      let content = ''
+      let title = file.name.replace(/\.[^/.]+$/, '') // 去掉扩展名
+      
+      // 根据文件类型解析
+      if (file.name.endsWith('.docx')) {
+        // 使用 Mammoth 解析 Word 文件
+        const arrayBuffer = await file.arrayBuffer()
+        const result = await mammoth.convertToHtml({ arrayBuffer })
+        content = result.value
+      } else if (file.name.endsWith('.md')) {
+        // Markdown 文件直接读取
+        content = await file.text()
+      } else if (file.name.endsWith('.txt')) {
+        // 文本文件直接读取
+        content = await file.text()
+      } else {
+        ElMessage.error({ message: '不支持的文件格式', duration: MESSAGE_DURATION.SHORT })
+        return
+      }
+      
+      if (!content.trim()) {
+        ElMessage.error({ message: '文件内容为空', duration: MESSAGE_DURATION.SHORT })
+        return
+      }
+      
+      // 直接保存到数据库（会自动出现在历史笔记中）
+      ElMessage.info({ message: '正在保存笔记...', duration: MESSAGE_DURATION.SHORT })
+      
+      const savedNote = await noteApi.createNote({
+        title: title,
+        content: content,
+        tags: '导入',
+        is_favorite: false  // 导入的笔记默认不加入"我的笔记"
+      })
+      
+      ElMessage.success({ message: `笔记「${savedNote.title}」已导入到历史笔记！`, duration: MESSAGE_DURATION.SHORT })
+      
+      // 显示在预览窗口
+      currentNote.value = savedNote
+      
+      // 重新加载所有笔记（历史笔记页面会看到）
+      loadAllNotes()
+      
+      // 更新最近笔记列表（实时同步）
+      updateRecentNotesWithCurrent(savedNote)
+      
+    } catch (error) {
+      console.error('导入笔记失败:', error)
+      
+      // 处理重复笔记错误
+      if (error.response?.status === 409) {
+        await handleDuplicateImport(error, file.name)
+      } else {
+        ElMessage.error({ message: error.message || '导入失败，请重试', duration: MESSAGE_DURATION.SHORT })
+      }
+    }
+  }
+  
+  // 触发文件选择
+  input.click()
+}
+
+// 处理重复导入
+async function handleDuplicateImport(error, fileName) {
+  const { ElMessageBox } = await import('element-plus')
+  
+  await ElMessageBox.confirm(
+    error.response?.data?.detail || '笔记已存在，是否覆盖？',
+    '重复笔记',
+    { confirmButtonText: '覆盖', cancelButtonText: '取消', type: 'warning' }
+  )
+  
+  try {
+    // 获取已存在的笔记ID并删除
+    const existingNotes = await noteApi.getNotes()
+    const title = fileName.replace(/\.[^/.]+$/, '')
+    const duplicateNote = existingNotes.find(n => n.title === title)
+    
+    if (duplicateNote) {
+      await noteApi.deleteNote(duplicateNote.id)
+    }
+    
+    // 重新导入（这里需要重新解析文件，简化处理：提示用户重新导入）
+    ElMessage.info({ message: '请重新导入文件以完成覆盖', duration: MESSAGE_DURATION.NORMAL })
+  } catch (err) {
+    console.error('覆盖笔记失败:', err)
+    ElMessage.error({ message: '覆盖失败，请重试', duration: MESSAGE_DURATION.SHORT })
+  }
+}
+
+async function viewNote(note) {
+  // 完全不等待任何异步操作，立即执行
+  // 使用 setTimeout 确保在下一个事件循环执行，避免被其他任务阻塞
+  setTimeout(async () => {
+    try {
+      // 1. 立即更新 currentNote（同步操作）
+      currentNote.value = { ...note, loading: true }
+      
+      // 2. 强制 Vue 更新 DOM
+      await nextTick()
+      
+      // 3. 异步获取完整内容
+      const fullNote = await noteApi.getNote(note.id)
+      
+      // 4. 更新为完整内容
+      currentNote.value = fullNote
+      
+      // 5. 保存到 localStorage 缓存
+      saveCurrentNoteToCache(fullNote)
+      
+      // 6. 再次强制更新 DOM
+      await nextTick()
+      
+      // 7. 显示成功提示
+      ElMessage.success({ message: '加载成功', duration: MESSAGE_DURATION.SHORT })
+      
+      // 8. 异步更新最近笔记列表（不阻塞）
+      updateRecentNotesWithCurrent(fullNote)
+    } catch (error) {
+      ElMessage.error({ message: '加载笔记失败', duration: MESSAGE_DURATION.SHORT })
+    }
+  }, 0)
+}
+
+function editNote(note) {
+  router.push(`/notes/edit/${note.id}`)
+}
+
+// 加入我的笔记
+async function addToMyNotes(note) {
+  try {
+    await noteApi.updateNote(note.id, { is_favorite: true })
+    
+    // 更新本地数据
+    note.is_favorite = true
+    
+    // 如果 currentNote 是同一个对象，也需要更新
+    if (currentNote.value && currentNote.value.id === note.id) {
+      currentNote.value.is_favorite = true
+    }
+    
+    ElMessage.success({ message: '已加入我的笔记', duration: MESSAGE_DURATION.SHORT })
+    
+    // 重新加载所有笔记
+    loadAllNotes()
+  } catch (error) {
+    console.error('加入我的笔记失败:', error)
+    ElMessage.error({ message: '操作失败，请重试', duration: MESSAGE_DURATION.SHORT })
+  }
+}
+
+function goToHistory() {
+  // 跳转到历史笔记页面（显示所有笔记）
+  router.push('/notes/history')
+}
+
+function selectNote(note) {
+  currentNote.value = note
+}
+
+function viewAllNotes() {
+  router.push('/notes/list')
+}
+
+// ==================== AI 助手功能 ====================
+
+// 发送快捷消息
+function sendQuickMessage(message) {
+  aiMessage.value = message
+  sendMessage()
+}
+
+// 上传笔记到 AI 助手
+function uploadNoteToAI() {
+  // 创建文件输入元素
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.txt,.md,.docx'
+  
+  input.onchange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    
+    // 验证文件大小（限制为10MB）
+    if (file.size > 10 * 1024 * 1024) {
+      ElMessage.error({ message: '文件大小不能超过10MB', duration: MESSAGE_DURATION.SHORT })
+      return
+    }
+    
+    try {
+      ElMessage.info({ message: '正在读取文件...', duration: MESSAGE_DURATION.SHORT })
+      
+      let content = ''
+      
+      // 根据文件类型解析
+      if (file.name.endsWith('.docx')) {
+        // 使用 Mammoth 解析 Word 文件
+        const arrayBuffer = await file.arrayBuffer()
+        const result = await mammoth.convertToHtml({ arrayBuffer })
+        content = result.value.replace(/<[^>]*>/g, '') // 去掉HTML标签
+      } else if (file.name.endsWith('.md')) {
+        // Markdown 文件直接读取
+        content = await file.text()
+      } else if (file.name.endsWith('.txt')) {
+        // 文本文件直接读取
+        content = await file.text()
+      } else {
+        ElMessage.error({ message: '不支持的文件格式', duration: MESSAGE_DURATION.SHORT })
+        return
+      }
+      
+      if (!content.trim()) {
+        ElMessage.error({ message: '文件内容为空', duration: MESSAGE_DURATION.SHORT })
+        return
+      }
+      
+      // 存储上传的笔记内容（不显示在输入框）
+      uploadedNoteContent.value = content
+      uploadedNoteName.value = file.name
+      
+      ElMessage.success({ 
+        message: `已上传笔记《${file.name}》，现在可以提问了`, 
+        duration: MESSAGE_DURATION.SHORT 
+      })
+    } catch (error) {
+      console.error('读取文件失败:', error)
+      ElMessage.error({ message: '读取文件失败，请重试', duration: MESSAGE_DURATION.SHORT })
+    }
+  }
+  
+  // 触发文件选择
+  input.click()
+}
+
+// 清除上传的笔记
+function clearUploadedNote() {
+  uploadedNoteContent.value = null
+  uploadedNoteName.value = ''
+  ElMessage.success({ message: '已清除上传的笔记', duration: MESSAGE_DURATION.SHORT })
+}
+
+// 发送消息（完全异步，不阻塞UI）
+function sendMessage() {
+  if (!aiMessage.value.trim() || isAiThinking.value) return
+  
+  const userMessage = aiMessage.value.trim()
+  aiMessage.value = ''
+  
+  // 添加用户消息到聊天历史
+  chatHistory.value.push({
+    role: 'user',
+    content: userMessage,
+    timestamp: new Date()
+  })
+  
+  // 立即滚动到底部（不等待）
+  scrollToBottom()
+  
+  // 显示 AI 思考状态
+  isAiThinking.value = true
+  
+  // 在后台异步执行 AI 请求，完全不阻塞其他操作
+  // 不使用 await，让它在后台独立运行
+  ;(async () => {
+    try {
+      // 构建消息历史
+      let messages = chatHistory.value.slice(0, -1).slice(-10).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+      
+      // 如果有上传的笔记，添加到上下文中
+      if (uploadedNoteContent.value) {
+        // 在历史消息前添加系统消息，包含上传的笔记内容
+        messages.unshift({
+          role: 'system',
+          content: `用户上传了笔记《${uploadedNoteName.value}》，以下是笔记内容，请基于此内容回答用户的问题：\n\n${uploadedNoteContent.value}`
+        })
+      }
+      
+      // 调用 AI API
+      const result = await aiApi.chat({
+        message: userMessage,
+        history: messages
+      })
+      
+      // 添加 AI 回复到聊天历史
+      chatHistory.value.push({
+        role: 'assistant',
+        content: result.data?.reply || '抱歉，我暂时无法回答这个问题。',
+        timestamp: new Date()
+      })
+      
+      // 保存到 localStorage
+      saveChatHistory()
+      
+    } catch (error) {
+      console.error('AI 回复失败:', error)
+      ElMessage.error({ message: 'AI 服务暂时不可用，请稍后重试', duration: MESSAGE_DURATION.SHORT })
+      chatHistory.value.push({
+        role: 'assistant',
+        content: '抱歉，服务暂时不可用，请稍后重试。',
+        timestamp: new Date()
+      })
+      
+      // 保存错误消息到 localStorage
+      saveChatHistory()
+    } finally {
+      isAiThinking.value = false
+      // 滚动到底部
+      scrollToBottom()
+    }
+  })()
+  
+  // 立即返回，不等待任何操作完成
+}
+
+// 渲染消息内容（支持 Markdown）
+function renderMessage(content) {
+  return marked.parse(content)
+}
+
+// 格式化时间
+function formatTime(timestamp) {
+  const date = new Date(timestamp)
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+// 滚动到聊天底部
+async function scrollToBottom() {
+  await nextTick()
+  if (chatMessagesRef.value) {
+    chatMessagesRef.value.scrollTop = chatMessagesRef.value.scrollHeight
+  }
+}
+
+// 处理输入事件，检测 /note 命令
+function handleInput(value) {
+  
+  // 检测是否包含 /note
+  if (value.includes('/note')) {
+    showNoteSelector.value = true
+  } else {
+    showNoteSelector.value = false
+  }
+}
+
+// 关闭笔记选择器
+function closeNoteSelector() {
+  showNoteSelector.value = false
+  // 移除输入框中的 /note
+  if (aiMessage.value.endsWith('/note')) {
+    aiMessage.value = aiMessage.value.slice(0, -5)
+  }
+}
+
+// 选择笔记作为上下文
+async function selectNoteForContext(note) {
+  try {
+    // 获取完整的笔记内容
+    const fullNote = await noteApi.getNote(note.id)
+    
+    // 将笔记内容添加到上下文中
+    uploadedNoteContent.value = fullNote.content
+    uploadedNoteName.value = fullNote.title
+    
+    // 关闭选择器
+    showNoteSelector.value = false
+    
+    // 移除输入框中的 /note
+    if (aiMessage.value.endsWith('/note')) {
+      aiMessage.value = aiMessage.value.slice(0, -5)
+    }
+    
+    ElMessage.success({ 
+      message: `已选择笔记《${fullNote.title}》作为上下文`, 
+      duration: MESSAGE_DURATION.SHORT 
+    })
+  } catch (error) {
+   ElMessage.error({ message: '加载笔记失败', duration: MESSAGE_DURATION.SHORT })
+  }
+}
+
+// ==================== 持久化缓存功能 ====================
+
+// 保存当前笔记到 localStorage
+function saveCurrentNoteToCache(note) {
+  if (!note || !note.id) return
+  
+  try {
+    const cacheData = {
+      id: note.id,
+      title: note.title,
+      content: note.content,
+      tags: note.tags,
+      is_favorite: note.is_favorite,
+      created_at: note.created_at,
+      updated_at: note.updated_at,
+      timestamp: Date.now()  // 记录缓存时间
+    }
+    localStorage.setItem('home_current_note', JSON.stringify(cacheData))
+  } catch (error) {
+    console.error('保存笔记缓存失败:', error)
+  }
+}
+
+// 从 localStorage 加载当前笔记
+async function loadCurrentNoteFromCache() {
+  try {
+    const cached = localStorage.getItem('home_current_note')
+    if (!cached) return
+    
+    const cacheData = JSON.parse(cached)
+    
+    // 检查缓存是否过期（24小时）
+    const now = Date.now()
+    const cacheAge = now - cacheData.timestamp
+    const maxAge = 24 * 60 * 60 * 1000  // 24小时
+    
+    if (cacheAge > maxAge) {
+      // 缓存过期，清除
+      localStorage.removeItem('home_current_note')
+      return
+    }
+    
+    // 使用缓存的笔记
+    currentNote.value = cacheData
+  } catch (error) {
+    console.error('加载笔记缓存失败:', error)
+    localStorage.removeItem('home_current_note')
+  }
+}
+
+// 保存聊天历史到 localStorage
+function saveChatHistory() {
+  try {
+    // 只保存最近50条消息，避免存储过大
+    const messagesToSave = chatHistory.value.slice(-50)
+    localStorage.setItem('home_chat_history', JSON.stringify(messagesToSave))
+  } catch (error) {
+    console.error('保存聊天历史失败:', error)
+  }
+}
+
+// 从 localStorage 加载聊天历史
+function loadChatHistory() {
+  try {
+    const cached = localStorage.getItem('home_chat_history')
+    if (!cached) return
+    
+    const history = JSON.parse(cached)
+    
+    // 恢复聊天历史
+    chatHistory.value = history.map(msg => ({
+      ...msg,
+      timestamp: new Date(msg.timestamp)  // 恢复 Date 对象
+    }))
+    
+    // 滚动到底部
+    setTimeout(() => scrollToBottom(), 100)
+  } catch (error) {
+    console.error('加载聊天历史失败:', error)
+    localStorage.removeItem('home_chat_history')
+  }
+}
+
+// 获取笔记预览文本
+function getNotePreview(content) {
+  if (!content) return ''
+  // 去掉HTML标签和Markdown标记
+  const text = content
+    .replace(/<[^>]*>/g, '')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .substring(0, 80)
+  return text + (content.length > 80 ? '...' : '')
+}
+</script>
+
+<style scoped>
+.home-container {
+  height: calc(100vh - 60px);
+  overflow: hidden;
+}
+
+.main-layout {
+  height: 100%;
+  background: #f5f7fa;
+}
+
+/* 左侧边栏 */
+.left-sidebar {
+  background: white;
+  border-right: 1px solid #e4e7ed;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.sidebar-header h3 {
+  font-size: 18px;
+  color: #303133;
+  margin: 0 0 20px 0;
+  font-weight: 600;
+}
+
+.sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.action-btn {
+  width: 100%;
+  justify-content: center;
+  margin-left: 0 !important;
+}
+
+.notes-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.list-title {
+  font-size: 14px;
+  color: #909399;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.note-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 4px;
+}
+
+.note-item:hover {
+  background: #f5f7fa;
+}
+
+.note-title {
+  font-size: 14px;
+  color: #606266;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* 更多笔记链接 */
+.more-notes {
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.more-notes:hover {
+  background: #f5f7fa;
+}
+
+.more-text {
+  font-size: 13px;
+  color: #409eff;
+  font-weight: 500;
+}
+
+.empty-notes {
+  text-align: center;
+  padding: 40px 20px;
+  color: #909399;
+}
+
+.empty-notes p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* 中间预览区 */
+.center-preview {
+  background: white;
+  padding: 0;  /* 移除padding，由子元素控制 */
+  overflow: hidden;  /* 隐藏整体滚动条 */
+  display: flex;
+  flex-direction: column;
+  height: 100%;  /* 确保占满高度 */
+}
+
+.preview-content {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30px 30px 20px 30px;  /* 上左右内边距 */
+  border-bottom: 2px solid #e4e7ed;
+  background: white;
+  flex-shrink: 0;  /* 防止头部被压缩 */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.preview-header h2 {
+  font-size: 24px;
+  color: #303133;
+  margin: 0;
+  font-weight: 600;
+}
+
+.preview-body {
+  flex: 1;  /* 占据剩余空间 */
+  overflow-y: auto;  /* 只有内容区域可以滚动 */
+  padding: 0 30px 30px 30px;  /* 下左右内边距 */
+  line-height: 1.8;
+  color: #303133;
+  font-size: 15px;
+  min-height: 0;  /* 重要：允许flex子项缩小 */
+}
+
+.preview-body :deep(h1),
+.preview-body :deep(h2),
+.preview-body :deep(h3) {
+  margin-top: 24px;
+  margin-bottom: 12px;
+  color: #303133;
+}
+
+.preview-body :deep(p) {
+  margin: 12px 0;
+}
+
+.empty-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #909399;
+  padding: 30px;  /* 添加内边距 */
+}
+
+.empty-preview h3 {
+  font-size: 20px;
+  color: #606266;
+  margin: 20px 0 10px 0;
+}
+
+.empty-preview p {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* 右侧 AI 面板 */
+.right-ai-panel {
+  background: white;
+  border-left: 1px solid #e4e7ed;
+  display: flex;
+  flex-direction: column;
+  height: 100%;  /* 确保占满高度 */
+  overflow: hidden;  /* 隐藏整体滚动条 */
+}
+
+.ai-header {
+  padding: 20px;
+  border-bottom: 1px solid #e4e7ed;
+  flex-shrink: 0;  /* 防止头部被压缩 */
+}
+
+.ai-header h3 {
+  font-size: 18px;
+  color: #303133;
+  margin: 0 0 5px 0;
+  font-weight: 600;
+}
+
+.ai-header p {
+  font-size: 13px;
+  color: #909399;
+  margin: 0;
+}
+
+.ai-chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;  /* 隐藏溢出 */
+  min-height: 0;  /* 重要：允许flex子项缩小 */
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;  /* 只有聊天内容区域可以滚动 */
+  padding: 20px;
+  min-height: 0;  /* 重要：允许flex子项缩小 */
+}
+
+.welcome-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #909399;
+}
+
+.welcome-message p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.welcome-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #606266;
+}
+
+.welcome-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.welcome-message h4 {
+  font-size: 18px;
+  color: #303133;
+  margin: 0 0 15px 0;
+  font-weight: 600;
+}
+
+.welcome-message p {
+  font-size: 14px;
+  color: #909399;
+  margin: 0 0 10px 0;
+}
+
+.welcome-message ul {
+  list-style: none;
+  padding: 0;
+  margin: 15px 0 0 0;
+  text-align: left;
+  max-width: 300px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.welcome-message li {
+  padding: 8px 12px;
+  margin: 5px 0;
+  background: #f5f7fa;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #606266;
+}
+
+/* 用户头像 */
+.user-avatar {
+  font-size: 20px;
+}
+
+/* 聊天消息样式 */
+.message-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  animation: messageSlideIn 0.3s ease;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-item.user {
+  flex-direction: row-reverse;
+}
+
+.message-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.message-content {
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.message-item.user .message-content {
+  align-items: flex-end;
+}
+
+.message-text {
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.message-item.assistant .message-text {
+  background: #f5f7fa;
+  color: #303133;
+  border-top-left-radius: 4px;
+}
+
+.message-item.user .message-text {
+  background: #409eff;
+  color: white;
+  border-top-right-radius: 4px;
+}
+
+.message-text :deep(p) {
+  margin: 8px 0;
+}
+
+.message-text :deep(p:first-child) {
+  margin-top: 0;
+}
+
+.message-text :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.message-text :deep(code) {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', monospace;
+  font-size: 13px;
+}
+
+.message-item.user .message-text :deep(code) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.message-text :deep(pre) {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.message-item.user .message-text :deep(pre) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.message-time {
+  font-size: 12px;
+  color: #909399;
+  padding: 0 4px;
+}
+
+/* 打字指示器 */
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px;
+  background: #f5f7fa;
+  border-radius: 12px;
+  border-top-left-radius: 4px;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #909399;
+  animation: typing 1.4s infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+.input-section {
+  padding: 20px;
+  border-top: 1px solid #e4e7ed;
+  background: #fafafa;
+}
+
+/* 已上传笔记提示条 */
+.uploaded-note-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #ccd2ef 0%, #2f7ee4 100%);
+  border-radius: 8px;
+  color: white;
+  font-size: 13px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.uploaded-note-banner .note-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.uploaded-note-banner .el-button {
+  color: white;
+  padding: 0;
+  font-size: 12px;
+}
+
+.uploaded-note-banner .el-button:hover {
+  color: #ffeb3b;
+}
+
+.input-section {
+  padding: 15px 20px;
+  border-top: 1px solid #e4e7ed;
+  background: white;
+  flex-shrink: 0;  /* 防止输入区域被压缩 */
+}
+
+.quick-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.quick-actions .el-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.input-container {
+  position: relative;
+  flex: 1;
+}
+
+.upload-note-btn {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: white;
+  border: 1px solid #dcdfe6;
+  z-index: 10;
+  transition: all 0.2s;
+}
+
+.upload-note-btn:hover {
+  background: #409eff;
+  border-color: #409eff;
+  color: white;
+}
+
+.upload-note-btn :deep(.el-icon) {
+  font-size: 16px;
+}
+
+.ai-input {
+  flex: 1;
+}
+
+.ai-input :deep(.el-textarea__inner) {
+  border-radius: 12px;
+  padding: 12px 15px 12px 45px;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: none;
+}
+
+.send-btn {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 笔记选择器下拉框 */
+.note-selector-dropdown {
+  background: white;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  max-height: 300px;
+  overflow-y: auto;
+  animation: slideDown 0.2s ease;
+  margin-bottom: 12px;  /* 与 uploaded-note-banner 保持一致 */
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e4e7ed;
+  background: #f5f7fa;
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.note-list-container {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.note-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.note-option:hover {
+  background: #f5f7fa;
+}
+
+.note-option:last-child {
+  border-bottom: none;
+}
+
+.note-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-preview {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.empty-note-list {
+  padding: 40px 20px;
+  text-align: center;
+  color: #909399;
+}
+
+.empty-note-list p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* ==================== 自定义滚动条样式 ==================== */
+
+/* Webkit浏览器（Chrome, Safari, Edge）*/
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(144, 147, 153, 0);  /* 默认：完全透明，不可见 */
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(144, 147, 153, 0.5);  /* 悬停：中等透明度，清晰可见 */
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: rgba(64, 158, 255, 0.7);  /* 点击：主题色蓝色，明显反馈 */
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(144, 147, 153, 0) transparent;
+}
+
+/* 针对特定滚动区域的优化 - 始终保留空间，避免内容跳动 */
+.chat-messages,
+.preview-body,
+.notes-list,
+.note-list-container {
+  /* 不隐藏滚动条，而是让它非常透明 */
+  /* 移除之前的隐藏设置 */
+}
+</style>
