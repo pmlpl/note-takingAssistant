@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.services import generate_note, analyze_note, chat_with_ai
 from typing import Optional, List
 from app.core.security import get_current_user
@@ -20,8 +20,8 @@ class ReferenceNote(BaseModel):
 class GenerateNoteRequest(BaseModel):
     topic: str
     keywords: Optional[str] = None
-    referenceNotes: Optional[List[ReferenceNote]] = []
-    images: Optional[List[str]] = []  # base64 编码的图片
+    referenceNotes: Optional[List[ReferenceNote]] = Field(default_factory=list)
+    images: Optional[List[str]] = Field(default_factory=list)  # base64 编码的图片
     wordCount: Optional[int] = 600  # 期望字数，默认600字
 
 
@@ -37,7 +37,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    history: Optional[List[ChatMessage]] = []
+    history: Optional[List[ChatMessage]] = Field(default_factory=list)
 
 
 @router.post("/generate-note", summary="AI生成笔记")
