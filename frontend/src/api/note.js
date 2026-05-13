@@ -1,5 +1,8 @@
 import api from './index'
 
+/** 导入/解析 Word 等可能超过默认 30s */
+const NOTE_IMPORT_TIMEOUT_MS = 120_000
+
 export const noteApi = {
   getNotes() {
     return api.get('/v1/note/')
@@ -32,7 +35,8 @@ export const noteApi = {
     return api.post('/v1/note/import', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
-      }
+      },
+      timeout: NOTE_IMPORT_TIMEOUT_MS
     })
   },
   

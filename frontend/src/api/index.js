@@ -1,9 +1,12 @@
 import axios from 'axios'
 import { useUserStore } from '@/store'
 
+/** 普通接口默认超时（毫秒）；AI 等长请求在各自 api 模块里单独覆盖 */
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
+
 const api = axios.create({
   baseURL: '/api',
-  timeout: 0  // 不设置超时，AI生成可能需要较长时间
+  timeout: DEFAULT_REQUEST_TIMEOUT_MS
 })
 
 api.interceptors.request.use(
