@@ -4,6 +4,11 @@ from pydantic import BaseModel
 from app.services import generate_note, analyze_note, chat_with_ai
 from typing import Optional, List
 import json
+from app.core.security import get_current_user
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_async_db
+from app.crud import user as crud_user
+from app.crud import ai_usage as crud_ai_usage
 
 router = APIRouter()
 
@@ -38,9 +43,18 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/generate-note", summary="AI生成笔记")
-async def generate_note_endpoint(req: GenerateNoteRequest):
+async def generate_note_endpoint(
+    req: GenerateNoteRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
     """AI生成笔记接口，支持参考笔记和图片"""
     try:
+        # 获取用户ID
+        db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+        if not db_user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
         # 调用 AI 服务
         note_content = generate_note(
             topic=req.topic,
@@ -49,26 +63,56 @@ async def generate_note_endpoint(req: GenerateNoteRequest):
             images=req.images,
             word_count=req.wordCount
         )
+        
+        # 记录AI使用
+        await crud_ai_usage.log_ai_usage(db, db_user.id, "generate")
+        
         return {"code": 200, "message": "生成成功", "data": {"content": note_content}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"生成失败：{str(e)}")
 
 
 @router.post("/summarize-note", summary="AI总结笔记")
-async def summarize_note_endpoint(req: SummarizeNoteRequest):
+async def summarize_note_endpoint(
+    req: SummarizeNoteRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
     """AI总结笔记接口，返回内容总结、优缺点和建议"""
     try:
+        # 获取用户ID
+        db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+        if not db_user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
         result = analyze_note(req.content)
+        
+        # 记录AI使用
+        await crud_ai_usage.log_ai_usage(db, db_user.id, "summarize")
+        
         return {"code": 200, "message": "分析成功", "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分析失败：{str(e)}")
 
 
 @router.post("/chat", summary="AI对话")
-async def chat_endpoint(req: ChatRequest):
+async def chat_endpoint(
+    req: ChatRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
     """AI 对话接口，支持上下文聊天"""
     try:
+        # 获取用户ID
+        db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+        if not db_user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
         reply = chat_with_ai(req.message, req.history)
+        
+        # 记录AI使用
+        await crud_ai_usage.log_ai_usage(db, db_user.id, "chat")
+        
         return {"code": 200, "message": "回复成功", "data": {"reply": reply}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"对话失败：{str(e)}")

@@ -7,6 +7,7 @@ from datetime import datetime
 class UserBase(BaseModel):
     username: str
     email: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class UserCreate(UserBase):
@@ -36,7 +37,7 @@ class TokenWithUser(Token):
 
 
 # SQLAlchemy数据库模型
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Text
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -48,4 +49,5 @@ class UserDB(Base):
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=True)
     hashed_password = Column(String(255), nullable=False)
+    avatar_url = Column(Text, nullable=True)  # 头像URL
     created_at = Column(DateTime(timezone=True), server_default=func.now())

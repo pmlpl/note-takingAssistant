@@ -15,5 +15,19 @@ export const userApi = {
   
   getUserInfo() {
     return api.get('/v1/user/me')
+  },
+  
+  uploadAvatar(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/v1/user/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+  
+  getUserStats() {
+    return api.get('/v1/user/stats')
   }
 }
