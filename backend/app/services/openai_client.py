@@ -12,8 +12,14 @@ _llm_http_timeout = httpx.Timeout(
     pool=60.0,
 )
 
+# 独立 AsyncClient：trust_env=False 时忽略 HTTP_PROXY，避免本机 LM Studio 被导向 Privoxy 等代理并报错
+_llm_httpx_client = httpx.AsyncClient(
+    timeout=_llm_http_timeout,
+    trust_env=settings.LLM_HTTP_TRUST_ENV,
+)
+
 async_openai_client = AsyncOpenAI(
     base_url=settings.LM_STUDIO_URL,
     api_key="not-needed",
-    timeout=_llm_http_timeout,
+    http_client=_llm_httpx_client,
 )
