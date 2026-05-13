@@ -1,14 +1,18 @@
 import api from './index'
 
+/** 本地大模型可能较慢，默认 10 分钟；可通过环境变量覆盖 */
+const AI_REQUEST_TIMEOUT_MS =
+  Number(import.meta.env.VITE_AI_REQUEST_TIMEOUT_MS) || 600_000
+
 export const aiApi = {
   generateNote(data) {
-    return api.post('/v1/ai/generate-note', data)
+    return api.post('/v1/ai/generate-note', data, { timeout: AI_REQUEST_TIMEOUT_MS })
   },
-  
+
   summarizeNote(data) {
-    return api.post('/v1/ai/summarize-note', data)
+    return api.post('/v1/ai/summarize-note', data, { timeout: AI_REQUEST_TIMEOUT_MS })
   },
-  
+
   /**
    * AI 对话接口
    * @param {Object} data - 对话数据
@@ -17,6 +21,6 @@ export const aiApi = {
    * @returns {Promise} 返回 AI 回复
    */
   chat(data) {
-    return api.post('/v1/ai/chat', data)
+    return api.post('/v1/ai/chat', data, { timeout: AI_REQUEST_TIMEOUT_MS })
   }
 }

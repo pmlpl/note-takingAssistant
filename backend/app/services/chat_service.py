@@ -1,54 +1,76 @@
 """
 AI 聊天服务
-负责 AI 对话功能
+负责 AI 对话功能（异步 OpenAI 客户端）
 """
+import logging
+from typing import Any, Dict, List, Optional
+
 from app.core.config import settings
-from openai import OpenAI
+from .openai_client import async_openai_client
 from .prompts import CHAT_SYSTEM_PROMPT
 
-# 初始化 OpenAI 客户端
-client = OpenAI(
-    base_url=settings.LM_STUDIO_URL,
-    api_key="not-needed"
-)
+logger = logging.getLogger(__name__)
 
 
-def chat_with_ai(message: str, history: list = None) -> str:
+def _message_as_dict(msg: Any) -> Dict[str, str]:
+    """将 Pydantic 模型或 dict 规范为 {role, content}。"""
+    if isinstance(msg, dict):
+        return {
+            "role": str(msg.get("role") or "user"),
+            "content": str(msg.get("content") or ""),
+        }
+    if hasattr(msg, "model_dump"):
+        d = msg.model_dump()
+        return {
+            "role": str(d.get("role") or "user"),
+            "content": str(d.get("content") or ""),
+        }
+    return {
+        "role": str(getattr(msg, "role", None) or "user"),
+        "content": str(getattr(msg, "content", None) or ""),
+    }
+
+
+async def chat_with_ai(message: str, history: Optional[List[Any]] = None) -> str:
     """
-    AI 对话功能，支持上下文聊天
-    
-    :param message: 用户当前消息
-    :param history: 聊天历史列表，每项包含 {role, content}
-    :return: AI 回复内容
+    AI 对话功能，支持上下文聊天。
+
+    将 history 中多条 system 合并进唯一一条 system，避免 LM Studio 等
+    OpenAI 兼容端点对「多个 system」返回错误。
     """
-    # 构建消息列表
-    messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
-    
-    # 添加聊天历史（最多保留最近 10 轮对话）
-    if history:
-        for msg in history[-10:]:
-            if isinstance(msg, dict):
-                messages.append({
-                    "role": msg.get("role", "user"),
-                    "content": msg.get("content", "")
-                })
-            else:
-                # ChatMessage 对象
-                messages.append({
-                    "role": msg.role,
-                    "content": msg.content
-                })
-    
-    # 添加当前用户消息
+    system_extras: List[str] = []
+    conversation: List[Dict[str, str]] = []
+
+    for msg in (history or [])[-10:]:
+        row = _message_as_dict(msg)
+        role, content = row["role"], row["content"]
+        if role == "system":
+            if content:
+                system_extras.append(content)
+            continue
+        if role not in ("user", "assistant"):
+            role = "user"
+        conversation.append({"role": role, "content": content})
+
+    system_content = CHAT_SYSTEM_PROMPT
+    if system_extras:
+        system_content += "\n\n# 附加上下文\n" + "\n\n".join(system_extras)
+
+    messages: List[Dict[str, str]] = [{"role": "system", "content": system_content}]
+    messages.extend(conversation)
     messages.append({"role": "user", "content": message})
-    
+
     try:
-        response = client.chat.completions.create(
+        response = await async_openai_client.chat.completions.create(
             model=settings.LM_STUDIO_MODEL,
             messages=messages,
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=1000,
         )
-        return response.choices[0].message.content.strip()
+        if not response.choices:
+            raise RuntimeError("LLM 返回空 choices")
+        text = response.choices[0].message.content
+        return (text or "").strip()
     except Exception as e:
-        raise Exception(f"AI对话失败：{str(e)}")
+        logger.exception("chat_with_ai 调用失败")
+        raise Exception(f"AI对话失败：{str(e)}") from e

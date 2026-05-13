@@ -1,9 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.services import generate_note, analyze_note, chat_with_ai
 from typing import Optional, List
-import json
 from app.core.security import get_current_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_db
@@ -22,8 +20,8 @@ class ReferenceNote(BaseModel):
 class GenerateNoteRequest(BaseModel):
     topic: str
     keywords: Optional[str] = None
-    referenceNotes: Optional[List[ReferenceNote]] = []
-    images: Optional[List[str]] = []  # base64 编码的图片
+    referenceNotes: Optional[List[ReferenceNote]] = Field(default_factory=list)
+    images: Optional[List[str]] = Field(default_factory=list)  # base64 编码的图片
     wordCount: Optional[int] = 600  # 期望字数，默认600字
 
 
@@ -39,7 +37,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    history: Optional[List[ChatMessage]] = []
+    history: Optional[List[ChatMessage]] = Field(default_factory=list)
 
 
 @router.post("/generate-note", summary="AI生成笔记")
@@ -55,8 +53,8 @@ async def generate_note_endpoint(
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
         
-        # 调用 AI 服务
-        note_content = generate_note(
+        # 调用 AI 服务（异步 HTTP，不阻塞事件循环）
+        note_content = await generate_note(
             topic=req.topic,
             keyword=req.keywords,
             reference_notes=req.referenceNotes,
@@ -85,7 +83,7 @@ async def summarize_note_endpoint(
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
         
-        result = analyze_note(req.content)
+        result = await analyze_note(req.content)
         
         # 记录AI使用
         await crud_ai_usage.log_ai_usage(db, db_user.id, "summarize")
@@ -108,7 +106,7 @@ async def chat_endpoint(
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
         
-        reply = chat_with_ai(req.message, req.history)
+        reply = await chat_with_ai(req.message, req.history)
         
         # 记录AI使用
         await crud_ai_usage.log_ai_usage(db, db_user.id, "chat")

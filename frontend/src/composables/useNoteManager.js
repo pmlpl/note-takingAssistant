@@ -211,7 +211,8 @@ export function useNoteManager() {
     
     try {
       const importedNote = await api.post('/v1/note/import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120_000
       })
       
       ElMessage.success({ message: `笔记「${importedNote.data.title}」已覆盖！`, duration: MESSAGE_DURATION.SHORT })
