@@ -1,19 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 from app.api.v1 import user, note, ai
 from app.core.database import engine, Base
 from app.core.config import settings
 import os
-import asyncio
-# 初始化FastAPI
-app = FastAPI(
-    title="AI个人智能笔记助手API",
-    description="基于FastAPI的AI笔记助手后端接口，支持用户管理、笔记管理、AI生成与总结",
-    version="1.0.0"
-)
-
-# 初始化数据库表（首次运行时创建）
 
 # 异步初始化数据库表
 async def init_db():
@@ -21,10 +13,35 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-# 在应用启动时初始化数据库
-@app.on_event("startup")
-async def startup():
+# 使用 lifespan 替代 on_event
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动时执行
     await init_db()
+    yield
+    # 关闭时执行清理操作
+    
+    # 关闭数据库连接池
+    try:
+        await engine.dispose()
+    except Exception as e:
+        print(f"⚠️ 关闭数据库连接池时出错: {e}")
+    
+    # 关闭 Redis 连接
+    try:
+        from app.core.redis_client import redis_client
+        if redis_client.is_available():
+            redis_client.client.close()
+    except Exception as e:
+        print(f"⚠️ 关闭 Redis 连接时出错: {e}")
+
+# 初始化FastAPI
+app = FastAPI(
+    title="AI个人智能笔记助手API",
+    description="基于FastAPI的AI笔记助手后端接口，支持用户管理、笔记管理、AI生成与总结",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 # 跨域配置（必加，否则Vue前端无法访问）
 app.add_middleware(
