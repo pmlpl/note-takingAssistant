@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     # AI配置（本地LM Studio）
     LM_STUDIO_URL: str = "http://localhost:1234/v1"
     LM_STUDIO_MODEL: str = "qwen3.5-9b-q4_k_m_gguf"
+    # 调用本地大模型时，首 token 与整段生成可能很慢；为 httpx 读超时（秒）
+    LLM_HTTP_READ_TIMEOUT_SECONDS: float = 1200.0
 
     class Config:
         env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")

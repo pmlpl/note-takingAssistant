@@ -1,12 +1,23 @@
 import axios from 'axios'
 import { useUserStore } from '@/store'
 
-/** 普通接口默认超时（毫秒）；AI 等长请求在各自 api 模块里单独覆盖 */
-const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
+/**
+ * 普通接口默认超时（毫秒）。
+ * 本地 LM Studio 在弱机器上首包可能远超 30s；默认 3 分钟。
+ * 环境变量 VITE_DEFAULT_REQUEST_TIMEOUT_MS 设为 0 表示不限制（与旧版一致）。
+ */
+function defaultRequestTimeoutMs() {
+  const raw = import.meta.env.VITE_DEFAULT_REQUEST_TIMEOUT_MS
+  if (raw === '' || raw === undefined) {
+    return 180_000
+  }
+  const n = Number(raw)
+  return Number.isNaN(n) ? 180_000 : n
+}
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: DEFAULT_REQUEST_TIMEOUT_MS
+  timeout: defaultRequestTimeoutMs()
 })
 
 api.interceptors.request.use(
@@ -30,19 +41,19 @@ api.interceptors.response.use(
     // 只有在访问受保护资源时才处理 401
     if (error.response?.status === 401) {
       const userStore = useUserStore()
-      
+
       // 检查是否已经登录（有 token）
       if (userStore.token) {
         // token 失效，清除登录状态
         console.warn('Token 失效，自动登出')
-        
+
         // 显示友好提示
         import('element-plus').then(({ ElMessage }) => {
           ElMessage.warning('登录已过期，请重新登录')
         })
-        
+
         userStore.logout()
-        
+
         // 只在当前不在登录页时才重定向
         if (window.location.pathname !== '/login') {
           window.location.href = '/login'
