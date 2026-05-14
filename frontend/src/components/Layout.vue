@@ -22,6 +22,10 @@
           <IconTrend :size="20" />
           <span>AI总结</span>
         </el-menu-item>
+        <el-menu-item index="/mindmap" @click="navigate('/mindmap')">
+          <IconMindmap :size="20"/>
+          <span>思维导图</span>
+        </el-menu-item>
       </el-menu>
       <div class="user-info">
         <el-dropdown v-if="userStore.isLoggedIn">
@@ -52,7 +56,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
-import { AppLogo, IconHome, IconDocument, IconMagic, IconTrend, IconUser } from '@/components/icons'
+import {AppLogo, IconHome, IconDocument, IconMagic, IconTrend, IconUser, IconAI, IconMindmap} from '@/components/icons'
 
 const router = useRouter()
 const userStore = useUserStore()

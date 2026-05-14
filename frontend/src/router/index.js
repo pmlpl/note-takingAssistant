@@ -57,6 +57,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/mindmap',
+    name: 'Mindmap',
+    component: () => import('@/views/mindmap/Mindmap.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/user',
     name: 'UserCenter',
     component: () => import('@/views/user/UserCenter.vue'),
