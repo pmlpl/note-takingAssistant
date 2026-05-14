@@ -71,8 +71,9 @@
           </div>
           
           <div class="ai-chat-area">
-            <!-- 聊天记录区域 -->
-            <div class="chat-messages" ref="chatMessagesRef">
+            <div class="chat-messages-stack">
+              <!-- 聊天记录区域 -->
+              <div class="chat-messages" ref="chatMessagesRef" @scroll.passive="onChatScroll">
               <div v-if="chatHistory.length === 0" class="welcome-message">
                 <div class="welcome-icon">👋</div>
                 <h4>您好！我是您的 AI 笔记助手</h4>
@@ -94,6 +95,24 @@
                 </div>
                 <div class="message-content">
                   <div class="message-text" v-html="renderMessage(message.content)"></div>
+                  <div
+                    v-if="message.role === 'assistant' && extractMindmapDiagramSource(message.content)"
+                    class="message-mindmap-actions"
+                  >
+                    <el-button
+                      type="primary"
+                      size="small"
+                      @click="openMindmapPreviewFromMessage(message.content)"
+                    >
+                      在思维导图页预览
+                    </el-button>
+                  </div>
+                  <div
+                    v-if="message.role === 'user' && message.contextNoteTitle"
+                    class="message-context-note"
+                  >
+                    {{ message.contextNoteTitle }}
+                  </div>
                   <div class="message-time">{{ formatTime(message.timestamp) }}</div>
                 </div>
               </div>
@@ -111,6 +130,18 @@
                   </div>
                 </div>
               </div>
+            </div>
+
+              <el-button
+                v-show="(chatHistory.length > 0 || isAiThinking) && showScrollToLatestBtn"
+                class="chat-scroll-float-btn"
+                circle
+                type="primary"
+                title="跳转最新消息"
+                @click="scrollChatToLatest"
+              >
+                <el-icon :size="20" class="chat-scroll-float-btn__icon"><ArrowDown /></el-icon>
+              </el-button>
             </div>
 
             <!-- 输入框区域 -->
@@ -155,7 +186,7 @@
               
               <!-- 快捷操作按钮 -->
               <div class="quick-actions">
-                <el-button size="small" @click="sendQuickMessage('分析笔记制作思维导图')">
+                <el-button size="small" @click="sendMindmapQuickPrompt">
                   思维导图
                 </el-button>
                 <el-button size="small" @click="sendQuickMessage('给我一些学习建议')">
@@ -218,8 +249,20 @@ import {IconPlus, IconUpload, IconDocument, IconEdit, IconAI, IconNotebook} from
 import { noteApi } from '@/api/note'
 import { aiApi } from '@/api/ai'
 import { ElMessage } from 'element-plus'
+import { ArrowDown } from '@element-plus/icons-vue'
 import { marked } from 'marked'
-import { MESSAGE_DURATION, hasMeaningfulNoteText, shouldAttachNoteContext, composeUserMessageWithNoteContext } from '@/utils/common'
+import {
+  MESSAGE_DURATION,
+  hasMeaningfulNoteText,
+  shouldAttachNoteContext,
+  composeUserMessageWithNoteContext,
+  extractMindmapDiagramSource,
+  setMindmapNavBridgeSource,
+  prepareMermaidSourceForRender,
+  AI_MINDMAP_QUICK_PROMPT,
+  MINDMAP_LOCAL_STORAGE_KEY,
+  MINDMAP_PENDING_SESSION_KEY
+} from '@/utils/common'
 import mammoth from 'mammoth'
 
 defineOptions({
@@ -239,6 +282,8 @@ const uploadedNoteContent = ref(null)  // 上传的笔记内容（给AI看，不
 const uploadedNoteName = ref('')  // 上传的笔记文件名
 const showNoteSelector = ref(false)  // 是否显示笔记选择器
 const allNotes = ref([])  // 所有笔记列表
+/** 聊天区未贴底时显示「↓」跳转按钮 */
+const showScrollToLatestBtn = ref(false)
 
 // 过滤后的笔记列表（用于搜索）
 const filteredNotes = computed(() => {
@@ -291,6 +336,22 @@ onMounted(async () => {
   
   // 4. 加载所有笔记用于 /note 命令
   await loadAllNotes()
+
+  await nextTick()
+  onChatScroll()
+})
+
+watch(
+  () => chatHistory.value.length,
+  async () => {
+    await nextTick()
+    onChatScroll()
+  }
+)
+
+watch(isAiThinking, async () => {
+  await nextTick()
+  onChatScroll()
 })
 
 // 监听路由query参数变化（解决从其他页面跳转回来时不刷新的问题）
@@ -575,6 +636,47 @@ function sendQuickMessage(message) {
   sendMessage()
 }
 
+function sendMindmapQuickPrompt() {
+  sendQuickMessage(AI_MINDMAP_QUICK_PROMPT)
+}
+
+/** 从 AI 回复提取可渲染的 Mermaid 源码并跳转思维导图页 */
+function openMindmapPreviewFromMessage(markdown) {
+  const raw = extractMindmapDiagramSource(markdown)
+  const src = prepareMermaidSourceForRender(raw)
+  if (!raw) {
+    ElMessage.warning({
+      message: '未识别到可渲染的 Mermaid 图表（需要 flowchart/graph 等语法或 ```mermaid 代码块）',
+      duration: MESSAGE_DURATION.LONG
+    })
+    return
+  }
+  setMindmapNavBridgeSource(src)
+  try {
+    sessionStorage.setItem(MINDMAP_PENDING_SESSION_KEY, src)
+    localStorage.setItem(MINDMAP_LOCAL_STORAGE_KEY, src)
+  } catch (e) {
+    console.error(e)
+    ElMessage.error({ message: '无法暂存导图数据，请检查浏览器存储权限', duration: MESSAGE_DURATION.SHORT })
+    return
+  }
+  router.push({ name: 'Mindmap' })
+}
+
+function onChatScroll() {
+  const el = chatMessagesRef.value
+  if (!el) {
+    showScrollToLatestBtn.value = false
+    return
+  }
+  const dist = el.scrollHeight - el.scrollTop - el.clientHeight
+  showScrollToLatestBtn.value = dist > 48
+}
+
+async function scrollChatToLatest() {
+  await scrollToBottom()
+}
+
 // 上传笔记到 AI 助手
 function uploadNoteToAI() {
   // 创建文件输入元素
@@ -650,12 +752,16 @@ function sendMessage() {
   
   const userMessage = aiMessage.value.trim()
   aiMessage.value = ''
-  
-  // 添加用户消息到聊天历史
+
+  const hasNoteContext =
+    uploadedNoteContent.value && shouldAttachNoteContext(uploadedNoteContent.value)
+
+  // 添加用户消息到聊天历史（附带本条是否绑定了笔记上下文，用于气泡下展示）
   chatHistory.value.push({
     role: 'user',
     content: userMessage,
-    timestamp: new Date()
+    timestamp: new Date(),
+    contextNoteTitle: hasNoteContext ? (uploadedNoteName.value || '笔记') : undefined
   })
   
   // 立即滚动到底部（不等待）
@@ -675,7 +781,7 @@ function sendMessage() {
       }))
 
       let messageForApi = userMessage
-      if (uploadedNoteContent.value && shouldAttachNoteContext(uploadedNoteContent.value)) {
+      if (hasNoteContext) {
         messageForApi = composeUserMessageWithNoteContext(
           userMessage,
           uploadedNoteName.value,
@@ -738,6 +844,8 @@ async function scrollToBottom() {
   if (chatMessagesRef.value) {
     chatMessagesRef.value.scrollTop = chatMessagesRef.value.scrollHeight
   }
+  await nextTick()
+  onChatScroll()
 }
 
 // 处理输入事件，检测 /note 命令
@@ -1140,11 +1248,42 @@ function getNotePreview(content) {
   min-height: 0;  /* 重要：允许flex子项缩小 */
 }
 
+.chat-messages-stack {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;  /* 只有聊天内容区域可以滚动 */
   padding: 20px;
   min-height: 0;  /* 重要：允许flex子项缩小 */
+}
+
+.chat-scroll-float-btn {
+  position: absolute;
+  left: 50%;
+  top: 95%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  border: none;
+}
+
+.chat-scroll-float-btn__icon,
+.chat-scroll-float-btn__icon svg {
+  color: #ffffff;
+}
+
+.chat-scroll-float-btn:hover {
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.35);
+  transform: translate(-50%, -50%);
 }
 
 .welcome-message {
@@ -1269,6 +1408,25 @@ function getNotePreview(content) {
   background: #409eff;
   color: white;
   border-top-right-radius: 4px;
+}
+
+.message-item.user .message-context-note {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+  max-width: 100%;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-mindmap-actions {
+  margin-top: 4px;
+}
+
+.message-item.assistant .message-mindmap-actions {
+  align-self: flex-start;
 }
 
 .message-text :deep(p) {

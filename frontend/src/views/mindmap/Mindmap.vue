@@ -7,8 +7,9 @@
           思维导图（Mermaid）
         </h2>
         <p class="subtitle">
-          在左侧粘贴或编写 Mermaid 源码，点击「渲染预览」在右侧查看流程图。可从 AI 助手回复中复制 fenced 代码块（以
-          mermaid 为语言标记）中的内容。
+          在左侧粘贴或编写 Mermaid 源码，点击「渲染预览」在右侧查看。从首页 AI
+          助手某条回复下点击「在思维导图页预览」时，会通过内存与本地存储传入源码并自动渲染；若预览失败，请检查回复中是否包含
+          <code>flowchart</code> / <code>mindmap</code> 等 Mermaid 语法。
         </p>
       </div>
 
@@ -60,8 +61,12 @@ import mermaid from 'mermaid'
 import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { IconMindmap } from '@/components/icons'
-
-const STORAGE_KEY = 'mindmap_mermaid_source'
+import {
+  MINDMAP_LOCAL_STORAGE_KEY,
+  MINDMAP_PENDING_SESSION_KEY,
+  takeMindmapNavBridgeSource,
+  prepareMermaidSourceForRender
+} from '@/utils/common'
 
 const DEFAULT_SAMPLE = `flowchart TD
     A[开始] --> B{判断}
@@ -97,7 +102,14 @@ async function renderPreview() {
   initMermaid()
   el.innerHTML = ''
 
-  const text = source.value.trim()
+  const raw = source.value.trim()
+  let text = prepareMermaidSourceForRender(raw)
+  if (text !== raw) {
+    source.value = text
+    await nextTick()
+    text = source.value.trim()
+  }
+
   if (!text) {
     showPlaceholder()
     return
@@ -125,7 +137,7 @@ async function renderPreview() {
 function clearAll() {
   source.value = ''
   parseError.value = ''
-  localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(MINDMAP_LOCAL_STORAGE_KEY)
   showPlaceholder()
 }
 
@@ -145,17 +157,49 @@ let saveTimer = null
 watch(source, () => {
   clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
-    localStorage.setItem(STORAGE_KEY, source.value)
+    localStorage.setItem(MINDMAP_LOCAL_STORAGE_KEY, source.value)
   }, 500)
 })
 
-onMounted(() => {
+async function loadInitialMindmapSource() {
   initMermaid()
-  const saved = localStorage.getItem(STORAGE_KEY)
+
+  let pending = takeMindmapNavBridgeSource().trim()
+  if (!pending) {
+    try {
+      pending = (sessionStorage.getItem(MINDMAP_PENDING_SESSION_KEY) || '').trim()
+      if (pending) sessionStorage.removeItem(MINDMAP_PENDING_SESSION_KEY)
+    } catch {
+      pending = ''
+    }
+  } else {
+    try {
+      sessionStorage.removeItem(MINDMAP_PENDING_SESSION_KEY)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (pending) {
+    source.value = pending
+    try {
+      localStorage.setItem(MINDMAP_LOCAL_STORAGE_KEY, source.value)
+    } catch {
+      /* ignore */
+    }
+    await nextTick()
+    await renderPreview()
+    return
+  }
+
+  const saved = localStorage.getItem(MINDMAP_LOCAL_STORAGE_KEY)
   source.value = saved != null && saved !== '' ? saved : DEFAULT_SAMPLE
-  nextTick(() => {
-    renderPreview()
-  })
+  await nextTick()
+  await renderPreview()
+}
+
+onMounted(() => {
+  loadInitialMindmapSource()
 })
 </script>
 

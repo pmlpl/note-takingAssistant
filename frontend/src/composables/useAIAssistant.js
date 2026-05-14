@@ -28,12 +28,16 @@ export function useAIAssistant() {
     
     const userMessage = aiMessage.value.trim()
     aiMessage.value = ''
-    
-    // 添加用户消息
+
+    const hasNoteContext =
+      uploadedNoteContent.value && shouldAttachNoteContext(uploadedNoteContent.value)
+
+    // 添加用户消息（附带本条是否绑定了笔记上下文，供气泡下展示）
     chatHistory.value.push({
       role: 'user',
       content: userMessage,
-      timestamp: new Date()
+      timestamp: new Date(),
+      contextNoteTitle: hasNoteContext ? (uploadedNoteName.value || '笔记') : undefined
     })
     
     await scrollToBottom()
@@ -48,7 +52,7 @@ export function useAIAssistant() {
         }))
 
         let messageForApi = userMessage
-        if (uploadedNoteContent.value && shouldAttachNoteContext(uploadedNoteContent.value)) {
+        if (hasNoteContext) {
           messageForApi = composeUserMessageWithNoteContext(
             userMessage,
             uploadedNoteName.value,
