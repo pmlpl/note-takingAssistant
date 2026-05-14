@@ -219,7 +219,7 @@ import { noteApi } from '@/api/note'
 import { aiApi } from '@/api/ai'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
-import { MESSAGE_DURATION } from '@/utils/common'
+import { MESSAGE_DURATION, hasMeaningfulNoteText, shouldAttachNoteContext, composeUserMessageWithNoteContext } from '@/utils/common'
 import mammoth from 'mammoth'
 
 defineOptions({
@@ -333,12 +333,15 @@ async function loadRecentNotes() {
   }
 }
 
-// 加载所有笔记
+// 加载所有笔记（/note 选择器依赖此列表）
 async function loadAllNotes() {
   try {
     const notes = await noteApi.getNotes()
-    allNotes.value = notes
+    allNotes.value = Array.isArray(notes) ? notes : []
   } catch (error) {
+    console.error('加载笔记列表失败（/note 将无选项）:', error)
+    allNotes.value = []
+    ElMessage.error({ message: '加载笔记列表失败，请刷新页面重试', duration: MESSAGE_DURATION.NORMAL })
   }
 }
 
@@ -670,19 +673,18 @@ function sendMessage() {
         role: msg.role,
         content: msg.content
       }))
-      
-      // 如果有上传的笔记，添加到上下文中
-      if (uploadedNoteContent.value) {
-        // 在历史消息前添加系统消息，包含上传的笔记内容
-        messages.unshift({
-          role: 'system',
-          content: `用户上传了笔记《${uploadedNoteName.value}》，以下是笔记内容，请基于此内容回答用户的问题：\n\n${uploadedNoteContent.value}`
-        })
+
+      let messageForApi = userMessage
+      if (uploadedNoteContent.value && shouldAttachNoteContext(uploadedNoteContent.value)) {
+        messageForApi = composeUserMessageWithNoteContext(
+          userMessage,
+          uploadedNoteName.value,
+          uploadedNoteContent.value
+        )
       }
-      
-      // 调用 AI API
+
       const result = await aiApi.chat({
-        message: userMessage,
+        message: messageForApi,
         history: messages
       })
       
@@ -758,30 +760,59 @@ function closeNoteSelector() {
   }
 }
 
+// 统一解析 GET /note/:id 的返回（axios 已解一层 data，兼容若将来包一层 data）
+function unwrapNoteResponse(res) {
+  if (!res || typeof res !== 'object') return null
+  if ('content' in res || 'title' in res || 'id' in res) return res
+  if (res.data && typeof res.data === 'object') return res.data
+  return res
+}
+
 // 选择笔记作为上下文
 async function selectNoteForContext(note) {
+  const id = note?.id
+  if (id == null) {
+    ElMessage.error({ message: '笔记数据无效，请刷新后重试', duration: MESSAGE_DURATION.SHORT })
+    return
+  }
   try {
-    // 获取完整的笔记内容
-    const fullNote = await noteApi.getNote(note.id)
-    
-    // 将笔记内容添加到上下文中
-    uploadedNoteContent.value = fullNote.content
-    uploadedNoteName.value = fullNote.title
-    
-    // 关闭选择器
+    const raw = await noteApi.getNote(id)
+    const fullNote = unwrapNoteResponse(raw)
+    if (!fullNote) {
+      ElMessage.error({ message: '加载笔记失败：响应无效', duration: MESSAGE_DURATION.SHORT })
+      return
+    }
+    const content = fullNote.content
+    const title = fullNote.title ?? note.title ?? '未命名笔记'
+    if (!shouldAttachNoteContext(content)) {
+      ElMessage.warning({
+        message: '该笔记正文为空，请先编辑笔记再作为上下文',
+        duration: MESSAGE_DURATION.NORMAL
+      })
+      return
+    }
+    if (!hasMeaningfulNoteText(content)) {
+      ElMessage.info({
+        message: '笔记以图表或富文本为主，已尽量提交源码供 AI 参考',
+        duration: MESSAGE_DURATION.NORMAL
+      })
+    }
+    uploadedNoteContent.value = typeof content === 'string' ? content : String(content)
+    uploadedNoteName.value = title
+
     showNoteSelector.value = false
-    
-    // 移除输入框中的 /note
+
     if (aiMessage.value.endsWith('/note')) {
       aiMessage.value = aiMessage.value.slice(0, -5)
     }
-    
-    ElMessage.success({ 
-      message: `已选择笔记《${fullNote.title}》作为上下文`, 
-      duration: MESSAGE_DURATION.SHORT 
+
+    ElMessage.success({
+      message: `已选择笔记《${title}》作为上下文`,
+      duration: MESSAGE_DURATION.SHORT
     })
   } catch (error) {
-   ElMessage.error({ message: '加载笔记失败', duration: MESSAGE_DURATION.SHORT })
+    console.error('selectNoteForContext:', error)
+    ElMessage.error({ message: '加载笔记失败', duration: MESSAGE_DURATION.SHORT })
   }
 }
 

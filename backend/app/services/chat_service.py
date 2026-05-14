@@ -65,7 +65,7 @@ async def chat_with_ai(message: str, history: Optional[List[Any]] = None) -> str
             model=settings.LM_STUDIO_MODEL,
             messages=messages,
             temperature=0.7,
-            max_tokens=1000,
+            max_tokens=2048,
         )
         if not response.choices:
             raise RuntimeError("LLM 返回空 choices")
