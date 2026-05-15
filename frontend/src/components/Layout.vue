@@ -30,6 +30,10 @@
           <IconMindmap :size="20"/>
           <span>思维导图</span>
         </el-menu-item>
+        <el-menu-item index="/manual" @click="navigate('/manual')">
+          <IconNotebook :size="20" />
+          <span>使用手册</span>
+        </el-menu-item>
       </el-menu>
       <div class="user-info">
         <el-dropdown v-if="userStore.isLoggedIn">
@@ -60,7 +64,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
-import {AppLogo, IconHome, IconDocument, IconMagic, IconTrend, IconUser, IconAI, IconMindmap, IconTranslate} from '@/components/icons'
+import {AppLogo, IconHome, IconDocument, IconMagic, IconTrend, IconUser, IconAI, IconMindmap, IconTranslate, IconNotebook} from '@/components/icons'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -139,7 +143,8 @@ function handleLogout() {
 .main-content {
   background: white;
   padding: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
   border-radius: 0 0 12px 12px;
 }
 </style>
