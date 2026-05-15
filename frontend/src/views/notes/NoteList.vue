@@ -57,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/store'
 import { noteApi } from '@/api/note'
@@ -87,6 +87,10 @@ const filteredNotes = computed(() => {
 })
 
 onMounted(async () => {
+  await loadNotes()
+})
+
+onActivated(async () => {
   await loadNotes()
 })
 

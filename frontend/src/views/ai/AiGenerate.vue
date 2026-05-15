@@ -218,9 +218,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
-import { useNoteStore } from '@/store'
+import { useNoteStore, useUserStore } from '@/store'
 import { aiApi } from '@/api/ai'
 import { noteApi } from '@/api/note'
 import Layout from '@/components/Layout.vue'
@@ -236,6 +236,8 @@ defineOptions({
 
 const router = useRouter()
 const noteStore = useNoteStore()
+const userStore = useUserStore()
+const generateBoundUserId = ref(null)
 
 const form = ref({
   topic: '',
@@ -256,6 +258,40 @@ const fileList = ref([])
 
 // 参考笔记上传相关（列表由 el-upload 展示，提交时再读取正文）
 const noteFileList = ref([])
+
+function resetGeneratePageForNewUser() {
+  form.value = {
+    topic: '',
+    keyword: '',
+    wordCount: 600,
+    outputFormat: 'md'
+  }
+  loading.value = false
+  saving.value = false
+  noteContent.value = ''
+  rawMarkdown.value = ''
+  displayMode.value = 'rich'
+  fileList.value = []
+  noteFileList.value = []
+}
+
+function ensureGenerateSession() {
+  const uid = userStore.user?.id
+  if (uid == null || uid === undefined) return
+  const uidNum = Number(uid)
+  if (generateBoundUserId.value !== uidNum) {
+    generateBoundUserId.value = uidNum
+    resetGeneratePageForNewUser()
+  }
+}
+
+onMounted(() => {
+  ensureGenerateSession()
+})
+
+onActivated(() => {
+  ensureGenerateSession()
+})
 
 function goBack() {
   router.back()

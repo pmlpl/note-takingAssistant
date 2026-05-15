@@ -70,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { noteApi } from '@/api/note'
 import Layout from '@/components/Layout.vue'
@@ -104,6 +104,10 @@ const filteredNotes = computed(() => {
 })
 
 onMounted(async () => {
+  await loadAllNotes()
+})
+
+onActivated(async () => {
   await loadAllNotes()
 })
 

@@ -49,9 +49,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted ,watch} from 'vue'
+import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useNoteStore } from '@/store'
+import { useNoteStore, useUserStore } from '@/store'
 import { noteApi } from '@/api/note'
 import Layout from '@/components/Layout.vue'
 import RichText from '@/components/RichText.vue'
@@ -65,6 +65,8 @@ defineOptions({
 const route = useRoute()
 const router = useRouter()
 const noteStore = useNoteStore()
+const userStore = useUserStore()
+const editBoundUserId = ref(null)
 
 const isEdit = ref(false)
 const saving = ref(false)
@@ -105,11 +107,36 @@ watch(() => route.params.id, async (newId, oldId) => {
   }
 }, { immediate: false })
 
-onMounted(async () => {
+async function hydrateNoteEditForRoute() {
   const noteId = route.params.id
   if (noteId) {
     isEdit.value = true
     await loadNote(noteId)
+  } else {
+    isEdit.value = false
+    form.value = {
+      title: '',
+      tags: '',
+      content: ''
+    }
+  }
+}
+
+onMounted(async () => {
+  const uid = userStore.user?.id
+  if (uid != null && uid !== undefined) {
+    editBoundUserId.value = Number(uid)
+  }
+  await hydrateNoteEditForRoute()
+})
+
+onActivated(async () => {
+  const uid = userStore.user?.id
+  if (uid == null || uid === undefined) return
+  const uidNum = Number(uid)
+  if (editBoundUserId.value !== uidNum) {
+    editBoundUserId.value = uidNum
+    await hydrateNoteEditForRoute()
   }
 })
 

@@ -159,8 +159,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/store'
 import Layout from '@/components/Layout.vue'
 import { IconTranslate, IconUpload } from '@/components/icons'
 import { DArrowLeft } from '@element-plus/icons-vue'
@@ -176,6 +177,8 @@ import {
 defineOptions({ name: 'NoteTranslate' })
 
 const router = useRouter()
+const userStore = useUserStore()
+const translateBoundUserId = ref(null)
 const maxChars = 8000
 const notes = ref([])
 const loading = ref(false)
@@ -227,7 +230,32 @@ const translatedPreviewHtml = computed(() => {
   return renderMarkdownToSafeHtml(translatedRaw.value)
 })
 
-onMounted(() => loadNotes())
+onMounted(() => {
+  void refreshTranslateSession()
+})
+
+onActivated(() => {
+  void refreshTranslateSession()
+})
+
+async function refreshTranslateSession() {
+  const uid = userStore.user?.id
+  if (uid == null || uid === undefined) return
+  const uidNum = Number(uid)
+  if (translateBoundUserId.value !== uidNum) {
+    translateBoundUserId.value = uidNum
+    form.value = {
+      noteId: null,
+      sourceText: '',
+      targetLang: 'en'
+    }
+    translatedRaw.value = ''
+    translatedFormat.value = 'markdown'
+    sourceEditOpen.value = []
+    loading.value = false
+  }
+  await loadNotes()
+}
 
 async function loadNotes() {
   try {

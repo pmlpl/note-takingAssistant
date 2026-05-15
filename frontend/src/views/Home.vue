@@ -253,9 +253,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useNoteStore } from '@/store'
+import { useUserStore } from '@/store'
 import Layout from '@/components/Layout.vue'
 import {IconPlus, IconUpload, IconDocument, IconEdit, IconAI, IconNotebook} from '@/components/icons'
 import { noteApi } from '@/api/note'
@@ -288,7 +288,26 @@ defineOptions({
 const HOME_CHAT_MAX_MESSAGES = 40
 
 const router = useRouter()
-const noteStore = useNoteStore()
+const userStore = useUserStore()
+
+/** 绑定到首页数据的账号 id；切换用户时必须清空 keep-alive 内的状态 */
+const homeBoundUserId = ref(null)
+const boundAuthEpoch = ref(-1)
+
+/** 当前登录用户在 localStorage 中的隔离标识（无 id 时用 username，避免多人共用 guest） */
+function homeUserScope() {
+  const u = userStore.user
+  if (!u) return null
+  if (u.id != null && u.id !== '') return `u${u.id}`
+  if (u.username) return `name_${u.username}`
+  return null
+}
+
+function homeStorageKey(suffix) {
+  const scope = homeUserScope()
+  if (!scope) return `home_${suffix}_guest`
+  return `home_${suffix}_${scope}`
+}
 
 const recentNotes = ref([])
 const currentNote = ref(null)
@@ -302,6 +321,18 @@ const showNoteSelector = ref(false)  // 是否显示笔记选择器
 const allNotes = ref([])  // 所有笔记列表
 /** 聊天区未贴底时显示「↓」跳转按钮 */
 const showScrollToLatestBtn = ref(false)
+
+function clearHomeUiState() {
+  recentNotes.value = []
+  allNotes.value = []
+  currentNote.value = null
+  chatHistory.value = []
+  aiMessage.value = ''
+  uploadedNoteContent.value = null
+  uploadedNoteName.value = ''
+  showNoteSelector.value = false
+  isAiThinking.value = false
+}
 
 // 过滤后的笔记列表（用于搜索）
 const filteredNotes = computed(() => {
@@ -323,49 +354,86 @@ const renderedContent = computed(() => {
 })
 
 onMounted(async () => {
-  // 1. 从 localStorage 恢复聊天历史
+  await ensureHomeSessionForCurrentUser()
+})
+
+onActivated(async () => {
+  await ensureHomeSessionForCurrentUser()
+})
+
+watch(
+  () => [userStore.user?.id, userStore.user?.username, userStore.authSessionEpoch],
+  () => {
+    void ensureHomeSessionForCurrentUser()
+  }
+)
+
+/** 切换账号后 keep-alive 仍保留旧状态：按用户 id + 登录世代重置并重新拉取 */
+async function ensureHomeSessionForCurrentUser() {
+  try {
+    localStorage.removeItem('home_chat_history')
+    localStorage.removeItem('home_current_note')
+  } catch {
+    /* ignore */
+  }
+
+  const uid = userStore.user?.id
+  const epoch = userStore.authSessionEpoch
+
+  if (uid == null || uid === undefined) {
+    if (homeBoundUserId.value != null) {
+      homeBoundUserId.value = null
+      boundAuthEpoch.value = -1
+      clearHomeUiState()
+    }
+    return
+  }
+
+  const uidNum = Number(uid)
+  if (homeBoundUserId.value === uidNum && boundAuthEpoch.value === epoch) {
+    return
+  }
+
+  homeBoundUserId.value = uidNum
+  boundAuthEpoch.value = epoch
+  clearHomeUiState()
+
+  await bootstrapHomeData()
+}
+
+async function bootstrapHomeData() {
   loadChatHistory()
-  
-  // 2. 从 localStorage 恢复当前笔记
   await loadCurrentNoteFromCache()
-  
-  // 3. 检查是否有笔记ID参数，如果有则自动加载该笔记（覆盖缓存）
+
   const noteId = router.currentRoute.value.query.noteId
-  
+
   if (noteId) {
     try {
       ElMessage.success({ message: '加载成功', duration: MESSAGE_DURATION.SHORT })
-      
-      // 确保 noteId 是字符串类型（URL参数始终是字符串）
+
       const fullNote = await noteApi.getNote(String(noteId))
-      
+
       currentNote.value = fullNote
-      
-      // 缓存到 localStorage
+
       saveCurrentNoteToCache(fullNote)
-      
-      // 重新加载最近笔记列表
+
       await loadRecentNotes()
-      
-      // 将当前查看的笔记移到列表最前面（如果不在列表中则添加）
+
       updateRecentNotesWithCurrent(fullNote)
-      
-      // 清除URL中的query参数
+
       router.replace({ path: '/home' })
     } catch (error) {
       ElMessage.error({ message: '加载笔记失败', duration: MESSAGE_DURATION.SHORT })
     }
   } else {
-    // 没有noteId参数，正常加载最近笔记
     await loadRecentNotes()
   }
-  
-  // 4. 加载所有笔记用于 /note 命令
+
   await loadAllNotes()
 
   await nextTick()
   onChatScroll()
-})
+}
 
 watch(
   () => chatHistory.value.length,
@@ -970,7 +1038,7 @@ function saveCurrentNoteToCache(note) {
       updated_at: note.updated_at,
       timestamp: Date.now()  // 记录缓存时间
     }
-    localStorage.setItem('home_current_note', JSON.stringify(cacheData))
+    localStorage.setItem(homeStorageKey('current_note'), JSON.stringify(cacheData))
   } catch (error) {
     console.error('保存笔记缓存失败:', error)
   }
@@ -979,7 +1047,7 @@ function saveCurrentNoteToCache(note) {
 // 从 localStorage 加载当前笔记
 async function loadCurrentNoteFromCache() {
   try {
-    const cached = localStorage.getItem('home_current_note')
+    const cached = localStorage.getItem(homeStorageKey('current_note'))
     if (!cached) return
     
     const cacheData = JSON.parse(cached)
@@ -991,7 +1059,7 @@ async function loadCurrentNoteFromCache() {
     
     if (cacheAge > maxAge) {
       // 缓存过期，清除
-      localStorage.removeItem('home_current_note')
+      localStorage.removeItem(homeStorageKey('current_note'))
       return
     }
     
@@ -999,46 +1067,74 @@ async function loadCurrentNoteFromCache() {
     currentNote.value = cacheData
   } catch (error) {
     console.error('加载笔记缓存失败:', error)
-    localStorage.removeItem('home_current_note')
+    localStorage.removeItem(homeStorageKey('current_note'))
   }
 }
 
-// 保存聊天历史到 localStorage（与内存同步裁剪，避免单页会话无限变长）
+// 保存聊天历史到 localStorage（按用户隔离，带归属校验）
 function saveChatHistory() {
+  if (!homeUserScope()) return
   try {
     if (chatHistory.value.length > HOME_CHAT_MAX_MESSAGES) {
       chatHistory.value = chatHistory.value.slice(-HOME_CHAT_MAX_MESSAGES)
     }
-    localStorage.setItem('home_chat_history', JSON.stringify(chatHistory.value))
+    const payload = {
+      v: 1,
+      ownerId: userStore.user?.id ?? null,
+      ownerUsername: userStore.user?.username ?? '',
+      messages: chatHistory.value
+    }
+    localStorage.setItem(homeStorageKey('chat_history'), JSON.stringify(payload))
   } catch (error) {
     console.error('保存聊天历史失败:', error)
   }
 }
 
-// 从 localStorage 加载聊天历史
+function chatHistoryBelongsToCurrentUser(parsed) {
+  const u = userStore.user
+  if (!u) return false
+  if (parsed.ownerId != null && u.id != null && Number(parsed.ownerId) !== Number(u.id)) {
+    return false
+  }
+  if (parsed.ownerUsername && u.username && parsed.ownerUsername !== u.username) {
+    return false
+  }
+  return true
+}
+
+// 从 localStorage 加载聊天历史（仅恢复当前用户的记录）
 function loadChatHistory() {
+  if (!homeUserScope()) return
   try {
-    const cached = localStorage.getItem('home_chat_history')
+    const cached = localStorage.getItem(homeStorageKey('chat_history'))
     if (!cached) return
 
-    const history = JSON.parse(cached)
-    if (!Array.isArray(history)) {
-      localStorage.removeItem('home_chat_history')
+    const parsed = JSON.parse(cached)
+    let history
+
+    if (Array.isArray(parsed)) {
+      history = parsed
+    } else if (parsed?.v === 1 && Array.isArray(parsed.messages)) {
+      if (!chatHistoryBelongsToCurrentUser(parsed)) {
+        localStorage.removeItem(homeStorageKey('chat_history'))
+        return
+      }
+      history = parsed.messages
+    } else {
+      localStorage.removeItem(homeStorageKey('chat_history'))
       return
     }
 
-    // 恢复聊天历史
     chatHistory.value = history.map((msg) => ({
       ...msg,
-      timestamp: new Date(msg.timestamp) // 恢复 Date 对象
+      timestamp: new Date(msg.timestamp)
     }))
     saveChatHistory()
 
-    // 滚动到底部
     setTimeout(() => scrollToBottom(), 100)
   } catch (error) {
     console.error('加载聊天历史失败:', error)
-    localStorage.removeItem('home_chat_history')
+    localStorage.removeItem(homeStorageKey('chat_history'))
   }
 }
 
@@ -1054,7 +1150,7 @@ async function confirmClearChat() {
   }
   chatHistory.value = []
   try {
-    localStorage.removeItem('home_chat_history')
+    localStorage.removeItem(homeStorageKey('chat_history'))
   } catch {
     /* ignore */
   }

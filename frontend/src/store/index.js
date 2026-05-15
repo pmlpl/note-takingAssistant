@@ -1,6 +1,18 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+/** 登出时仅清除旧版全局 key（按用户隔离的聊天记录保留，供同账号再次登录恢复） */
+function clearLegacyHomeCaches() {
+  try {
+    localStorage.removeItem('home_chat_history')
+    localStorage.removeItem('home_current_note')
+    localStorage.removeItem('mindmap_mermaid_source')
+    sessionStorage.removeItem('mindmap_pending_mermaid_source')
+  } catch {
+    /* ignore */
+  }
+}
+
 export const useUserStore = defineStore('user', () => {
   // 安全地从 localStorage 获取数据
   let storedToken = ''
@@ -19,6 +31,8 @@ export const useUserStore = defineStore('user', () => {
 
   const token = ref(storedToken)
   const user = ref(storedUser)
+  /** 登录/登出时递增，供首页等 keep-alive 页面感知账号切换 */
+  const authSessionEpoch = ref(0)
 
   const isLoggedIn = computed(() => {
     const result = !!token.value && !!user.value
@@ -26,6 +40,10 @@ export const useUserStore = defineStore('user', () => {
   })
 
   function login(tokenValue, userData) {
+    const noteStore = useNoteStore()
+    noteStore.setNotes([])
+    clearLegacyHomeCaches()
+    authSessionEpoch.value += 1
     token.value = tokenValue
     user.value = userData
     localStorage.setItem('token', tokenValue)
@@ -33,6 +51,10 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function logout() {
+    const noteStore = useNoteStore()
+    noteStore.setNotes([])
+    clearLegacyHomeCaches()
+    authSessionEpoch.value += 1
     token.value = ''
     user.value = null
     localStorage.removeItem('token')
@@ -42,6 +64,7 @@ export const useUserStore = defineStore('user', () => {
   return {
     token,
     user,
+    authSessionEpoch,
     isLoggedIn,
     login,
     logout

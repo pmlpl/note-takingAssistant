@@ -202,8 +202,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/store'
 import { noteApi } from '@/api/note'
 import { aiApi } from '@/api/ai'
 import Layout from '@/components/Layout.vue'
@@ -216,6 +217,9 @@ defineOptions({
 })
 
 const router = useRouter()
+const userStore = useUserStore()
+/** keep-alive：切换账号后清空表单与分析结果 */
+const summarizeBoundUserId = ref(null)
 
 const notes = ref([])
 const loading = ref(false)
@@ -282,8 +286,29 @@ const canAnalyze = computed(() => {
 })
 
 onMounted(async () => {
-  await loadNotes()
+  await refreshSummarizeSession()
 })
+
+onActivated(async () => {
+  await refreshSummarizeSession()
+})
+
+async function refreshSummarizeSession() {
+  const uid = userStore.user?.id
+  if (uid == null || uid === undefined) return
+  const uidNum = Number(uid)
+  if (summarizeBoundUserId.value !== uidNum) {
+    summarizeBoundUserId.value = uidNum
+    form.value = { noteId: '', content: '' }
+    analysisResult.value = null
+    cleanupRadarChartSizing()
+    if (radarChart) {
+      radarChart.dispose()
+      radarChart = null
+    }
+  }
+  await loadNotes()
+}
 
 onBeforeUnmount(() => {
   cleanupRadarChartSizing()
