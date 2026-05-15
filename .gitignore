@@ -76,7 +76,3 @@ docs/
 
 # Virtual environment
 .venv/
-
-# Test scripts
-backend/test_*.py
-backend/tests/

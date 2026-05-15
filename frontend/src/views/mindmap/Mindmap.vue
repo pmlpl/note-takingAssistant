@@ -38,7 +38,18 @@
         <el-col :xs="24" :lg="14">
           <el-card shadow="hover" class="panel-card preview-card">
             <template #header>
-              <span>预览</span>
+              <div class="preview-card-header">
+                <span>预览</span>
+                <el-button
+                  type="primary"
+                  plain
+                  size="small"
+                  :loading="savingPreviewPng"
+                  @click="savePreviewAsPng"
+                >
+                  保存为 PNG
+                </el-button>
+              </div>
             </template>
             <el-alert
               v-if="parseError"
@@ -57,7 +68,6 @@
 
 <script setup>
 import { ref, watch, onMounted, nextTick } from 'vue'
-import mermaid from 'mermaid'
 import { ElMessage } from 'element-plus'
 import Layout from '@/components/Layout.vue'
 import { IconMindmap } from '@/components/icons'
@@ -76,10 +86,113 @@ const DEFAULT_SAMPLE = `flowchart TD
 const source = ref('')
 const previewHost = ref(null)
 const parseError = ref('')
+const savingPreviewPng = ref(false)
 let mermaidReady = false
+let mermaidApi = null
 
-function initMermaid() {
+async function getMermaid() {
+  if (!mermaidApi) {
+    const mod = await import('mermaid')
+    mermaidApi = mod.default
+  }
+  return mermaidApi
+}
+
+/** 将预览区内的 Mermaid SVG 导出为 PNG（白底、2× 像素密度） */
+async function savePreviewAsPng() {
+  const host = previewHost.value
+  const svg = host?.querySelector('svg')
+  if (!svg) {
+    ElMessage.warning('请先点击「渲染预览」生成图形后再保存')
+    return
+  }
+  savingPreviewPng.value = true
+  try {
+    await exportSvgToPngWithCanvg(svg, `思维导图_${Date.now()}.png`)
+    ElMessage.success('已保存为 PNG')
+  } catch (e) {
+    ElMessage.error(e?.message || '导出图片失败，请重试')
+  } finally {
+    savingPreviewPng.value = false
+  }
+}
+
+/**
+ * 使用 canvg 将 SVG 矢量绘制到 Canvas，避免 Image+Blob 解码时因外链/字体等导致画布污染（toBlob 报 Tainted）。
+ * @param {SVGSVGElement} svgEl
+ * @param {string} filename
+ */
+async function exportSvgToPngWithCanvg(svgEl, filename) {
+  const { Canvg } = await import('canvg')
+  const bbox = svgEl.getBBox()
+  if (!bbox.width || !bbox.height) {
+    throw new Error('图形尺寸为空，无法导出')
+  }
+  const pad = 24
+  const vbW = bbox.width + pad * 2
+  const vbH = bbox.height + pad * 2
+  const vx = bbox.x - pad
+  const vy = bbox.y - pad
+  const scale = 2
+  const outW = Math.ceil(vbW * scale)
+  const outH = Math.ceil(vbH * scale)
+
+  const clone = /** @type {SVGSVGElement} */ (svgEl.cloneNode(true))
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+  if (!clone.getAttribute('xmlns:xlink')) {
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink')
+  }
+  clone.setAttribute('viewBox', `${vx} ${vy} ${vbW} ${vbH}`)
+  clone.setAttribute('width', String(outW))
+  clone.setAttribute('height', String(outH))
+  clone.removeAttribute('style')
+
+  const xml = new XMLSerializer().serializeToString(clone)
+  const canvas = document.createElement('canvas')
+  canvas.width = outW
+  canvas.height = outH
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    throw new Error('浏览器不支持 Canvas')
+  }
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, outW, outH)
+
+  const canvg = Canvg.fromString(ctx, xml, {
+    ignoreMouse: true,
+    ignoreAnimation: true
+  })
+  await canvg.render()
+
+  await new Promise((resolve, reject) => {
+    try {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('生成 PNG 失败'))
+            return
+          }
+          const a = document.createElement('a')
+          a.download = filename
+          const pngUrl = URL.createObjectURL(blob)
+          a.href = pngUrl
+          a.rel = 'noopener'
+          a.click()
+          setTimeout(() => URL.revokeObjectURL(pngUrl), 2000)
+          resolve()
+        },
+        'image/png',
+        1
+      )
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
+async function initMermaid() {
   if (mermaidReady) return
+  const mermaid = await getMermaid()
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
@@ -99,7 +212,8 @@ async function renderPreview() {
   const el = previewHost.value
   if (!el) return
 
-  initMermaid()
+  await initMermaid()
+  const mermaid = await getMermaid()
   el.innerHTML = ''
 
   const raw = source.value.trim()
@@ -162,7 +276,7 @@ watch(source, () => {
 })
 
 async function loadInitialMindmapSource() {
-  initMermaid()
+  await initMermaid()
 
   let pending = takeMindmapNavBridgeSource().trim()
   if (!pending) {
@@ -255,6 +369,14 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.preview-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .preview-card :deep(.el-card__body) {

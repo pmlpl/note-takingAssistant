@@ -4,7 +4,7 @@
       <el-card class="login-card">
         <div class="login-header">
           <IconNotebook :size="48" color="#409eff" />
-          <h2>AI笔记助手</h2>
+          <h2>智能笔记助手</h2>
           <p>登录您的账号</p>
         </div>
         <el-form :model="form" ref="formRef" label-width="80px">

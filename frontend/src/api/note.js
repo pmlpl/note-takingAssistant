@@ -27,11 +27,15 @@ export const noteApi = {
   /**
    * 导入笔记文件
    * @param {File} file - 要导入的文件对象
+   * @param {{ overwrite?: boolean }} [options] - overwrite=true 时覆盖同名标题笔记（后端 409 后重试用）
    * @returns {Promise} 返回创建的笔记
    */
-  importNote(file) {
+  importNote(file, options = {}) {
     const formData = new FormData()
     formData.append('file', file)
+    if (options.overwrite) {
+      formData.append('overwrite', 'true')
+    }
     return api.post('/v1/note/import', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'

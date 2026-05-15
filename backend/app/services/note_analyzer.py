@@ -5,12 +5,12 @@
 import json
 from typing import Any, Dict
 
-from app.core.config import settings
-from .openai_client import async_openai_client
+from app.models.user import UserDB
+from app.services.llm_runtime import openai_client_and_model_for_user
 from .prompts import NOTE_ANALYSIS_SYSTEM_PROMPT
 
 
-async def analyze_note(content: str) -> Dict[str, Any]:
+async def analyze_note(content: str, *, db_user: UserDB) -> Dict[str, Any]:
     """
     对笔记内容进行 AI 分析，返回总结、优缺点和建议。
     """
@@ -31,8 +31,9 @@ async def analyze_note(content: str) -> Dict[str, Any]:
 请以严格的 JSON 格式返回分析结果，不要包含其他文字或 Markdown 标记。"""
 
     try:
-        response = await async_openai_client.chat.completions.create(
-            model=settings.LM_STUDIO_MODEL,
+        client, model = openai_client_and_model_for_user(db_user)
+        response = await client.chat.completions.create(
+            model=model,
             messages=[
                 {"role": "system", "content": NOTE_ANALYSIS_SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},

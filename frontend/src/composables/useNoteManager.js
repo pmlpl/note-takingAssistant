@@ -7,7 +7,7 @@ import { useRouter } from 'vue-router'
 import { noteApi } from '@/api/note'
 import api from '@/api/index'  // 导入 api 实例用于覆盖上传
 import { ElMessage } from 'element-plus'
-import { marked } from 'marked'
+import { renderMarkdownToSafeHtml } from '@/utils/htmlSanitize'
 import { MESSAGE_DURATION } from '@/utils/common'
 
 export function useNoteManager() {
@@ -21,7 +21,7 @@ export function useNoteManager() {
   // 计算属性
   const renderedContent = computed(() => {
     if (!currentNote.value?.content) return ''
-    return marked.parse(currentNote.value.content)
+    return renderMarkdownToSafeHtml(currentNote.value.content)
   })
   
   const filteredNotes = computed(() => {

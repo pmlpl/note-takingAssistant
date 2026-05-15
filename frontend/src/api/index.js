@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useUserStore } from '@/store'
+import router from '@/router'
 
 /**
  * 普通接口默认超时（毫秒）。
@@ -54,9 +55,9 @@ api.interceptors.response.use(
 
         userStore.logout()
 
-        // 只在当前不在登录页时才重定向
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login'
+        // 只在当前不在登录页时才重定向（SPA 内 replace，避免整页刷新）
+        if (router.currentRoute.value.path !== '/login') {
+          router.replace({ path: '/login' })
         }
       }
       // 如果没有 token，说明用户本来就没登录，不需要处理

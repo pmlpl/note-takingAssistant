@@ -2,7 +2,7 @@
   <div id="app-container">
     <router-view v-slot="{ Component, route }">
       <transition :name="getTransitionName(route)" mode="out-in" appear>
-        <keep-alive include="Home,AiGenerate,AiSummarize,NoteEdit,NoteList,HistoryNotes">
+        <keep-alive include="Home,AiGenerate,AiSummarize,NoteEdit,NoteList,HistoryNotes,NoteTranslate">
           <component :is="Component" class="page-wrapper" />
         </keep-alive>
       </transition>

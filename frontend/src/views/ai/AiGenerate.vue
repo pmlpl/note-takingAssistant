@@ -103,22 +103,6 @@
                       </div>
                     </template>
                   </el-upload>
-
-                  <!-- 已上传的笔记文件列表 -->
-                  <div v-if="uploadedNotes.length > 0" class="uploaded-notes">
-                    <div v-for="(note, index) in uploadedNotes" :key="index" class="note-file-item">
-                      <IconDocument :size="20" color="#409eff" />
-                      <span class="note-filename">{{ note.name }}</span>
-                      <el-button
-                        size="small"
-                        type="danger"
-                        link
-                        @click="removeNote(index)"
-                      >
-                        删除
-                      </el-button>
-                    </div>
-                  </div>
                 </div>
               </el-form-item>
 
@@ -142,22 +126,6 @@
                       </div>
                     </template>
                   </el-upload>
-
-                  <!-- 图片预览 -->
-                  <div v-if="imagePreviews.length > 0" class="image-previews">
-                    <div v-for="(preview, index) in imagePreviews" :key="index" class="preview-item">
-                      <img :src="preview" alt="预览" />
-                      <el-button
-                        size="small"
-                        type="danger"
-                        circle
-                        class="remove-image"
-                        @click="removeImage(index)"
-                      >
-                        ×
-                      </el-button>
-                    </div>
-                  </div>
                 </div>
               </el-form-item>
 
@@ -228,7 +196,7 @@
             <!-- 内容显示区域 -->
             <div v-else-if="noteContent" class="note-content-wrapper">
               <!-- 富文本模式（默认） -->
-              <div v-if="displayMode === 'rich'" v-html="noteContent" class="note-content prose" />
+              <div v-if="displayMode === 'rich'" v-html="sanitizedNoteHtml" class="note-content prose" />
               <!-- Markdown 原始模式 -->
               <div v-else class="note-content markdown-raw">
                 <pre>{{ rawMarkdown }}</pre>
@@ -250,7 +218,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/store'
 import { aiApi } from '@/api/ai'
@@ -260,6 +228,7 @@ import { IconMagic, IconPlus, IconEdit, IconUpload, IconDocument } from '@/compo
 import { ElMessage } from 'element-plus'
 import {IconNotebook} from "@/components/icons/index.js";
 import { Loading } from '@element-plus/icons-vue'
+import { sanitizeHtml } from '@/utils/htmlSanitize'
 
 defineOptions({
   name: 'AiGenerate'
@@ -278,77 +247,51 @@ const form = ref({
 const loading = ref(false)
 const saving = ref(false)
 const noteContent = ref('')  // 富文本内容（HTML）
+const sanitizedNoteHtml = computed(() => sanitizeHtml(noteContent.value))
 const rawMarkdown = ref('')  // 原始 Markdown 内容
 const displayMode = ref('rich')  // 显示模式：'rich' 富文本, 'markdown' 原始Markdown
 
-// 图片上传相关
+// 图片上传相关（预览由 el-upload picture-card 展示，提交时再读为 Data URL）
 const fileList = ref([])
-const imagePreviews = ref([])
 
-// 参考笔记上传相关
+// 参考笔记上传相关（列表由 el-upload 展示，提交时再读取正文）
 const noteFileList = ref([])
-const uploadedNotes = ref([])
-const noteContents = ref([])
 
 function goBack() {
   router.back()
 }
 
-// 处理笔记文件上传
 function handleNoteChange(file, files) {
-  uploadedNotes.value.push({
-    name: file.name,
-    size: file.size,
-    raw: file.raw
-  })
-
-  // 读取文件内容
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    noteContents.value.push({
-      name: file.name,
-      content: e.target.result
-    })
-  }
-
-  // 根据文件类型读取
-  if (file.raw.type === 'application/pdf') {
-    // PDF 文件需要特殊处理，这里暂时只获取文件名
-    reader.readAsText(file.raw)
-  } else {
-    reader.readAsText(file.raw)
-  }
-
   if (files.length > 2) {
     ElMessage.warning('最多只能上传2个参考笔记')
     noteFileList.value = files.slice(0, 2)
-    uploadedNotes.value = uploadedNotes.value.slice(0, 2)
   }
 }
 
 function handleNoteRemove(file, files) {
-  const index = noteFileList.value.findIndex(f => f.uid === file.uid)
-  if (index > -1) {
-    uploadedNotes.value.splice(index, 1)
-    noteContents.value.splice(index, 1)
+  noteFileList.value = files
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsText(file)
+  })
+}
+
+async function noteFileListToReferenceNotes(files) {
+  const slice = files.slice(0, 2).filter((f) => f.raw)
+  const out = []
+  for (const f of slice) {
+    const content = await readFileAsText(f.raw)
+    out.push({ name: f.name, content })
   }
+  return out
 }
 
-function removeNote(index) {
-  uploadedNotes.value.splice(index, 1)
-  noteContents.value.splice(index, 1)
-  noteFileList.value.splice(index, 1)
-}
-
-// 处理图片上传
 function handleImageChange(file, files) {
-  // 创建图片预览
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    imagePreviews.value.push(e.target.result)
-  }
-  reader.readAsDataURL(file.raw)
-
   if (files.length > 3) {
     ElMessage.warning('最多只能上传3张图片')
     fileList.value = files.slice(0, 3)
@@ -359,9 +302,19 @@ function handleImageRemove(file, files) {
   fileList.value = files
 }
 
-function removeImage(index) {
-  imagePreviews.value.splice(index, 1)
-  fileList.value.splice(index, 1)
+function fileListToDataUrls(files) {
+  const slice = files.slice(0, 3).filter((f) => f.raw)
+  return Promise.all(
+    slice.map(
+      (f) =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result)
+          reader.onerror = () => reject(reader.error)
+          reader.readAsDataURL(f.raw)
+        })
+    )
+  )
 }
 
 async function generateNote() {
@@ -375,16 +328,18 @@ async function generateNote() {
   rawMarkdown.value = ''  // 清空原始 Markdown
   
   try {
+    const images = await fileListToDataUrls(fileList.value)
+    const referenceNotePayload = await noteFileListToReferenceNotes(noteFileList.value)
     // 构建请求数据
     const requestData = {
       topic: form.value.topic,
       keywords: form.value.keyword,
       wordCount: form.value.wordCount,
-      images: imagePreviews.value,
-      referenceNotes: noteContents.value.map(note => ({
+      images,
+      referenceNotes: referenceNotePayload.map((note) => ({
         filename: note.name,
-        content: note.content
-      }))
+        content: note.content,
+      })),
     }
 
     // 使用普通的 API 调用
@@ -687,79 +642,14 @@ function convertMarkdownToHtml(markdown) {
   min-height: 100%;
 }
 
-/* 参考笔记上传区域 */
+/* 参考笔记上传区域（仅 el-upload 列表，无重复展示） */
 .reference-section {
   width: 100%;
-}
-
-.uploaded-notes {
-  margin-top: 15px;
-}
-
-.note-file-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: #f5f7fa;
-  border-radius: 8px;
-  margin-bottom: 8px;
-  transition: all 0.2s;
-}
-
-.note-file-item:hover {
-  background: #ecf5ff;
-}
-
-.note-filename {
-  flex: 1;
-  font-size: 14px;
-  color: #606266;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* 图片上传区域 */
 .upload-section {
   width: 100%;
-}
-
-.image-previews {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.preview-item {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #dcdfe6;
-}
-
-.preview-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.remove-image {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.preview-item:hover .remove-image {
-  opacity: 1;
 }
 
 .generate-btn {

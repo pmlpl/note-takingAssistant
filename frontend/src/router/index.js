@@ -57,6 +57,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/ai/translate',
+    name: 'NoteTranslate',
+    component: () => import('@/views/ai/NoteTranslate.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/mindmap',
     name: 'Mindmap',
     component: () => import('@/views/mindmap/Mindmap.vue'),

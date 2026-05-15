@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from app.api.v1 import user, note, ai
-from app.core.database import engine, Base
+from app.core.database import engine, Base, AsyncSessionLocal
+from app.core.startup_migrations import ensure_user_llm_columns
 from app.core.config import settings
 import os
 
@@ -17,7 +18,13 @@ async def init_db():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动时执行
+    if os.environ.get("SKIP_APP_LIFESPAN") == "1":
+        yield
+        return
     await init_db()
+    async with AsyncSessionLocal() as session:
+        await ensure_user_llm_columns(session)
+        await session.commit()
     yield
     # 关闭时执行清理操作
     
@@ -38,7 +45,7 @@ async def lifespan(app: FastAPI):
 # 初始化FastAPI
 app = FastAPI(
     title="AI个人智能笔记助手API",
-    description="基于FastAPI的AI笔记助手后端接口，支持用户管理、笔记管理、AI生成与总结",
+    description="基于 FastAPI 的 AI 笔记助手后端；AI 能力通过 OpenAI 兼容协议连接 LM Studio（或其它本地推理服务）。",
     version="1.0.0",
     lifespan=lifespan
 )

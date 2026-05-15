@@ -321,7 +321,7 @@ except json.JSONDecodeError as e:
 ## 📞 技术支持
 
 如果遇到 Prompt 相关问题，可以：
-1. 查看 Ollama 官方文档：https://ollama.ai/docs
+1. 查看 LM Studio 与本地 API 说明：https://lmstudio.ai/docs
 2. 测试不同的 temperature 值
 3. 记录失败的案例，分析原因
 4. 持续迭代和优化提示词

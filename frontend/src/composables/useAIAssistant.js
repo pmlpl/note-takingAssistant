@@ -6,7 +6,7 @@ import { ref } from 'vue'
 import { aiApi } from '@/api/ai'
 import { noteApi } from '@/api/note'
 import { ElMessage } from 'element-plus'
-import { marked } from 'marked'
+import { renderMarkdownToSafeHtml } from '@/utils/htmlSanitize'
 import { MESSAGE_DURATION, hasMeaningfulNoteText, shouldAttachNoteContext, composeUserMessageWithNoteContext } from '@/utils/common'
 import mammoth from 'mammoth'
 
@@ -99,7 +99,7 @@ export function useAIAssistant() {
    * 渲染消息内容（支持 Markdown）
    */
   function renderMessage(content) {
-    return marked.parse(content)
+    return renderMarkdownToSafeHtml(content)
   }
   
   /**

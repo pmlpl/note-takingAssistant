@@ -1,5 +1,7 @@
 <template>
-  <div ref="editorRef" class="rich-text-editor"></div>
+  <div class="rich-text-shell">
+    <div ref="editorRef" class="rich-text-editor"></div>
+  </div>
 </template>
 
 <script setup>
@@ -22,7 +24,6 @@ onMounted(() => {
   editor = new WangEditor(editorRef.value)
   
   editor.config.uploadImgShowBase64 = true
-  editor.config.height = 400
   editor.config.onchange = (html) => {
     emit('update:modelValue', html)
   }
@@ -47,9 +48,21 @@ defineExpose({
 </script>
 
 <style scoped>
+/* Flex 子项默认 min-width:auto，会被 Word 宽表格撑开导致整页横向滚动 */
+.rich-text-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .rich-text-editor {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid #e4e7ed;
   border-radius: 4px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .rich-text-editor :deep(.w-e-toolbar) {
@@ -57,7 +70,37 @@ defineExpose({
   flex-wrap: wrap;
 }
 
+/* 编辑区：仅纵向滚动，文档宽度跟随容器 */
 .rich-text-editor :deep(.w-e-text-container) {
-  height: 400px;
+  height: min(70vh, 720px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.rich-text-editor :deep(.w-e-scroll) {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.rich-text-editor :deep(.w-e-text) {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.rich-text-editor :deep(.w-e-text img),
+.rich-text-editor :deep(.w-e-text video) {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+.rich-text-editor :deep(.w-e-text table) {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: fixed;
+}
+
+.rich-text-editor :deep(.w-e-text td),
+.rich-text-editor :deep(.w-e-text th) {
+  word-break: break-word;
 }
 </style>

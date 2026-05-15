@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from app.services import generate_note, analyze_note, chat_with_ai
+from app.services import generate_note, analyze_note, chat_with_ai, translate_note
+from app.core.field_crypto import SecretCryptoError
 from typing import Optional, List
 from app.core.security import get_current_user
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +28,11 @@ class GenerateNoteRequest(BaseModel):
 
 class SummarizeNoteRequest(BaseModel):
     content: str
+
+
+class TranslateNoteRequest(BaseModel):
+    content: str
+    targetLang: str = Field(..., min_length=2, max_length=12)
 
 
 class ChatMessage(BaseModel):
@@ -59,13 +65,18 @@ async def generate_note_endpoint(
             keyword=req.keywords,
             reference_notes=req.referenceNotes,
             images=req.images,
-            word_count=req.wordCount
+            word_count=req.wordCount,
+            db_user=db_user,
         )
         
         # 记录AI使用
         await crud_ai_usage.log_ai_usage(db, db_user.id, "generate")
         
         return {"code": 200, "message": "生成成功", "data": {"content": note_content}}
+    except HTTPException:
+        raise
+    except SecretCryptoError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"生成失败：{str(e)}")
 
@@ -83,14 +94,47 @@ async def summarize_note_endpoint(
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
         
-        result = await analyze_note(req.content)
+        result = await analyze_note(req.content, db_user=db_user)
         
         # 记录AI使用
         await crud_ai_usage.log_ai_usage(db, db_user.id, "summarize")
         
         return {"code": 200, "message": "分析成功", "data": result}
+    except HTTPException:
+        raise
+    except SecretCryptoError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分析失败：{str(e)}")
+
+
+@router.post("/translate-note", summary="翻译笔记")
+async def translate_note_endpoint(
+    req: TranslateNoteRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """将笔记正文译为目标语言（Markdown 全文翻译或 HTML 仅译文本节点保留 DOM），返回带水印。"""
+    try:
+        db_user = await crud_user.get_user_by_username(
+            db, username=current_user["username"]
+        )
+        if not db_user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+
+        result = await translate_note(
+            req.content, req.targetLang, db_user=db_user
+        )
+        await crud_ai_usage.log_ai_usage(db, db_user.id, "translate")
+        return {"code": 200, "message": "翻译成功", "data": result}
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except SecretCryptoError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"翻译失败：{str(e)}") from e
 
 
 @router.post("/chat", summary="AI对话")
@@ -106,11 +150,15 @@ async def chat_endpoint(
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
         
-        reply = await chat_with_ai(req.message, req.history)
+        reply = await chat_with_ai(req.message, req.history, db_user=db_user)
         
         # 记录AI使用
         await crud_ai_usage.log_ai_usage(db, db_user.id, "chat")
         
         return {"code": 200, "message": "回复成功", "data": {"reply": reply}}
+    except HTTPException:
+        raise
+    except SecretCryptoError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"对话失败：{str(e)}")

@@ -1,348 +1,211 @@
 # AI个人智能笔记助手 📝
 
-一个基于 **Vue 3 + FastAPI + Ollama** 的全栈智能笔记应用，提供AI辅助的笔记生成、总结和管理功能。
+一个基于 **Vue 3 + FastAPI + LM Studio**（或其它 OpenAI 兼容推理端）的全栈智能笔记应用，支持笔记管理、AI 生成/总结/翻译、思维导图与个人自带模型（BYOK）。
 
 ![Vue](https://img.shields.io/badge/Vue-3.3-brightgreen)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.104-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-blue)
 ![Python](https://img.shields.io/badge/Python-3.10+-yellow)
-![License](https://img.shields.io/badge/License-MIT-orange)
 
 ## ✨ 核心功能
 
 ### 📝 笔记管理
-- ✅ 富文本编辑器支持
-- ✅ 笔记分类与标签
-- ✅ 搜索与筛选
-- ✅ 收藏功能
-- ✅ 历史记录追踪
-- ✅ 导入 Word/TXT 文档
+- 富文本（WangEditor）与 Markdown 双模式编辑
+- 标签、搜索、筛选与收藏
+- 历史笔记入口
+- 导入 Word（`.docx`）与 TXT；支持与后端校验相关的合并/覆盖流程（详见接口）
 
 ### 🤖 AI 智能助手
-- ✅ AI 自动生成笔记（多格式输出）
-- ✅ 智能总结笔记内容
-- ✅ AI 对话交互
-- ✅ 流式输出显示
-- ✅ 上下文理解（支持上传笔记作为参考）
-- ✅ /note 命令快速调用
+- **生成**：主题 / 关键词、字数滑块，可选参考笔记与参考图片（列表仅由上传组件展示，避免重复）；输出格式 Markdown / Word / 纯文本
+- **总结**：基于选定笔记或上传内容
+- **翻译**：多目标语言（非中英文选项附带中文说明），译文含水印与脚注；有单次字数上限（以服务端为准）
+- **对话**：首页助手面板，支持上下文与 `/note` 等指令（详见前端交互）
+
+### 🗺️ 其它页面
+- **思维导图**：独立路由 `/mindmap`（需登录）
 
 ### 📊 数据可视化
-- ✅ 笔记统计图表（ECharts）
-- ✅ 最近笔记动态展示
-- ✅ 学习趋势分析
+- 首页笔记统计（ECharts）、最近笔记等模块（Redis 可缓存加速）
 
 ### 🔐 用户系统
-- ✅ JWT 身份认证
-- ✅ 用户注册/登录
-- ✅ 个人中心管理
+- JWT 注册 / 登录
+- **个人中心**：资料与密码；可选配置「自带密钥」下的推理 **API 基址 / 模型 / Key**（与后端 Fernet 加密存储对齐）
 
-### 💾 缓存优化
-- ✅ Redis 高性能缓存
-- ✅ 持久化缓存策略
-- ✅ 自动同步机制
+### 💾 缓存（Redis）
+- 用于「最近笔记」等；**未安装或未启动 Redis 时仍可正常使用**（降级逻辑见 `backend/app/core/redis_client.py`）
 
-## 🏗️ 技术架构
-
-### 前端技术栈
-- **框架**: Vue 3 (Composition API)
-- **路由**: Vue Router 4
-- **状态管理**: Pinia
-- **UI组件**: Element Plus
-- **富文本**: WangEditor
-- **HTTP客户端**: Axios
-- **Markdown**: Marked
-- **Word解析**: Mammoth
-- **图表**: ECharts
-- **构建工具**: Vite 5
-
-### 后端技术栈
-- **框架**: FastAPI
-- **数据库**: MySQL + SQLAlchemy ORM
-- **缓存**: Redis
-- **AI模型**: Ollama (本地部署)
-- **认证**: JWT (python-jose)
-- **密码加密**: Bcrypt
-- **文档处理**: python-docx
-- **异步服务器**: Uvicorn
-
-## 📁 项目结构
-
-```
-note-takingAssistant/
-├── backend/                 # 后端服务
-│   ├── app/
-│   │   ├── api/v1/         # API路由层
-│   │   │   ├── user.py     # 用户接口
-│   │   │   ├── note.py     # 笔记接口
-│   │   │   └── ai.py       # AI接口
-│   │   ├── core/           # 核心配置
-│   │   │   ├── config.py   # 环境变量配置
-│   │   │   ├── database.py # 数据库连接
-│   │   │   ├── redis_client.py # Redis客户端
-│   │   │   └── security.py # 安全工具
-│   │   ├── crud/           # 数据操作层
-│   │   ├── models/         # 数据模型
-│   │   ├── services/       # 业务逻辑层
-│   │   │   ├── prompts.py          # AI提示词
-│   │   │   ├── note_generator.py   # 笔记生成
-│   │   │   ├── note_analyzer.py    # 笔记分析
-│   │   │   └── chat_service.py     # 聊天服务
-│   │   └── utils/          # 工具函数
-│   ├── uploads/            # 文件上传目录
-│   ├── .env                # 环境配置（不提交）
-│   ├── .env.example        # 配置模板
-│   ├── requirements.txt    # Python依赖
-│   └── main.py             # 入口文件
-│
-├── frontend/               # 前端应用
-│   ├── src/
-│   │   ├── api/           # API接口封装
-│   │   ├── assets/        # 静态资源
-│   │   ├── components/    # 公共组件
-│   │   │   ├── icons/     # SVG图标
-│   │   │   ├── Layout.vue # 布局组件
-│   │   │   └── RichText.vue # 富文本编辑器
-│   │   ├── composables/   # 组合式函数
-│   │   │   ├── useNoteManager.js  # 笔记管理
-│   │   │   └── useAIAssistant.js  # AI助手
-│   │   ├── config/        # 配置文件
-│   │   ├── router/        # 路由配置
-│   │   ├── store/         # Pinia状态管理
-│   │   ├── utils/         # 工具函数
-│   │   ├── views/         # 页面视图
-│   │   │   ├── auth/      # 认证页面
-│   │   │   ├── notes/     # 笔记页面
-│   │   │   └── ai/        # AI功能页面
-│   │   ├── App.vue        # 根组件
-│   │   └── main.js        # 入口文件
-│   ├── .env               # 环境配置（不提交）
-│   ├── .env.example       # 配置模板
-│   └── package.json       # Node依赖
-│
-└── docs/                  # 项目文档
-    ├── ENVIRONMENT_CONFIG.md          # 环境配置指南
-    ├── PROJECT_OPTIMIZATION_SUMMARY.md # 项目优化总结
-    └── ...                            # 其他功能文档
-```
-
-## 🚀 快速开始
-
-### 前置要求
-
-- **Node.js** >= 16.x
-- **Python** >= 3.10
-- **MySQL** >= 8.0
-- **Redis** >= 6.0
-- **Ollama** (本地AI模型)
-
-### 1️⃣ 安装 Ollama
-
-```bash
-# 访问 https://ollama.ai 下载安装
-
-# 拉取 AI 模型
-ollama pull qwen:7b
-
-# 启动 Ollama 服务
-ollama serve
-```
-
-### 2️⃣ 配置后端
-
-```bash
-cd backend
-
-# 创建虚拟环境（推荐）
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# 或
-.venv\Scripts\activate     # Windows
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件，设置数据库密码等配置
-```
-
-编辑 `backend/.env`：
-```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=你的数据库密码
-DB_NAME=ai_note_db
-
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-REDIS_DB=0
-
-SECRET_KEY=your-secret-key-change-in-production
-OLLAMA_MODEL=qwen:7b
-```
-
-创建数据库：
-```sql
-CREATE DATABASE ai_note_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-启动后端服务：
-```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-访问 API 文档：http://localhost:8000/docs
-
-### 3️⃣ 配置前端
-
-```bash
-cd frontend
-
-# 安装依赖
-npm install
-
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件
-```
-
-编辑 `frontend/.env`：
-```env
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-启动开发服务器：
-```bash
-npm run dev
-```
-
-访问前端应用：http://localhost:5173
-
-## 📖 使用指南
-
-### 基本流程
-
-1. **注册/登录** - 创建账户并登录
-2. **创建笔记** - 手动编写或使用 AI 生成
-3. **AI 辅助** - 使用 AI 总结、生成或对话
-4. **管理笔记** - 搜索、分类、收藏、导出
-
-### AI 功能使用
-
-#### 生成笔记
-- 进入"AI生成"页面
-- 输入主题或关键词
-- 选择输出格式（Markdown/纯文本）
-- 点击生成，等待 AI 创作
-
-#### 总结笔记
-- 在笔记列表中点击"AI总结"
-- 或直接上传已有笔记
-- AI 会自动提取关键信息
-
-#### AI 对话
-- 在首页打开 AI 助手面板
-- 输入问题或指令
-- 支持 `/note` 命令引用笔记
-- 可上传笔记作为上下文
-
-### 导入笔记
-
-1. 点击"导入笔记"按钮
-2. 选择 Word (.docx) 或 TXT 文件
-3. 预览内容并确认
-4. 系统自动保存至历史记录
-
-## 📚 详细文档
-
-更多功能说明和技术细节请查看 [docs](./docs/) 文件夹：
-
-- 📌 [环境配置指南](./docs/ENVIRONMENT_CONFIG.md) - 详细的配置说明
-- 📌 [项目优化总结](./docs/PROJECT_OPTIMIZATION_SUMMARY.md) - 代码优化记录
-- 📌 [AI功能文档](./docs/AI_*.md) - AI相关功能说明
-- 📌 [修复报告](./docs/FIX_*.md) - Bug修复记录
-- 📌 [功能特性](./docs/*_FEATURE.md) - 功能特性介绍
-
-## 🔧 开发说明
-
-### 后端开发
-
-```bash
-cd backend
-
-# 启动开发服务器（热重载）
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
-# 运行测试
-pytest
-```
-
-### 前端开发
-
-```bash
-cd frontend
-
-# 启动开发服务器
-npm run dev
-
-# 构建生产版本
-npm run build
-
-# 预览生产构建
-npm run preview
-```
-
-### 代码规范
-
-- **前端**: 遵循 Vue 3 Composition API 最佳实践
-- **后端**: 遵循 PEP 8 Python 编码规范
-- **Git提交**: 使用语义化提交信息
-
-## 🐛 常见问题
-
-### Q: AI 响应很慢怎么办？
-A: 检查 Ollama 服务是否正常运行，可以尝试使用更小的模型（如 qwen:1.8b）
-
-### Q: Redis 连接失败？
-A: 确保 Redis 服务已启动，检查 `.env` 中的配置是否正确
-
-### Q: 图片上传失败？
-A: 检查 `backend/uploads` 目录是否有写入权限
-
-### Q: 前端白屏？
-A: 检查浏览器控制台错误，确认后端 API 地址配置正确
-
-更多问题请查看 [docs](./docs/) 中的修复报告文档。
-
-## 📝 更新日志
-
-详见各功能文档：
-- [AI生成优化](./docs/AI_GENERATE_*.md)
-- [笔记导入功能](./docs/IMPORT_*.md)
-- [缓存优化](./docs/REDIS_*.md)
-- [界面优化](./docs/HOME_*.md)
-
-## 🤝 贡献指南
-
-欢迎提交 Issue 和 Pull Request！
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
-
-## 👨‍💻 作者
-
-如有问题或建议，欢迎联系！
+### 🧭 前端路由缓存
+- `keep-alive` 缓存首页、AI 生成/总结/**翻译笔记**、笔记列表/编辑/历史等，切换路由后常见表单状态可保留（见 `frontend/src/App.vue`）
 
 ---
 
-**最后更新**: 2026-05-12  
-**版本**: 1.0.0  
-**状态**: ✅ 活跃开发中
+## 🏗️ 技术架构
+
+### 前端
+| 类别 | 技术 |
+|------|------|
+| 框架 | Vue 3（Composition API）、Vue Router 4、Pinia |
+| UI | Element Plus |
+| 富文本 | WangEditor |
+| 图表 | ECharts |
+| Markdown / 消毒 | Marked、isomorphic-dompurify |
+| Word 导入 | Mammoth |
+| 测试 | Vitest（`npm run test`） |
+| 构建 | Vite 5（默认端口 **5174**） |
+
+### 后端
+| 类别 | 技术 |
+|------|------|
+| 框架 | FastAPI、Pydantic v2、Uvicorn |
+| 数据 | MySQL + SQLAlchemy 2.x（异步 aiomysql） |
+| AI | `openai` SDK，`LM_STUDIO_URL` / `LM_STUDIO_MODEL`；支持用户 BYOK 与会话级客户端（`llm_runtime`、`openai_client`） |
+| 密钥加密 | `field_crypto`（`ENCRYPTION_KEY` 可选，否则由 `SECRET_KEY` 派生） |
+| 其它 | JWT、Bcrypt、python-docx、Redis、`beautifulsoup4` |
+
+---
+
+## 📁 项目结构（节选）
+
+```
+note-takingAssistant/
+├── .github/workflows/ci.yml   # 前端 build/test + 后端 pytest 等
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/           # user, note, ai
+│   │   ├── core/             # config, security, database, redis_client, field_crypto, startup_migrations
+│   │   ├── crud/, models/, services/, utils/
+│   ├── migrations/           # SQLAlchemy 外的小型迁移脚本
+│   ├── tests/                # pytest（含加密与 URL 规范化等）
+│   ├── .env.example
+│   ├── PROMPT_DESIGN_GUIDE.md
+│   └── README.md             # 接口与环境说明（更细的 API 列表）
+├── frontend/
+│   ├── src/
+│   │   ├── api/, router/, store/, utils/
+│   │   ├── views/auth/, notes/, ai/, user/, mindmap/
+│   │   ├── components/, composables/
+│   └── vite.config.js
+└── README.md                  # 本文件
+```
+
+---
+
+## 🚀 快速开始
+
+### 前置条件
+- **Node.js** ≥ 18（推荐 20.x）
+- **Python** ≥ 3.10
+- **MySQL** ≥ 8.0
+- **Redis**（可选）
+- **推理端**：本机 [LM Studio](https://lmstudio.ai/) 或其它 OpenAI 兼容服务，`API 基址`须形如 **`…/v1`**（不要填浏览器里的 `…/v1/models`；服务端会对常见误填做规范化）
+
+### CI（可选）
+推送 / PR 时 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 会跑前端测试与构建、后端 `pytest` 等。本地示例：
+
+```bash
+cd frontend && npm ci && npm run test && npm run build
+cd backend && pip install -r requirements.txt -r requirements-dev.txt && pytest -q
+```
+
+### 1. LM Studio（或其它兼容端）
+1. 加载模型并启动 **Local Server**。
+2. 在 `backend/.env` 中设置（模型 ID 须与界面一致）：
+   - `LM_STUDIO_URL`，例如 `http://127.0.0.1:1234/v1`
+   - `LM_STUDIO_MODEL`
+
+### 2. 后端
+
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux/macOS
+pip install -r requirements.txt
+copy .env.example .env          # 或 cp；再编辑 .env
+```
+
+必填：`DB_*`、`SECRET_KEY`、`LM_STUDIO_URL`、`LM_STUDIO_MODEL`。可选：`REDIS_*`、`OPENAI_API_KEY`、`ENCRYPTION_KEY`（BYOK 加密；不配则从 `SECRET_KEY` 派生，**轮换 `SECRET_KEY` 后用户需在个人中心重新保存自带 Key**）。
+
+数据库名称须与 `.env` 中 `DB_NAME` 一致（模板默认为 `note_db`）：
+
+```sql
+CREATE DATABASE note_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+API 文档：<http://localhost:8000/docs>
+
+### 3. 前端
+
+```bash
+cd frontend
+npm install
+copy .env.example .env
+```
+
+`frontend/.env` 中 `VITE_API_BASE_URL` 指向后端（开发环境也可依赖 Vite 将 `/api` 代理到该地址，见 `vite.config.js`）。
+
+```bash
+npm run dev
+```
+
+默认：<http://localhost:5174>
+
+---
+
+## 📖 使用提示（简要）
+
+| 功能 | 路径 / 说明 |
+|------|-------------|
+| AI 生成 | `/ai/generate` — 参考笔记与参考图片通过上传区管理 |
+| AI 总结 | `/ai/summarize` |
+| 翻译笔记 | `/ai/translate` — 切换路由后表单一般由 `keep-alive` 保留 |
+| 思维导图 | `/mindmap` |
+| 个人中心 / BYOK | `/user` |
+
+---
+
+## 📚 更多文档
+
+- [`backend/README.md`](backend/README.md) — 后端 API 列表与环境变量
+- [`backend/PROMPT_DESIGN_GUIDE.md`](backend/PROMPT_DESIGN_GUIDE.md) — 提示词与模型侧约定（若有）
+
+---
+
+## 🔧 开发命令摘要
+
+```bash
+# 后端
+cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cd backend && pytest
+
+# 前端
+cd frontend && npm run dev
+cd frontend && npm run build && npm run preview
+cd frontend && npm run test
+```
+
+---
+
+## ❓ 常见问题
+
+- **AI 很慢或超时**：确认推理端已启动；可适当放宽后端 LLM HTTP 超时配置（见 `config`）；换更小模型。
+- **Redis 报错**：可忽略或使用缓存；检查 `.env` 中 Redis 地址。
+- **BYOK / 基址错误**：OpenAI 兼容 **`base_url` 应止于 `/v1`**；模型 ID 须与 LM Studio（或服务端）展示的一致。
+- **前端空白**：看控制台与 Network；确认 `VITE_API_BASE_URL` / 代理与后端端口一致。
+
+---
+
+## 🤝 贡献
+
+欢迎 Issue / PR：建议小步提交，便于评审。
+
+## 📄 许可
+
+如无特别声明，本项目可按 **MIT** 思路自由使用；若仓库后续补充 `LICENSE` 文件，以文件正文为准。
+
+---
+
+**最后更新**：2026-05-15  

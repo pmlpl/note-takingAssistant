@@ -66,8 +66,20 @@
         <!-- 右侧：AI 助手 -->
         <el-aside width="480px" class="right-ai-panel">
           <div class="ai-header">
-            <h3><IconAI :size="24"/>AI 助手</h3>
-            <p>智能问答与辅助</p>
+            <div class="ai-header-main">
+              <h3><IconAI :size="24"/>AI 助手</h3>
+              <p>智能问答与辅助 · 本地最多保留 {{ HOME_CHAT_MAX_MESSAGES }} 条，超出自动丢弃最早消息</p>
+            </div>
+            <el-button
+              v-if="chatHistory.length > 0"
+              type="danger"
+              link
+              size="small"
+              class="ai-header-clear"
+              @click="confirmClearChat"
+            >
+              清空对话
+            </el-button>
           </div>
           
           <div class="ai-chat-area">
@@ -248,9 +260,13 @@ import Layout from '@/components/Layout.vue'
 import {IconPlus, IconUpload, IconDocument, IconEdit, IconAI, IconNotebook} from '@/components/icons'
 import { noteApi } from '@/api/note'
 import { aiApi } from '@/api/ai'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
-import { marked } from 'marked'
+import {
+  renderMarkdownToSafeHtml,
+  sanitizeHtml,
+  isLikelyHtmlContent
+} from '@/utils/htmlSanitize'
 import {
   MESSAGE_DURATION,
   hasMeaningfulNoteText,
@@ -263,11 +279,13 @@ import {
   MINDMAP_LOCAL_STORAGE_KEY,
   MINDMAP_PENDING_SESSION_KEY
 } from '@/utils/common'
-import mammoth from 'mammoth'
 
 defineOptions({
   name: 'Home'
 })
+
+/** 首页 AI 助手：聊天（含用户/助手）在内存与 localStorage 中最多保留条数，超出丢弃最早消息 */
+const HOME_CHAT_MAX_MESSAGES = 40
 
 const router = useRouter()
 const noteStore = useNoteStore()
@@ -290,10 +308,18 @@ const filteredNotes = computed(() => {
   return allNotes.value
 })
 
-// 渲染当前笔记的 Markdown 内容
+/** 与翻译页一致：富文本 HTML 只消毒；纯 Markdown 再走 marked */
+function noteContentToSafeHtml(content) {
+  if (!content) return ''
+  return isLikelyHtmlContent(content)
+    ? sanitizeHtml(content)
+    : renderMarkdownToSafeHtml(content)
+}
+
+// 渲染当前笔记（HTML 笔记保留表格/图片等 DOM）
 const renderedContent = computed(() => {
   if (!currentNote.value?.content) return ''
-  return marked.parse(currentNote.value.content)
+  return noteContentToSafeHtml(currentNote.value.content)
 })
 
 onMounted(async () => {
@@ -469,8 +495,9 @@ function importNote() {
       
       // 根据文件类型解析
       if (file.name.endsWith('.docx')) {
-        // 使用 Mammoth 解析 Word 文件
+        // 使用 Mammoth 解析 Word 文件（按需加载，减轻首页首包）
         const arrayBuffer = await file.arrayBuffer()
+        const mammoth = (await import('mammoth')).default
         const result = await mammoth.convertToHtml({ arrayBuffer })
         content = result.value
       } else if (file.name.endsWith('.md')) {
@@ -701,8 +728,9 @@ function uploadNoteToAI() {
       
       // 根据文件类型解析
       if (file.name.endsWith('.docx')) {
-        // 使用 Mammoth 解析 Word 文件
+        // 使用 Mammoth 解析 Word 文件（按需加载）
         const arrayBuffer = await file.arrayBuffer()
+        const mammoth = (await import('mammoth')).default
         const result = await mammoth.convertToHtml({ arrayBuffer })
         content = result.value.replace(/<[^>]*>/g, '') // 去掉HTML标签
       } else if (file.name.endsWith('.md')) {
@@ -763,7 +791,8 @@ function sendMessage() {
     timestamp: new Date(),
     contextNoteTitle: hasNoteContext ? (uploadedNoteName.value || '笔记') : undefined
   })
-  
+  saveChatHistory()
+
   // 立即滚动到底部（不等待）
   scrollToBottom()
   
@@ -825,9 +854,9 @@ function sendMessage() {
   // 立即返回，不等待任何操作完成
 }
 
-// 渲染消息内容（支持 Markdown）
+// 渲染消息内容（HTML / Markdown 与预览区一致）
 function renderMessage(content) {
-  return marked.parse(content)
+  return noteContentToSafeHtml(content)
 }
 
 // 格式化时间
@@ -974,12 +1003,13 @@ async function loadCurrentNoteFromCache() {
   }
 }
 
-// 保存聊天历史到 localStorage
+// 保存聊天历史到 localStorage（与内存同步裁剪，避免单页会话无限变长）
 function saveChatHistory() {
   try {
-    // 只保存最近50条消息，避免存储过大
-    const messagesToSave = chatHistory.value.slice(-50)
-    localStorage.setItem('home_chat_history', JSON.stringify(messagesToSave))
+    if (chatHistory.value.length > HOME_CHAT_MAX_MESSAGES) {
+      chatHistory.value = chatHistory.value.slice(-HOME_CHAT_MAX_MESSAGES)
+    }
+    localStorage.setItem('home_chat_history', JSON.stringify(chatHistory.value))
   } catch (error) {
     console.error('保存聊天历史失败:', error)
   }
@@ -990,21 +1020,47 @@ function loadChatHistory() {
   try {
     const cached = localStorage.getItem('home_chat_history')
     if (!cached) return
-    
+
     const history = JSON.parse(cached)
-    
+    if (!Array.isArray(history)) {
+      localStorage.removeItem('home_chat_history')
+      return
+    }
+
     // 恢复聊天历史
-    chatHistory.value = history.map(msg => ({
+    chatHistory.value = history.map((msg) => ({
       ...msg,
-      timestamp: new Date(msg.timestamp)  // 恢复 Date 对象
+      timestamp: new Date(msg.timestamp) // 恢复 Date 对象
     }))
-    
+    saveChatHistory()
+
     // 滚动到底部
     setTimeout(() => scrollToBottom(), 100)
   } catch (error) {
     console.error('加载聊天历史失败:', error)
     localStorage.removeItem('home_chat_history')
   }
+}
+
+async function confirmClearChat() {
+  try {
+    await ElMessageBox.confirm('确定清空当前对话？清空后无法恢复。', '清空对话', {
+      type: 'warning',
+      confirmButtonText: '清空',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return
+  }
+  chatHistory.value = []
+  try {
+    localStorage.removeItem('home_chat_history')
+  } catch {
+    /* ignore */
+  }
+  ElMessage.success({ message: '已清空对话', duration: MESSAGE_DURATION.SHORT })
+  await nextTick()
+  onChatScroll()
 }
 
 // 获取笔记预览文本
@@ -1170,7 +1226,8 @@ function getNotePreview(content) {
 
 .preview-body {
   flex: 1;  /* 占据剩余空间 */
-  overflow-y: auto;  /* 只有内容区域可以滚动 */
+  overflow-y: auto;
+  overflow-x: auto;
   padding: 0 30px 30px 30px;  /* 下左右内边距 */
   line-height: 1.8;
   color: #303133;
@@ -1188,6 +1245,30 @@ function getNotePreview(content) {
 
 .preview-body :deep(p) {
   margin: 12px 0;
+}
+
+.preview-body :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.preview-body :deep(table) {
+  display: table;
+  border-collapse: collapse;
+  max-width: 100%;
+  margin: 12px 0;
+}
+
+.preview-body :deep(td),
+.preview-body :deep(th) {
+  border: 1px solid #dcdfe6;
+  padding: 8px 12px;
+  vertical-align: top;
+}
+
+.preview-body :deep(th) {
+  background: #f5f7fa;
+  font-weight: 600;
 }
 
 .empty-preview {
@@ -1224,7 +1305,21 @@ function getNotePreview(content) {
 .ai-header {
   padding: 20px;
   border-bottom: 1px solid #e4e7ed;
-  flex-shrink: 0;  /* 防止头部被压缩 */
+  flex-shrink: 0; /* 防止头部被压缩 */
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-header-clear {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .ai-header h3 {
@@ -1258,7 +1353,8 @@ function getNotePreview(content) {
 
 .chat-messages {
   flex: 1;
-  overflow-y: auto;  /* 只有聊天内容区域可以滚动 */
+  overflow-y: auto;
+  overflow-x: auto;
   padding: 20px;
   min-height: 0;  /* 重要：允许flex子项缩小 */
 }
@@ -1463,6 +1559,28 @@ function getNotePreview(content) {
 
 .message-item.user .message-text :deep(pre) {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.message-text :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.message-text :deep(table) {
+  border-collapse: collapse;
+  max-width: 100%;
+  margin: 8px 0;
+}
+
+.message-text :deep(td),
+.message-text :deep(th) {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 6px 10px;
+}
+
+.message-item.user .message-text :deep(td),
+.message-item.user .message-text :deep(th) {
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .message-time {
@@ -1740,45 +1858,52 @@ function getNotePreview(content) {
   font-size: 14px;
 }
 
-/* ==================== 自定义滚动条样式 ==================== */
+/* ==================== 首页滚动条：默认可辨，悬停区域时更明显 ==================== */
 
-/* Webkit浏览器（Chrome, Safari, Edge）*/
-::-webkit-scrollbar {
+.preview-body::-webkit-scrollbar,
+.chat-messages::-webkit-scrollbar,
+.notes-list::-webkit-scrollbar,
+.note-list-container::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+.preview-body::-webkit-scrollbar-track,
+.chat-messages::-webkit-scrollbar-track,
+.notes-list::-webkit-scrollbar-track,
+.note-list-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(144, 147, 153, 0);  /* 默认：完全透明，不可见 */
+.preview-body::-webkit-scrollbar-thumb,
+.chat-messages::-webkit-scrollbar-thumb,
+.notes-list::-webkit-scrollbar-thumb,
+.note-list-container::-webkit-scrollbar-thumb {
+  background: rgba(144, 147, 153, 0.35);
   border-radius: 4px;
   transition: background 0.2s ease;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(144, 147, 153, 0.5);  /* 悬停：中等透明度，清晰可见 */
+.preview-body:hover::-webkit-scrollbar-thumb,
+.chat-messages:hover::-webkit-scrollbar-thumb,
+.notes-list:hover::-webkit-scrollbar-thumb,
+.note-list-container:hover::-webkit-scrollbar-thumb {
+  background: rgba(144, 147, 153, 0.65);
 }
 
-::-webkit-scrollbar-thumb:active {
-  background: rgba(64, 158, 255, 0.7);  /* 点击：主题色蓝色，明显反馈 */
+.preview-body::-webkit-scrollbar-thumb:active,
+.chat-messages::-webkit-scrollbar-thumb:active,
+.notes-list::-webkit-scrollbar-thumb:active,
+.note-list-container::-webkit-scrollbar-thumb:active {
+  background: rgba(64, 158, 255, 0.75);
 }
 
-/* Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(144, 147, 153, 0) transparent;
-}
-
-/* 针对特定滚动区域的优化 - 始终保留空间，避免内容跳动 */
-.chat-messages,
 .preview-body,
+.chat-messages,
 .notes-list,
 .note-list-container {
-  /* 不隐藏滚动条，而是让它非常透明 */
-  /* 移除之前的隐藏设置 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(144, 147, 153, 0.45) rgba(0, 0, 0, 0.06);
 }
 </style>

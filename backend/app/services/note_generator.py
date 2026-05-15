@@ -4,8 +4,8 @@
 """
 from typing import Any, AsyncIterator, List, Optional
 
-from app.core.config import settings
-from .openai_client import async_openai_client
+from app.models.user import UserDB
+from app.services.llm_runtime import openai_client_and_model_for_user
 from .prompts import NOTE_GENERATION_SYSTEM_PROMPT
 
 
@@ -65,14 +65,17 @@ async def generate_note_stream(
     reference_notes: Optional[List[Any]] = None,
     images: Optional[list] = None,
     word_count: int = 600,
+    *,
+    db_user: UserDB,
 ) -> AsyncIterator[str]:
     """流式生成笔记内容（异步生成器）。"""
     normalized = _normalize_reference_notes(reference_notes)
     user_prompt = _build_generation_prompt(topic, keyword, normalized, word_count)
 
     try:
-        stream = await async_openai_client.chat.completions.create(
-            model=settings.LM_STUDIO_MODEL,
+        client, model = openai_client_and_model_for_user(db_user)
+        stream = await client.chat.completions.create(
+            model=model,
             messages=[
                 {"role": "system", "content": NOTE_GENERATION_SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
@@ -97,14 +100,17 @@ async def generate_note(
     reference_notes: Optional[List[Any]] = None,
     images: Optional[list] = None,
     word_count: int = 600,
+    *,
+    db_user: UserDB,
 ) -> str:
     """根据主题、关键词、参考笔记等生成笔记正文。"""
     normalized = _normalize_reference_notes(reference_notes)
     user_prompt = _build_generation_prompt(topic, keyword, normalized, word_count)
 
     try:
-        response = await async_openai_client.chat.completions.create(
-            model=settings.LM_STUDIO_MODEL,
+        client, model = openai_client_and_model_for_user(db_user)
+        response = await client.chat.completions.create(
+            model=model,
             messages=[
                 {"role": "system", "content": NOTE_GENERATION_SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
