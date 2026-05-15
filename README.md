@@ -33,8 +33,11 @@
 ### 💾 缓存（Redis）
 - 用于「最近笔记」等；**未安装或未启动 Redis 时仍可正常使用**（降级逻辑见 `backend/app/core/redis_client.py`）
 
+### 📖 使用手册
+- 登录后通过顶部导航 **「使用手册」** 打开（路由 **`/manual`**），含项目介绍、操作说明、用户协议、隐私说明与反馈入口
+
 ### 🧭 前端路由缓存
-- `keep-alive` 缓存首页、AI 生成/总结/**翻译笔记**、笔记列表/编辑/历史等，切换路由后常见表单状态可保留（见 `frontend/src/App.vue`）
+- `keep-alive` 缓存首页、AI 生成/总结/**翻译笔记**、笔记列表/编辑/历史、使用手册等，切换路由后常见表单状态可保留（见 `frontend/src/App.vue`）
 
 ---
 
@@ -164,11 +167,13 @@ npm run dev
 | 翻译笔记 | `/ai/translate` — 切换路由后表单一般由 `keep-alive` 保留 |
 | 思维导图 | `/mindmap` |
 | 个人中心 / BYOK | `/user` |
+| 使用手册 | `/manual` — 应用内用户文档（需登录） |
 
 ---
 
 ## 📚 更多文档
 
+- **终端用户**：登录后打开 **使用手册**（`/manual`），无需单独维护仓库内 Markdown 用户指南
 - [`backend/README.md`](backend/README.md) — 后端 API 列表与环境变量
 - [`backend/PROMPT_DESIGN_GUIDE.md`](backend/PROMPT_DESIGN_GUIDE.md) — 提示词与模型侧约定（若有）
 

@@ -71,8 +71,5 @@ coverage/
 # Type stubs
 *.pyi
 
-# Documentation
+# Local documentation drafts (end-user guide lives in-app at /manual)
 docs/
-
-# Virtual environment
-.venv/
