@@ -5,8 +5,8 @@ AI 聊天服务
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.core.config import settings
-from .openai_client import async_openai_client
+from app.models.user import UserDB
+from app.services.llm_runtime import openai_client_and_model_for_user
 from .prompts import CHAT_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,12 @@ def _message_as_dict(msg: Any) -> Dict[str, str]:
     }
 
 
-async def chat_with_ai(message: str, history: Optional[List[Any]] = None) -> str:
+async def chat_with_ai(
+    message: str,
+    history: Optional[List[Any]] = None,
+    *,
+    db_user: UserDB,
+) -> str:
     """
     AI 对话功能，支持上下文聊天。
 
@@ -61,11 +66,12 @@ async def chat_with_ai(message: str, history: Optional[List[Any]] = None) -> str
     messages.append({"role": "user", "content": message})
 
     try:
-        response = await async_openai_client.chat.completions.create(
-            model=settings.LM_STUDIO_MODEL,
+        client, model = openai_client_and_model_for_user(db_user)
+        response = await client.chat.completions.create(
+            model=model,
             messages=messages,
             temperature=0.7,
-            max_tokens=1000,
+            max_tokens=2048,
         )
         if not response.choices:
             raise RuntimeError("LLM 返回空 choices")

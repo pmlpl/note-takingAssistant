@@ -117,6 +117,38 @@ def cache_recent_note(user_id: int, note_data: dict):
         print(f"❌ 缓存笔记失败: {e}")
 
 
+def remove_recent_note_by_id(user_id: int, note_id: int) -> None:
+    """
+    从「最近笔记」Redis 列表中移除指定笔记 id（例如覆盖导入已删库中旧笔记，但列表里仍留着旧 id）。
+    保持其余条目的相对顺序不变。
+    """
+    client = redis_client.client
+    if not client:
+        return
+    try:
+        key = f"recent_notes:{user_id}"
+        notes_json = client.lrange(key, 0, -1)
+        kept: List[str] = []
+        for nj in notes_json:
+            try:
+                if json.loads(nj).get("id") == note_id:
+                    continue
+            except (json.JSONDecodeError, TypeError):
+                pass
+            kept.append(nj)
+        if len(kept) == len(notes_json):
+            return
+        pipe = client.pipeline()
+        pipe.delete(key)
+        for nj in reversed(kept):
+            pipe.lpush(key, nj)
+        if kept:
+            pipe.expire(key, 7 * 24 * 60 * 60)
+        pipe.execute()
+    except Exception as e:
+        print(f"❌ 从最近笔记移除 id={note_id} 失败: {e}")
+
+
 def batch_cache_recent_notes(user_id: int, notes_data: List[dict]):
     """
     批量缓存最近笔记（按指定顺序）

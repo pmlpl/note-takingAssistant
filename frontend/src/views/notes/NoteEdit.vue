@@ -56,7 +56,7 @@ import { noteApi } from '@/api/note'
 import Layout from '@/components/Layout.vue'
 import RichText from '@/components/RichText.vue'
 import { IconUpload } from '@/components/icons'
-import { marked } from 'marked'
+import { sanitizeHtml, renderMarkdownToSafeHtml } from '@/utils/htmlSanitize'
 import { ElMessage } from 'element-plus'
 
 defineOptions({
@@ -84,12 +84,9 @@ const renderedContent = computed(() => {
   const isHtml = /<[a-z][\s\S]*>/i.test(form.value.content)
   
   if (isHtml) {
-    // 直接返回 HTML
-    return form.value.content
-  } else {
-    // 使用 marked 渲染 Markdown
-    return marked.parse(form.value.content)
+    return sanitizeHtml(form.value.content)
   }
+  return renderMarkdownToSafeHtml(form.value.content)
 })
 // 监听路由参数变化，当ID改变时重新加载笔记
 watch(() => route.params.id, async (newId, oldId) => {
@@ -128,8 +125,9 @@ async function loadNote(id) {
     const isHtml = /<[a-z][\s\S]*>/i.test(content)
     // 如果不是 HTML 格式，则认为是 Markdown，转换为 HTML
     if (!isHtml && content.trim()) {
-      content = marked.parse(content)
-      console.log('Markdown 已转换为 HTML')
+      content = renderMarkdownToSafeHtml(content)
+    } else if (isHtml && content.trim()) {
+      content = sanitizeHtml(content)
     }
 
     form.value = {
@@ -169,8 +167,21 @@ function goBack() {
 
 <style scoped>
 .note-edit-container {
-  padding: 20px 0;
-  margin: 20px 240px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 20px 24px;
+}
+
+.note-edit-container :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.note-edit-container :deep(.el-card__body) {
+  overflow-x: hidden;
 }
 
 .edit-header {

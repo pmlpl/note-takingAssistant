@@ -202,7 +202,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { noteApi } from '@/api/note'
 import { aiApi } from '@/api/ai'
@@ -210,7 +210,6 @@ import Layout from '@/components/Layout.vue'
 import { IconTrend } from '@/components/icons'
 import { DArrowLeft, Document, ScaleToOriginal, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import * as echarts from 'echarts'
 
 defineOptions({
   name: 'AiSummarize'
@@ -223,6 +222,55 @@ const loading = ref(false)
 const analysisResult = ref(null)
 const radarChartRef = ref(null)  // 雷达图容器引用
 let radarChart = null  // ECharts 实例
+let radarResizeObserver = null
+let radarWindowResizeHandler = null
+
+function cleanupRadarChartSizing() {
+  if (radarResizeObserver) {
+    radarResizeObserver.disconnect()
+    radarResizeObserver = null
+  }
+  if (radarWindowResizeHandler) {
+    window.removeEventListener('resize', radarWindowResizeHandler)
+    radarWindowResizeHandler = null
+  }
+}
+
+function attachRadarChartSizing(chart) {
+  cleanupRadarChartSizing()
+  const el = radarChartRef.value
+  if (!el) return
+  radarResizeObserver = new ResizeObserver(() => {
+    chart?.resize()
+  })
+  radarResizeObserver.observe(el)
+  radarWindowResizeHandler = () => chart?.resize()
+  window.addEventListener('resize', radarWindowResizeHandler)
+}
+
+/** Wait until the chart DOM has non-zero size (avoids ECharts clientWidth/height warning). */
+async function ensureRadarContainerHasLayout(el) {
+  await nextTick()
+  await new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve))
+  })
+  if (el.clientWidth > 0 && el.clientHeight > 0) return
+  await new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      ro.disconnect()
+      clearTimeout(timer)
+      resolve()
+    }
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth > 0 && el.clientHeight > 0) finish()
+    })
+    ro.observe(el)
+    const timer = setTimeout(finish, 2000)
+  })
+}
 
 const form = ref({
   noteId: '',
@@ -235,6 +283,14 @@ const canAnalyze = computed(() => {
 
 onMounted(async () => {
   await loadNotes()
+})
+
+onBeforeUnmount(() => {
+  cleanupRadarChartSizing()
+  if (radarChart) {
+    radarChart.dispose()
+    radarChart = null
+  }
 })
 
 async function loadNotes() {
@@ -304,7 +360,7 @@ async function analyzeNote() {
     
     // 等待 DOM 更新后渲染雷达图
     await nextTick()
-    renderRadarChart(scores)
+    await renderRadarChart(scores)
   } catch (error) {
     console.error('分析失败:', error)
     ElMessage.error('分析失败，请重试')
@@ -370,17 +426,31 @@ function generateScores(analysisData) {
   }
 }
 
-// 渲染雷达图
-function renderRadarChart(scores) {
-  if (!radarChartRef.value) return
-  
-  // 销毁旧图表
+// 渲染雷达图（按需加载 ECharts，减小非「AI总结」路由的初始加载体积）
+async function renderRadarChart(scores) {
+  const el = radarChartRef.value
+  if (!el) return
+
+  cleanupRadarChartSizing()
   if (radarChart) {
     radarChart.dispose()
+    radarChart = null
   }
-  
-  // 创建新图表
-  radarChart = echarts.init(radarChartRef.value)
+
+  await ensureRadarContainerHasLayout(el)
+
+  const echartsNs = await import('echarts')
+  const echarts = echartsNs.default ?? echartsNs
+
+  const w = el.clientWidth
+  const h = el.clientHeight
+  const initOpts =
+    w > 0 && h > 0
+      ? null
+      : { width: Math.max(w, 400), height: Math.max(h, 400) }
+
+  radarChart = initOpts ? echarts.init(el, null, initOpts) : echarts.init(el)
+  attachRadarChartSizing(radarChart)
   
   const option = {
     tooltip: {
@@ -470,11 +540,7 @@ function renderRadarChart(scores) {
   }
   
   radarChart.setOption(option)
-  
-  // 响应式调整
-  window.addEventListener('resize', () => {
-    radarChart && radarChart.resize()
-  })
+  radarChart.resize()
 }
 
 function copyAnalysis() {
@@ -632,7 +698,9 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 /* 雷达图样式 */
 .radar-chart {
   width: 100%;
+  min-width: 240px;
   height: 400px;
+  min-height: 400px;
   margin-bottom: 15px;
 }
 

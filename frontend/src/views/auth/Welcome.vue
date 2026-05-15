@@ -2,7 +2,7 @@
   <div class="welcome-container">
     <div class="welcome-header">
       <IconNotebook :size="64" color="#409eff" />
-      <h1>AI笔记助手</h1>
+      <h1>智能笔记助手</h1>
       <p>让AI帮你生成、总结和整理笔记，提升学习和工作效率</p>
       <div class="welcome-buttons">
         <el-button type="primary" size="large" @click="navigate('/login')">

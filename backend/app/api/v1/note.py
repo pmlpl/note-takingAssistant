@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import os
@@ -6,10 +7,15 @@ import tempfile
 import uuid
 from datetime import datetime
 from app.core.database import get_async_db
-from app.models.note import NoteCreate, NoteUpdate, NoteResponse
+from app.models.note import NoteCreate, NoteUpdate, NoteResponse, NoteDB
 from app.crud import note as crud_note
 from app.utils.file_parser import parse_file, extract_title_from_filename
-from app.core.redis_client import cache_recent_note, batch_cache_recent_notes, clear_recent_notes
+from app.core.redis_client import (
+    cache_recent_note,
+    batch_cache_recent_notes,
+    clear_recent_notes,
+    remove_recent_note_by_id,
+)
 from app.core.security import get_current_user
 
 router = APIRouter()
@@ -113,9 +119,26 @@ async def list_recent_notes(db: AsyncSession = Depends(get_async_db), current_us
         recent_notes = redis_get_recent_notes(user_id, limit=20)
 
         if recent_notes:
-            # 如果 Redis 中有数据，打印调试信息
-            # 直接返回字典列表
-            return recent_notes
+            recent_ids = [
+                n.get("id") for n in recent_notes if n.get("id") is not None
+            ]
+            if recent_ids:
+                result_ids = await db.execute(
+                    select(NoteDB.id).where(
+                        NoteDB.user_id == user_id,
+                        NoteDB.id.in_(recent_ids),
+                    )
+                )
+                valid_ids = set(result_ids.scalars().all())
+            else:
+                valid_ids = set()
+            pruned = [n for n in recent_notes if n.get("id") in valid_ids]
+            if len(pruned) != len(recent_notes):
+                if pruned:
+                    batch_cache_recent_notes(user_id, pruned)
+                else:
+                    clear_recent_notes(user_id)
+            return pruned
         
         # 如果 Redis 中没有，从数据库获取（最备20个）
         notes = await crud_note.get_notes(db=db, user_id=user_id, skip=0, limit=20)
@@ -359,8 +382,9 @@ async def import_note(
                         detail=f"笔记 '{title}' 已存在，请选择是否覆盖"
                     )
                 else:
-                    # 用户选择覆盖，先删除旧笔记
+                    # 用户选择覆盖，先删除旧笔记（并从最近列表移除，避免与新 id 并存重复）
                     await crud_note.delete_note(db=db, note_id=existing_note.id, user_id=user_id)
+                    remove_recent_note_by_id(user_id, existing_note.id)
 
             # 创建笔记到数据库
             db_note = await crud_note.create_note(

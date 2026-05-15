@@ -13,6 +13,10 @@ export const aiApi = {
     return api.post('/v1/ai/summarize-note', data, { timeout: AI_REQUEST_TIMEOUT_MS })
   },
 
+  translateNote(data) {
+    return api.post('/v1/ai/translate-note', data, { timeout: AI_REQUEST_TIMEOUT_MS })
+  },
+
   /**
    * AI 对话接口
    * @param {Object} data - 对话数据

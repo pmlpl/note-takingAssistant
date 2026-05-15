@@ -3,7 +3,7 @@
     <el-header class="header">
       <div class="logo">
         <AppLogo :size="32" color="#409eff" />
-        <span class="title">AI笔记助手</span>
+        <span class="title">智能笔记助手</span>
       </div>
       <el-menu :default-active="activeMenu" mode="horizontal" class="nav-menu">
         <el-menu-item index="/home" @click="navigate('/home')">
@@ -21,6 +21,10 @@
         <el-menu-item index="/ai/summarize" @click="navigate('/ai/summarize')">
           <IconTrend :size="20" />
           <span>AI总结</span>
+        </el-menu-item>
+        <el-menu-item index="/ai/translate" @click="navigate('/ai/translate')">
+          <IconTranslate :size="20" />
+          <span>翻译笔记</span>
         </el-menu-item>
         <el-menu-item index="/mindmap" @click="navigate('/mindmap')">
           <IconMindmap :size="20"/>
@@ -56,7 +60,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
-import {AppLogo, IconHome, IconDocument, IconMagic, IconTrend, IconUser, IconAI, IconMindmap} from '@/components/icons'
+import {AppLogo, IconHome, IconDocument, IconMagic, IconTrend, IconUser, IconAI, IconMindmap, IconTranslate} from '@/components/icons'
 
 const router = useRouter()
 const userStore = useUserStore()

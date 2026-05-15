@@ -77,7 +77,6 @@ import Layout from '@/components/Layout.vue'
 import { IconDocument, IconPlus } from '@/components/icons'
 import { DArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { marked } from 'marked'
 import { MESSAGE_DURATION } from '@/utils/common'
 defineOptions({
   name: 'HistoryNotes'

@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_db
-from app.models.user import UserCreate, UserLogin, Token, TokenWithUser, UserResponse
+from app.models.user import UserCreate, UserLogin, Token, TokenWithUser, UserResponse, LLMSettingsPut, LLMSettingsResponse
 from app.crud import user as crud_user
 from app.core.security import create_access_token, verify_password, get_password_hash, get_current_user
+from app.core.field_crypto import SecretCryptoError, encrypt_secret, decrypt_secret, api_key_last_four
+from app.utils.openai_compatible_url import normalize_openai_compatible_base_url
 from datetime import timedelta
 from app.core.config import settings
 from pydantic import BaseModel
@@ -73,6 +75,93 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user), 
         "avatar_url": db_user.avatar_url,
         "created_at": db_user.created_at
     }
+
+
+@router.get(
+    "/me/llm-settings",
+    summary="获取当前用户 LLM / BYOK 设置",
+    response_model=LLMSettingsResponse,
+    response_model_by_alias=True,
+)
+async def get_llm_settings(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+):
+    db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+    if not db_user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    last4: str | None = None
+    has_key = bool(db_user.llm_api_key_encrypted)
+    if has_key and db_user.llm_api_key_encrypted:
+        try:
+            plain = decrypt_secret(db_user.llm_api_key_encrypted)
+            last4 = api_key_last_four(plain)
+        except SecretCryptoError:
+            raise HTTPException(
+                status_code=503,
+                detail="无法解密已保存的 API 密钥，请确认服务端加密配置（ENCRYPTION_KEY 或与保存时一致的 SECRET_KEY）未改动",
+            ) from None
+    return LLMSettingsResponse(
+        base_url=normalize_openai_compatible_base_url(db_user.llm_base_url)
+        if db_user.llm_base_url
+        else None,
+        llm_model=db_user.llm_model,
+        api_key_last4=last4,
+        has_stored_api_key=has_key,
+    )
+
+
+@router.put(
+    "/me/llm-settings",
+    summary="更新当前用户 LLM / BYOK 设置",
+    response_model=LLMSettingsResponse,
+    response_model_by_alias=True,
+)
+async def put_llm_settings(
+    body: LLMSettingsPut,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+):
+    db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+    if not db_user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    stripped_base = body.base_url.strip()
+    db_user.llm_base_url = (
+        normalize_openai_compatible_base_url(stripped_base) if stripped_base else None
+    )
+    db_user.llm_model = body.llm_model.strip() or None
+
+    if not body.retain_api_key:
+        raw = (body.api_key or "").strip()
+        if not raw:
+            db_user.llm_api_key_encrypted = None
+        else:
+            try:
+                db_user.llm_api_key_encrypted = encrypt_secret(raw)
+            except SecretCryptoError as e:
+                raise HTTPException(status_code=503, detail=str(e)) from e
+
+    await db.commit()
+    await db.refresh(db_user)
+
+    last4: str | None = None
+    has_key = bool(db_user.llm_api_key_encrypted)
+    if has_key and db_user.llm_api_key_encrypted:
+        try:
+            plain = decrypt_secret(db_user.llm_api_key_encrypted)
+            last4 = api_key_last_four(plain)
+        except SecretCryptoError:
+            last4 = None
+
+    return LLMSettingsResponse(
+        base_url=normalize_openai_compatible_base_url(db_user.llm_base_url)
+        if db_user.llm_base_url
+        else None,
+        llm_model=db_user.llm_model,
+        api_key_last4=last4,
+        has_stored_api_key=has_key,
+    )
 
 
 @router.put("/password", summary="修改密码")

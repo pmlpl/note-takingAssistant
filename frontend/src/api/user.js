@@ -29,5 +29,13 @@ export const userApi = {
   
   getUserStats() {
     return api.get('/v1/user/stats')
+  },
+
+  getLLMSettings() {
+    return api.get('/v1/user/me/llm-settings')
+  },
+
+  putLLMSettings(data) {
+    return api.put('/v1/user/me/llm-settings', data)
   }
 }
