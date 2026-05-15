@@ -69,6 +69,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/manual',
+    name: 'UserManual',
+    component: () => import('@/views/help/UserManual.vue'),
+    meta: { requiresAuth: true, transition: 'fade' }
+  },
+  {
     path: '/user',
     name: 'UserCenter',
     component: () => import('@/views/user/UserCenter.vue'),

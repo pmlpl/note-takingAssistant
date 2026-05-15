@@ -2,7 +2,7 @@
   <div id="app-container">
     <router-view v-slot="{ Component, route }">
       <transition :name="getTransitionName(route)" mode="out-in" appear>
-        <keep-alive include="Home,AiGenerate,AiSummarize,NoteEdit,NoteList,HistoryNotes,NoteTranslate">
+        <keep-alive include="Home,AiGenerate,AiSummarize,NoteEdit,NoteList,HistoryNotes,NoteTranslate,UserManual">
           <component :is="Component" class="page-wrapper" />
         </keep-alive>
       </transition>
@@ -26,7 +26,9 @@ function getTransitionName(route) {
   min-height: 100vh;
   background: rgb(104 104 104 / 0.45);
   border-radius: 12px;
-  overflow: hidden;
+  /* 仅限制横向溢出；纵向不要用 hidden，否则会打断子元素的 position:sticky（如使用手册目录） */
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 /* 页面包装器 - 确保背景色一致 */
