@@ -41,8 +41,27 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-编辑 `.env`：填写 MySQL、JWT，以及 **LM Studio** 的 `LM_STUDIO_URL`（通常为 `http://127.0.0.1:1234/v1`）与 `LM_STUDIO_MODEL`（与 LM Studio 服务器页显示的模型 ID 一致）。若启用「用户自带 API Key（BYOK）」保存功能：可不配 `ENCRYPTION_KEY`，服务端会用现有 `SECRET_KEY` 派生加密密钥（换 `SECRET_KEY` 后用户需重新保存自带密钥）；也可单独配置 `ENCRYPTION_KEY`（见 `.env.example`）。
+编辑 `.env`，填写以下**必填项**：
 
+| 配置项 | 说明 | 示例值 |
+|--------|------|--------|
+| `API_HOST` | 服务器绑定地址 | `0.0.0.0` |
+| `API_PORT` | 服务端口 | `8000` |
+| `API_BASE_URL` | 外部访问地址 | `http://localhost:8000` |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | MySQL 数据库配置 | - |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_DB` | Redis 配置 | - |
+| `SECRET_KEY` | JWT 密钥（至少32字符） | `your-secret-key-...` |
+| `ALGORITHM` | JWT 算法 | `HS256` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token 过期时间（分钟） | `43200` |
+| `LM_STUDIO_URL` | LM Studio API 地址 | `http://127.0.0.1:1234/v1` |
+| `LM_STUDIO_MODEL` | 使用的模型 ID | `qwen3.5-9b-q4_k_m_gguf` |
+| `LLM_HTTP_READ_TIMEOUT_SECONDS` | LLM 请求超时 | `1200.0` |
+| `LLM_HTTP_TRUST_ENV` | 是否读取系统代理 | `false` |
+
+**可选配置：**
+- `REDIS_PASSWORD` - Redis 密码
+- `OPENAI_API_KEY` - 服务端默认 API Key
+- `ENCRYPTION_KEY` - BYOK 加密密钥（留空则从 SECRET_KEY 派生）
 ### 3. 启动 LM Studio 本地 API
 
 1. 打开 [LM Studio](https://lmstudio.ai/)，下载并加载模型。
@@ -92,7 +111,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ### AI功能
 - `POST /api/v1/ai/generate-note` - AI生成笔记
 - `POST /api/v1/ai/summarize-note` - AI总结笔记
-- `POST /api/v1/ai/translate-note` - 翻译笔记（请求体 `content`、`targetLang`，返回 `content`、`truncated`）
+- `POST /api/v1/ai/translate-note-stream` - 流式翻译笔记（请求体 `content`、`targetLang`；`text/plain` 响应体为译文 Markdown 片段拼接；服务端会先将 HTML 转为 Markdown 再翻译）
 
 ## 开发说明
 

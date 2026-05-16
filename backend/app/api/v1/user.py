@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_db
-from app.models.user import UserCreate, UserLogin, Token, TokenWithUser, UserResponse, LLMSettingsPut, LLMSettingsResponse
+from app.models.user import UserCreate, UserLogin, Token, TokenWithUser, UserResponse, LLMSettingsPut, LLMSettingsResponse, ChangePasswordRequest
 from app.crud import user as crud_user
 from app.core.security import create_access_token, verify_password, get_password_hash, get_current_user
 from app.core.field_crypto import SecretCryptoError, encrypt_secret, decrypt_secret, api_key_last_four
@@ -14,12 +14,6 @@ import uuid
 from pathlib import Path
 
 router = APIRouter()
-
-
-class ChangePasswordRequest(BaseModel):
-    currentPassword: str
-    newPassword: str
-    confirmPassword: str
 
 
 @router.post("/register", summary="用户注册", response_model=UserResponse)

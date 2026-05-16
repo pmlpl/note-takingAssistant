@@ -722,11 +722,11 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 
 /* 雷达图样式 */
 .radar-chart {
-  width: 100%;
   min-width: 240px;
   height: 400px;
   min-height: 400px;
   margin-bottom: 15px;
+  margin: 0 180px;
 }
 
 .radar-legend {

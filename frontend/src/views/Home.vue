@@ -198,13 +198,25 @@
               
               <!-- 快捷操作按钮 -->
               <div class="quick-actions">
-                <el-button size="small" @click="sendMindmapQuickPrompt">
+                <el-button
+                  size="small"
+                  :disabled="isAiOutputInProgress"
+                  @click="sendMindmapQuickPrompt"
+                >
                   思维导图
                 </el-button>
-                <el-button size="small" @click="sendQuickMessage('给我一些学习建议')">
+                <el-button
+                  size="small"
+                  :disabled="isAiOutputInProgress"
+                  @click="sendQuickMessage('给我一些学习建议')"
+                >
                   学习建议
                 </el-button>
-                <el-button size="small" @click="sendQuickMessage('解释一下这个概念')">
+                <el-button
+                  size="small"
+                  :disabled="isAiOutputInProgress"
+                  @click="sendQuickMessage('解释一下这个概念')"
+                >
                   概念解释
                 </el-button>
               </div>
@@ -233,11 +245,20 @@
                     <IconPlus :size="16" />
                   </el-button>
                 </div>
-                <el-button 
-                  type="primary" 
+                <el-button
+                  v-if="isAiOutputInProgress"
+                  type="danger"
+                  plain
+                  class="stop-ai-btn"
+                  @click="stopAiChatOutput"
+                >
+                  停止
+                </el-button>
+                <el-button
+                  type="primary"
                   @click="sendMessage"
-                  :disabled="!aiMessage.trim() || isAiThinking"
-                  :loading="isAiThinking"
+                  :disabled="!aiMessage.trim() || isAiOutputInProgress"
+                  :loading="isAiOutputInProgress"
                   class="send-btn"
                   circle
                 >
@@ -253,7 +274,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
 import Layout from '@/components/Layout.vue'
@@ -287,6 +308,33 @@ defineOptions({
 /** 首页 AI 助手：聊天（含用户/助手）在内存与 localStorage 中最多保留条数，超出丢弃最早消息 */
 const HOME_CHAT_MAX_MESSAGES = 40
 
+/** 首页 AI 流式对话超时（与翻译/生成页一致） */
+const HOME_CHAT_STREAM_MS =
+  Number(import.meta.env.VITE_AI_REQUEST_TIMEOUT_MS) || 600_000
+
+let homeChatSaveDebounceTimer = null
+function scheduleDebouncedSaveChatHistory() {
+  clearTimeout(homeChatSaveDebounceTimer)
+  homeChatSaveDebounceTimer = setTimeout(() => {
+    homeChatSaveDebounceTimer = null
+    saveChatHistory()
+  }, 350)
+}
+
+let homeChatScrollRaf = 0
+function scheduleHomeChatScroll() {
+  if (homeChatScrollRaf) return
+  homeChatScrollRaf = requestAnimationFrame(async () => {
+    homeChatScrollRaf = 0
+    await scrollToBottom()
+  })
+}
+
+/** 当前首页 AI 流式请求的 AbortController（用户点「停止」或离开页面时中止） */
+let homeChatAbortController = null
+/** 区分用户主动停止与超时等中止，用于提示文案 */
+let homeChatStopWasUser = false
+
 const router = useRouter()
 const userStore = useUserStore()
 
@@ -313,7 +361,9 @@ const recentNotes = ref([])
 const currentNote = ref(null)
 const aiMessage = ref('')
 const chatHistory = ref([])  // 聊天历史
-const isAiThinking = ref(false)  // AI 是否正在思考
+const isAiThinking = ref(false)  // AI 是否正在思考（首包前显示打字动画）
+/** 从发送请求到流结束整段过程，用于禁用发送/快捷操作与显示「停止」 */
+const isAiOutputInProgress = ref(false)
 const chatMessagesRef = ref(null)  // 聊天消息容器引用
 const uploadedNoteContent = ref(null)  // 上传的笔记内容（给AI看，不显示在输入框）
 const uploadedNoteName = ref('')  // 上传的笔记文件名
@@ -332,6 +382,9 @@ function clearHomeUiState() {
   uploadedNoteName.value = ''
   showNoteSelector.value = false
   isAiThinking.value = false
+  isAiOutputInProgress.value = false
+  homeChatAbortController?.abort()
+  homeChatAbortController = null
 }
 
 // 过滤后的笔记列表（用于搜索）
@@ -359,6 +412,12 @@ onMounted(async () => {
 
 onActivated(async () => {
   await ensureHomeSessionForCurrentUser()
+})
+
+onBeforeUnmount(() => {
+  homeChatStopWasUser = false
+  homeChatAbortController?.abort()
+  homeChatAbortController = null
 })
 
 watch(
@@ -501,35 +560,27 @@ async function loadAllNotes() {
 }
 
 // 更新最近笔记列表，将当前笔记移到最前面
-async function updateRecentNotesWithCurrent(note) {
+function updateRecentNotesWithCurrent(note) {
   if (!note || !note.id) return
   
-  // 查找当前笔记在列表中的位置
-  const index = recentNotes.value.findIndex(n => n.id === note.id)
+  // 移除所有重复的笔记（不只是第一个）
+  recentNotes.value = recentNotes.value.filter(n => n.id !== note.id)
   
-  if (index > -1) {
-    // 如果已存在，移除并添加到最前面
-    recentNotes.value.splice(index, 1)
-    recentNotes.value.unshift(note)
-  } else {
-    // 如果不存在，直接添加到最前面
-    recentNotes.value.unshift(note)
-    
-    // 保持列表最多20个笔记（解除5个限制）
-    if (recentNotes.value.length > 20) {
-      recentNotes.value = recentNotes.value.slice(0, 20)
-    }
+  // 添加到最前面
+  recentNotes.value.unshift(note)
+  
+  // 保持列表最多20个笔记
+  if (recentNotes.value.length > 20) {
+    recentNotes.value = recentNotes.value.slice(0, 20)
   }
   
-  // 异步同步到后端Redis缓存（不阻塞UI）
-  // 使用 setTimeout 确保在下一个事件循环执行
+  // 异步同步到后端Redis缓存
   setTimeout(async () => {
     try {
       const noteIds = recentNotes.value.map(n => n.id)
       await noteApi.updateRecentNotesOrder(noteIds)
     } catch (error) {
       console.error('❌ 同步最近笔记顺序失败:', error)
-      // 不显示错误提示，避免影响用户体验
     }
   }, 0)
 }
@@ -843,8 +894,14 @@ function clearUploadedNote() {
 }
 
 // 发送消息（完全异步，不阻塞UI）
+function stopAiChatOutput() {
+  if (!isAiOutputInProgress.value) return
+  homeChatStopWasUser = true
+  homeChatAbortController?.abort()
+}
+
 function sendMessage() {
-  if (!aiMessage.value.trim() || isAiThinking.value) return
+  if (!aiMessage.value.trim() || isAiOutputInProgress.value) return
   
   const userMessage = aiMessage.value.trim()
   aiMessage.value = ''
@@ -866,10 +923,16 @@ function sendMessage() {
   
   // 显示 AI 思考状态
   isAiThinking.value = true
+  isAiOutputInProgress.value = true
   
   // 在后台异步执行 AI 请求，完全不阻塞其他操作
   // 不使用 await，让它在后台独立运行
   ;(async () => {
+    const streamAbort = new AbortController()
+    homeChatAbortController = streamAbort
+    const timeoutId = setTimeout(() => streamAbort.abort(), HOME_CHAT_STREAM_MS)
+    let assistantIdx = -1
+
     try {
       // 构建消息历史
       let messages = chatHistory.value.slice(0, -1).slice(-10).map(msg => ({
@@ -886,36 +949,134 @@ function sendMessage() {
         )
       }
 
-      const result = await aiApi.chat({
+      await aiApi.chatStream({
         message: messageForApi,
-        history: messages
+        history: messages,
+        signal: streamAbort.signal,
+        onChunk: (acc) => {
+          if (assistantIdx < 0) {
+            chatHistory.value.push({
+              role: 'assistant',
+              content: acc,
+              timestamp: new Date()
+            })
+            assistantIdx = chatHistory.value.length - 1
+            isAiThinking.value = false
+          } else {
+            chatHistory.value[assistantIdx].content = acc
+          }
+          scheduleHomeChatScroll()
+          scheduleDebouncedSaveChatHistory()
+        }
       })
-      
-      // 添加 AI 回复到聊天历史
-      chatHistory.value.push({
-        role: 'assistant',
-        content: result.data?.reply || '抱歉，我暂时无法回答这个问题。',
-        timestamp: new Date()
-      })
-      
-      // 保存到 localStorage
-      saveChatHistory()
-      
+
+      if (assistantIdx < 0) {
+        chatHistory.value.push({
+          role: 'assistant',
+          content: '抱歉，我暂时无法回答这个问题。',
+          timestamp: new Date()
+        })
+        isAiThinking.value = false
+      } else {
+        const c = String(chatHistory.value[assistantIdx].content || '').trim()
+        if (!c) {
+          chatHistory.value[assistantIdx].content =
+            '抱歉，我暂时无法回答这个问题。'
+        }
+      }
+
     } catch (error) {
       console.error('AI 回复失败:', error)
-      ElMessage.error({ message: 'AI 服务暂时不可用，请稍后重试', duration: MESSAGE_DURATION.SHORT })
-      chatHistory.value.push({
-        role: 'assistant',
-        content: '抱歉，服务暂时不可用，请稍后重试。',
-        timestamp: new Date()
-      })
-      
-      // 保存错误消息到 localStorage
-      saveChatHistory()
+      const aborted = error?.name === 'AbortError' || streamAbort.signal.aborted
+      let fallback =
+        '抱歉，服务暂时不可用，请稍后重试。'
+
+      if (!aborted) {
+        const d = error?.response?.data?.detail
+        const msg = Array.isArray(d)
+          ? d.map((x) => x.msg || JSON.stringify(x)).join('；')
+          : d || error?.message
+        const s = String(msg || '')
+        if (s.includes('503') || /密钥|ENCRYPTION|crypto/i.test(s)) {
+          fallback = '模型或密钥不可用，请到个人中心检查 LLM / API Key 配置'
+        } else if (typeof msg === 'string' && msg.trim()) {
+          fallback = msg.trim()
+        }
+        ElMessage.error({
+          message: 'AI 服务暂时不可用，请稍后重试',
+          duration: MESSAGE_DURATION.SHORT
+        })
+      } else if (homeChatStopWasUser) {
+        if (assistantIdx >= 0 && String(chatHistory.value[assistantIdx].content || '').trim()) {
+          ElMessage.info({
+            message: '已停止生成',
+            duration: MESSAGE_DURATION.SHORT
+          })
+        } else {
+          ElMessage.info({
+            message: '已停止',
+            duration: MESSAGE_DURATION.SHORT
+          })
+        }
+      } else if (assistantIdx >= 0 && String(chatHistory.value[assistantIdx].content || '').trim()) {
+        ElMessage.warning({
+          message: '回复已中断（可能为超时）',
+          duration: MESSAGE_DURATION.SHORT
+        })
+      } else if (assistantIdx < 0) {
+        ElMessage.info({
+          message: '已取消或超时',
+          duration: MESSAGE_DURATION.SHORT
+        })
+      }
+
+      if (!aborted) {
+        if (assistantIdx >= 0) {
+          if (!String(chatHistory.value[assistantIdx].content || '').trim()) {
+            chatHistory.value[assistantIdx].content = fallback
+          }
+        } else {
+          chatHistory.value.push({
+            role: 'assistant',
+            content: fallback,
+            timestamp: new Date()
+          })
+        }
+      } else if (homeChatStopWasUser) {
+        if (assistantIdx >= 0) {
+          if (!String(chatHistory.value[assistantIdx].content || '').trim()) {
+            chatHistory.value[assistantIdx].content = '（已停止生成）'
+          }
+        } else {
+          chatHistory.value.push({
+            role: 'assistant',
+            content: '（已停止生成）',
+            timestamp: new Date()
+          })
+        }
+      } else {
+        if (assistantIdx >= 0) {
+          if (!String(chatHistory.value[assistantIdx].content || '').trim()) {
+            chatHistory.value[assistantIdx].content = fallback
+          }
+        } else {
+          chatHistory.value.push({
+            role: 'assistant',
+            content: fallback,
+            timestamp: new Date()
+          })
+        }
+      }
     } finally {
+      clearTimeout(timeoutId)
+      clearTimeout(homeChatSaveDebounceTimer)
+      homeChatSaveDebounceTimer = null
       isAiThinking.value = false
-      // 滚动到底部
-      scrollToBottom()
+      isAiOutputInProgress.value = false
+      homeChatAbortController = null
+      homeChatStopWasUser = false
+      saveChatHistory()
+      await scrollToBottom()
     }
   })()
   
@@ -1841,6 +2002,13 @@ function getNotePreview(content) {
   width: 44px;
   height: 44px;
   flex-shrink: 0;
+}
+
+.stop-ai-btn {
+  flex-shrink: 0;
+  height: 44px;
+  padding: 0 14px;
+  font-size: 13px;
 }
 
 .send-btn:disabled {

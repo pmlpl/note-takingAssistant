@@ -7,9 +7,7 @@
           思维导图（Mermaid）
         </h2>
         <p class="subtitle">
-          在左侧粘贴或编写 Mermaid 源码，点击「渲染预览」在右侧查看。从首页 AI
-          助手某条回复下点击「在思维导图页预览」时，会通过内存与本地存储传入源码并自动渲染；若预览失败，请检查回复中是否包含
-          <code>flowchart</code> / <code>mindmap</code> 等 Mermaid 语法。
+          支持 Mermaid 语法，创建和分享思维导图。
         </p>
       </div>
 
@@ -325,29 +323,26 @@ onMounted(() => {
 }
 
 .page-header {
-  margin-bottom: 20px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 28px;
 }
 
 .page-header h2 {
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
   margin: 0 0 8px;
-  font-size: 1.35rem;
+  font-size: 28px;
 }
 
 .subtitle {
-  margin: 0;
+  margin: 0 auto;
   color: #606266;
   font-size: 14px;
   line-height: 1.6;
-}
-
-.subtitle code {
-  padding: 0 4px;
-  background: #f4f4f5;
-  border-radius: 4px;
-  font-size: 13px;
+  text-align: center;
 }
 
 .split-row {

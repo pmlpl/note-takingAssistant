@@ -1,12 +1,13 @@
 import bcrypt
-from datetime import datetime, timedelta
+from datetime import timezone, timedelta, datetime
 from typing import Optional
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from app.core.config import settings
 
-
+# 定义OAuth2认证方案
+# 用于在路由中依赖注入当前用户信息
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/user/login")
 
 
@@ -25,11 +26,13 @@ def get_password_hash(password: str) -> str:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """创建访问令牌"""
     to_encode = data.copy()
+    # 计算过期时间
+    expire = datetime.now(timezone.utc)
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = expire + expires_delta # 使用传入的过期时间
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+        expire = expire + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES) # 使用默认过期时间
+    to_encode.update({"exp": expire}) # 添加过期时间到数据库
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 

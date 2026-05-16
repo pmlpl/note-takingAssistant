@@ -3,15 +3,7 @@ from sqlalchemy.orm import declarative_base
 from app.core.config import settings
 
 # 数据库URL
-SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
-
-# 将 mysql+mysqlconnector 转换为 mysql+aiomysql
-if SQLALCHEMY_DATABASE_URL.startswith("mysql+mysqlconnector"):
-    ASYNC_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace(
-        "mysql+mysqlconnector", "mysql+aiomysql"
-    )
-else:
-    ASYNC_DATABASE_URL = SQLALCHEMY_DATABASE_URL
+ASYNC_DATABASE_URL = settings.DATABASE_URL
 
 # 异步数据库引擎配置
 engine = create_async_engine(

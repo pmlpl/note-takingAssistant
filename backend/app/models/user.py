@@ -58,6 +58,13 @@ class LLMSettingsPut(BaseModel):
     retain_api_key: bool = Field(default=True, alias="retainApiKey")
 
 
+class ChangePasswordRequest(BaseModel):
+    """修改密码请求模型"""
+    currentPassword: str
+    newPassword: str
+    confirmPassword: str
+
+
 # SQLAlchemy数据库模型
 from sqlalchemy import Column, Integer, String, DateTime, Text
 from sqlalchemy.sql import func

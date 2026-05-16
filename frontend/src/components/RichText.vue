@@ -22,14 +22,14 @@ let editor = null
 
 onMounted(() => {
   editor = new WangEditor(editorRef.value)
-  
+
   editor.config.uploadImgShowBase64 = true
   editor.config.onchange = (html) => {
     emit('update:modelValue', html)
   }
-  
+
   editor.create()
-  
+
   if (props.modelValue) {
     editor.txt.html(props.modelValue)
   }
@@ -70,14 +70,13 @@ defineExpose({
   flex-wrap: wrap;
 }
 
-/* 编辑区：仅纵向滚动，文档宽度跟随容器 */
 .rich-text-editor :deep(.w-e-text-container) {
-  height: min(70vh, 720px) !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
+  height: min(120vh, 800px) !important;
+  overflow: hidden !important;
 }
 
 .rich-text-editor :deep(.w-e-scroll) {
+  height: 100% !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
 }

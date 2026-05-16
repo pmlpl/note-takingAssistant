@@ -68,14 +68,3 @@ Rules:
 3. Translate inline code (`like this`) only when it is natural language; if it looks like a symbol or API name, keep it.
 4. Match the tone of educational / technical notes.
 5. Do NOT append signatures, watermarks, or footers — the application will add one line at the end."""
-
-# HTML 笔记：按 JSON 字符串数组批量翻译（仅替换文本节点，结构由程序保留）
-NOTE_HTML_SEGMENT_TRANSLATION_SYSTEM_PROMPT = """You translate short text fragments from an HTML study note.
-
-Rules:
-1. You will receive a JSON array of strings. Return ONLY a JSON array of strings.
-2. The output array length MUST exactly match the input array length. Same order.
-3. Each output[i] is the translation of input[i] into the target language given in the user message.
-4. Preserve numbers, units, symbols, file paths, URLs, and code-like tokens when they should not be translated.
-5. Preserve leading and trailing whitespace in each string when the input has it.
-6. Do not add markdown fences, comments, or any text outside the JSON array."""

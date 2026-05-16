@@ -107,7 +107,7 @@ def cache_recent_note(user_id: int, note_data: dict):
         # 从左侧推入（最新笔记在最前面）
         client.lpush(key, note_json)
         
-        # 只保留最近20个笔记（解除5个限制）
+        # 只保留最近20个笔记
         client.ltrim(key, 0, 19)
         
         # 设置过期时间（7天）
@@ -203,7 +203,6 @@ def get_recent_notes(user_id: int, limit: int = 20) -> List[dict]:
     
     try:
         key = f"recent_notes:{user_id}"
-        
         # 获取列表中的所有笔记
         notes_json = client.lrange(key, 0, limit - 1)
         
@@ -237,6 +236,5 @@ def clear_recent_notes(user_id: int):
     try:
         key = f"recent_notes:{user_id}"
         client.delete(key)
-        print(f"✅ 已清除用户 {user_id} 的最近笔记缓存")
     except Exception as e:
         print(f"❌ 清除缓存失败: {e}")

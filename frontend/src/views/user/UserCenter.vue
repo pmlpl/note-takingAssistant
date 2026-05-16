@@ -290,9 +290,9 @@
               </el-descriptions-item>
             </el-descriptions>
             <div class="legal-links">
-              <el-link type="primary" :underline="false" @click.prevent="termsDialogVisible = true">用户协议</el-link>
+              <el-link type="primary" underline="never" @click.prevent="termsDialogVisible = true">用户协议</el-link>
               <span class="link-sep">|</span>
-              <el-link type="primary" :underline="false" @click.prevent="privacyDialogVisible = true">隐私政策</el-link>
+              <el-link type="primary" underline="never" @click.prevent="privacyDialogVisible = true">隐私政策</el-link>
             </div>
           </div>
         </Transition>
