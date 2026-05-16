@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.models.note import NoteDB
-from typing import List, Optional
+from typing import Optional
 
 
 async def get_note(db: AsyncSession, note_id: int, user_id: int):
@@ -20,6 +20,43 @@ async def get_notes(db: AsyncSession, user_id: int, skip: int = 0, limit: int = 
     return result.scalars().all()
 
 
+async def search_notes(
+    db: AsyncSession,
+    user_id: int,
+    keyword: str = "",
+    skip: int = 0,
+    limit: int = 20,
+    is_favorite: Optional[bool] = None,
+):
+    """搜索笔记（仅按标题模糊匹配），支持分页和收藏筛选"""
+    query = select(NoteDB).where(NoteDB.user_id == user_id)
+    if keyword:
+        query = query.where(
+                NoteDB.title.ilike(f"%{keyword}%")
+        )
+    if is_favorite is not None:
+        query = query.where(NoteDB.is_favorite == (1 if is_favorite else 0))
+    query = query.order_by(NoteDB.updated_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def count_notes(
+    db: AsyncSession,
+    user_id: int,
+    keyword: str = "",
+    is_favorite: Optional[bool] = None,
+) -> int:
+    """统计符合条件的笔记总数（用于分页）"""
+    query = select(func.count(NoteDB.id)).where(NoteDB.user_id == user_id)
+    if keyword:
+        query = query.where(NoteDB.title.ilike(f"%{keyword}%"))
+    if is_favorite is not None:
+        query = query.where(NoteDB.is_favorite == (1 if is_favorite else 0))
+    result = await db.execute(query)
+    return result.scalar() or 0
+
+
 async def create_note(db: AsyncSession, user_id: int, title: str, content: str, tags: str = None, is_favorite: int = 1):
     """创建笔记"""
     db_note = NoteDB(
@@ -27,7 +64,7 @@ async def create_note(db: AsyncSession, user_id: int, title: str, content: str, 
         title=title,
         content=content,
         tags=tags,
-        is_favorite=is_favorite  # 默认为1（已加入我的笔记）
+        is_favorite=is_favorite
     )
     db.add(db_note)
     await db.commit()
@@ -62,20 +99,6 @@ async def delete_note(db: AsyncSession, note_id: int, user_id: int):
 
 
 async def get_note_by_title_and_content(db: AsyncSession, user_id: int, title: str, content: str) -> type[NoteDB] | None:
-    """
-    根据标题和内容查找笔记（用于去重）
-    
-    Args:
-        db: 数据库会话
-        user_id: 用户ID
-        title: 笔记标题
-        content: 笔记内容
-    
-    Returns:
-        Optional[NoteDB]: 如果找到返回笔记对象，否则返回None
-    """
-    # 查找相同用户、相同标题且内容相似度高的笔记
-    # 这里使用精确匹配，也可以改为模糊匹配或哈希比较
     result = await db.execute(
         select(NoteDB).where(
             NoteDB.user_id == user_id,
