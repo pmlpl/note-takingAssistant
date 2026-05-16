@@ -36,6 +36,8 @@ yarn-error.log*
 .env.local
 .env.*.local
 !.env.example
+!.env.docker.example
+.env.docker
 
 # Database
 *.db
@@ -72,4 +74,4 @@ coverage/
 *.pyi
 
 # Local documentation drafts (end-user guide lives in-app at /manual)
-docs/
+# Project docs/ (architecture, ER) are tracked; in-app manual is at /manual

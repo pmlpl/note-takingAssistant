@@ -109,6 +109,27 @@ cd frontend && npm ci && npm run test && npm run build
 cd backend && pip install -r requirements.txt -r requirements-dev.txt && pytest -q
 ```
 
+### ☁️ Docker 一键部署
+
+项目根目录下已提供 `docker-compose.yml`，可一键启动全部服务：
+
+```bash
+# 1. 启动所有服务（MySQL + Redis + 后端 + 前端）
+docker-compose up -d
+
+# 2. 访问应用
+# 前端：http://localhost:5174
+# 后端 API：http://localhost:8000/docs
+
+# 3. 查看日志
+docker-compose logs -f
+
+# 4. 停止
+docker-compose down
+```
+
+> **注意**：首次部署请复制 `.env.docker.example` 为 `.env.docker`。AI 功能需配置本地推理端（如 LM Studio），在 `.env.docker` 中设置 `LM_STUDIO_URL`（容器内访问宿主机可用 `host.docker.internal`）。
+
 ### 1. LM Studio（或其它兼容端）
 1. 加载模型并启动 **Local Server**。
 2. 在 `backend/.env` 中设置（模型 ID 须与界面一致）：
