@@ -2,11 +2,13 @@
   <div class="register-container">
     <div class="register-wrapper">
       <el-card class="register-card">
+        <!-- Tape strip decoration -->
         <div class="register-header">
-          <IconNotebook :size="48" color="#409eff" />
+          <IconNotebook :size="52" color="var(--color-pencil)" />
           <h2>智能笔记助手</h2>
-          <p>创建新账号</p>
+          <p class="register-subtitle">创建新账号</p>
         </div>
+
         <el-form :model="form" ref="formRef" label-width="80px">
           <el-form-item label="用户名" prop="username" :rules="[{ required: true, message: '请输入用户名' }]">
             <el-input v-model="form.username" placeholder="请输入用户名" />
@@ -15,23 +17,28 @@
             <el-input v-model="form.email" placeholder="请输入邮箱" />
           </el-form-item>
           <el-form-item label="密码" prop="password" :rules="[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少6位' }]">
-            <el-input v-model="form.password" type="password" placeholder="请输入密码" />
+            <el-input v-model="form.password" type="password" placeholder="请输入密码" show-password />
           </el-form-item>
           <el-form-item label="确认密码" prop="confirmPassword" :rules="[{ required: true, message: '请确认密码' }]">
-            <el-input v-model="form.confirmPassword" type="password" placeholder="请确认密码" />
+            <el-input v-model="form.confirmPassword" type="password" placeholder="请确认密码" show-password />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleRegister" :loading="loading" class="register-btn">
-              {{ loading ? '注册中...' : '注册' }}
+              {{ loading ? '注册中...' : '注 册' }}
             </el-button>
           </el-form-item>
         </el-form>
+
         <div class="register-footer">
           <span>已有账号？</span>
           <el-button link @click="navigate('/login')">立即登录</el-button>
         </div>
       </el-card>
     </div>
+
+    <!-- Decorative shapes -->
+    <div class="deco deco-1"></div>
+    <div class="deco deco-2"></div>
   </div>
 </template>
 
@@ -68,9 +75,6 @@ async function handleRegister() {
     ElMessage.success('注册成功！请登录')
     router.push('/login')
   } catch (error) {
-    console.error('注册失败:', error)
-    
-    // 根据错误类型显示不同的提示
     if (error.response?.status === 400) {
       const detail = error.response.data?.detail
       if (detail && detail.includes('用户名')) {
@@ -92,29 +96,19 @@ function navigate(path) {
 </script>
 
 <style scoped>
+/* ═══ Register Page — Hand-Drawn Theme ═══ */
+
 .register-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+  background-color: var(--color-paper);
+  background-image: radial-gradient(var(--color-muted) 1px, transparent 1px);
+  background-size: 24px 24px;
   position: relative;
   overflow: hidden;
   padding: 40px 20px;
-}
-
-.register-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: 
-    radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(78, 205, 196, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 40% 20%, rgba(69, 183, 209, 0.1) 0%, transparent 50%);
-  pointer-events: none;
 }
 
 .register-wrapper {
@@ -123,44 +117,98 @@ function navigate(path) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 50px;
+  gap: 40px;
   position: relative;
   z-index: 1;
 }
 
 .register-card {
   width: 100%;
-  max-width: 450px;
-  padding: 40px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 80px;
+  max-width: 460px;
+  padding: 0;
+}
+.register-card :deep(.el-card__body) {
+  padding: 40px 36px 30px;
+}
+
+/* Thumbtack */
+.register-card::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%) rotate(3deg);
+  width: 22px;
+  height: 22px;
+  background: var(--color-accent);
+  border-radius: 50%;
+  box-shadow: 1px 1px 0px 0px rgba(0,0,0,0.3);
+  z-index: 2;
+  border: 3px solid #fff;
 }
 
 .register-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 28px;
 }
 
 .register-header h2 {
-  margin: 15px 0 5px 0;
-  font-size: 24px;
-  color: #303133;
+  margin: 12px 0 4px;
+  font-family: var(--font-heading);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-pencil);
 }
 
-.register-header p {
-  color: #909399;
+.register-subtitle {
+  color: #888;
+  font-family: var(--font-body);
+  font-size: 15px;
   margin: 0;
 }
 
 .register-btn {
   width: 100%;
+  font-size: 18px !important;
+  padding: 12px 0 !important;
+  height: auto !important;
 }
 
 .register-footer {
   text-align: center;
   margin-top: 20px;
-  color: #909399;
+  font-family: var(--font-body);
+  color: #888;
+}
+
+/* ── Decorative blobs ── */
+.deco {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.5;
+}
+.deco-1 {
+  width: 160px;
+  height: 160px;
+  top: 15%;
+  left: 10%;
+  border: 3px dashed var(--color-muted);
+  animation: floatDeco 8s ease-in-out infinite;
+}
+.deco-2 {
+  width: 100px;
+  height: 100px;
+  bottom: 20%;
+  right: 12%;
+  background: var(--color-yellow);
+  border: 3px solid var(--color-pencil);
+  animation: floatDeco 6s ease-in-out infinite reverse;
+}
+
+@keyframes floatDeco {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  33%  { transform: translateY(-12px) rotate(3deg); }
+  66%  { transform: translateY(6px) rotate(-2deg); }
 }
 </style>

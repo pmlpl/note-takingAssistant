@@ -11,6 +11,7 @@ import {
   debounce,
   throttle,
   generateId,
+  normalizeOpenAiCompatibleBaseUrl,
 } from './common'
 
 describe('formatDate', () => {
@@ -100,5 +101,19 @@ describe('stripHtml', () => {
 describe('generateId', () => {
   it('generates non-empty string', () => {
     expect(generateId().length).toBeGreaterThan(0)
+  })
+})
+
+describe('normalizeOpenAiCompatibleBaseUrl', () => {
+  it('appends /v1 for host:port only', () => {
+    expect(normalizeOpenAiCompatibleBaseUrl('http://10.16.54.177:1234')).toBe(
+      'http://10.16.54.177:1234/v1'
+    )
+  })
+
+  it('strips /v1/models and keeps /v1', () => {
+    expect(normalizeOpenAiCompatibleBaseUrl('http://127.0.0.1:1234/v1/models')).toBe(
+      'http://127.0.0.1:1234/v1'
+    )
   })
 })

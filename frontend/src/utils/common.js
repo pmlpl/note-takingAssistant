@@ -254,3 +254,47 @@ export function generateId() {
 export function stripHtml(html) {
   return html.replace(/<[^>]*>/g, '')
 }
+
+const _OPENAI_BAD_BASE_SUFFIXES = ['/models', '/chat/completions']
+
+/**
+ * 规范化 OpenAI 兼容 API 基址：去掉误填后缀，并在缺少 /v1 时自动补上（LM Studio 等）。
+ * @returns {string|null}
+ */
+export function normalizeOpenAiCompatibleBaseUrl(url) {
+  if (url == null) return null
+  let u = String(url).trim().replace(/\/+$/, '')
+  if (!u) return null
+  let lower = u.toLowerCase()
+  for (;;) {
+    let matched = false
+    for (const suf of _OPENAI_BAD_BASE_SUFFIXES) {
+      if (lower.endsWith(suf)) {
+        u = u.slice(0, -suf.length).replace(/\/+$/, '')
+        lower = u.toLowerCase()
+        matched = true
+        break
+      }
+    }
+    if (!matched) break
+    if (!u) return null
+  }
+  try {
+    const parsed = new URL(u)
+    let path = (parsed.pathname || '').replace(/\/+$/, '')
+    if (path.toLowerCase() === '/v1' || path.toLowerCase().endsWith('/v1')) {
+      return u
+    }
+    if (!path || path === '/') {
+      parsed.pathname = '/v1'
+    } else {
+      parsed.pathname = `${path}/v1`
+    }
+    return parsed.toString().replace(/\/+$/, '')
+  } catch {
+    if (!lower.endsWith('/v1')) {
+      return `${u}/v1`
+    }
+    return u
+  }
+}

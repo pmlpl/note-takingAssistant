@@ -10,23 +10,11 @@
       <!-- 用户信息卡片 -->
       <el-card class="user-info-card" shadow="hover">
         <template #header>
-          <div class="card-header card-header--fold">
+          <div class="card-header">
             <span class="card-title">个人信息</span>
-            <el-button
-              text
-              type="primary"
-              class="section-toggle-btn"
-              @click="showProfilePanel = !showProfilePanel"
-            >
-              <el-icon class="section-toggle-icon" :class="{ 'is-open': showProfilePanel }">
-                <ArrowDown />
-              </el-icon>
-              <span>展开</span>
-            </el-button>
           </div>
         </template>
-        <Transition name="section-fold">
-          <div v-show="showProfilePanel" class="section-fold-panel" v-loading="profileLoading">
+        <div class="section-fold-panel" v-loading="profileLoading">
             <el-alert
               v-if="profileError && !profileLoading"
               type="error"
@@ -64,7 +52,6 @@
           </div>
             </div>
           </div>
-        </Transition>
       </el-card>
 
       <!-- 统计数据卡片 -->
@@ -205,9 +192,10 @@
           <el-form-item label="API 基址">
             <el-input
               v-model="llmForm.baseUrl"
-              placeholder="留空则使用服务端默认"
+              placeholder="例如 http://10.16.54.177:1234（可省略 /v1，保存时自动补全）"
               clearable
               autocomplete="off"
+              @blur="onLlmBaseUrlBlur"
             />
           </el-form-item>
           <el-form-item label="模型标识">
@@ -423,6 +411,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Message, Calendar, ArrowDown } from '@element-plus/icons-vue'
 import appPkg from '../../../package.json'
 import { TERMS_SECTIONS, PRIVACY_SECTIONS } from '@/constants/userCenterLegal'
+import { normalizeOpenAiCompatibleBaseUrl } from '@/utils/common'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -437,7 +426,6 @@ const noteCount = ref(0)
 const aiUsage = ref(0)
 const daysActive = ref(0)
 const avatarUrl = ref('')
-const showProfilePanel = ref(false)
 const showStatsPanel = ref(false)
 const showLlmPanel = ref(false)
 const showPasswordForm = ref(false)
@@ -627,17 +615,37 @@ async function loadLlmSettings() {
   }
 }
 
+function applyLlmBaseUrlNormalization(showToast = true) {
+  const raw = llmForm.value.baseUrl.trim()
+  if (!raw) return raw
+  const normalized = normalizeOpenAiCompatibleBaseUrl(raw)
+  if (!normalized || normalized === raw) return raw
+  llmForm.value.baseUrl = normalized
+  if (showToast) {
+    ElMessage.info(`已自动将 API 基址规范为：${normalized}`)
+  }
+  return normalized
+}
+
+function onLlmBaseUrlBlur() {
+  applyLlmBaseUrlNormalization(true)
+}
+
 async function saveLlmSettings() {
   llmSaving.value = true
   try {
+    const baseUrl = applyLlmBaseUrlNormalization(false) ?? llmForm.value.baseUrl.trim()
     const payload = {
-      baseUrl: llmForm.value.baseUrl.trim(),
+      baseUrl,
       model: llmForm.value.model.trim(),
       apiKey: llmForm.value.apiKey.trim() || null,
       retainApiKey: !llmForm.value.editApiKey
     }
     const s = await userApi.putLLMSettings(payload)
     llmStatus.value = { hasStoredApiKey: !!s.hasStoredApiKey, apiKeyLast4: s.apiKeyLast4 ?? null }
+    if (s.baseUrl) {
+      llmForm.value.baseUrl = s.baseUrl
+    }
     llmForm.value.apiKey = ''
     llmForm.value.editApiKey = false
     ElMessage.success('模型设置已保存')
@@ -1021,6 +1029,20 @@ function formatDays(days) {
   line-height: 1.5;
   flex: 1;
   min-width: 200px;
+}
+
+.llm-base-url-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
+}
+
+.llm-base-url-hint code {
+  font-size: 11px;
+  padding: 0 4px;
+  background: #f4f4f5;
+  border-radius: 3px;
 }
 
 /* 统计项样式 */

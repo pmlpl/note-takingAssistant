@@ -176,7 +176,10 @@ async function saveNote() {
       await noteApi.updateNote(route.params.id, form.value)
       noteStore.updateNote(route.params.id, form.value)
     } else {
-      const note = await noteApi.createNote(form.value)
+      const note = await noteApi.createNote({
+        ...form.value,
+        is_favorite: true,
+      })
       noteStore.addNote(note)
     }
     router.push('/notes')

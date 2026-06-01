@@ -54,12 +54,15 @@
         <!-- 空状态（勿用 v-else-if 接分页，否则有笔记且仅一页时会误显示） -->
         <el-empty
           v-if="!loading && filteredNotes.length === 0"
-          description="暂无笔记"
+          :description="emptyDescription"
           :image-size="200"
         >
           <el-button type="primary" @click="navigate('/notes/edit')">
             <IconPlus :size="18" />
             创建第一个笔记
+          </el-button>
+          <el-button v-if="hasNotesOutsideFavorites" class="empty-secondary-btn" @click="navigate('/notes/history')">
+            查看历史笔记（含未加入「我的笔记」的条目）
           </el-button>
         </el-empty>
       </div>
@@ -88,9 +91,18 @@ const loading = ref(false)
 const page = ref(1)
 const pageSize = 20
 const total = ref(0)
+const totalAllNotes = ref(0)
 let searchTimer = null
 
 const filteredNotes = computed(() => notes.value)
+const hasNotesOutsideFavorites = computed(
+  () => totalAllNotes.value > 0 && total.value === 0 && !searchQuery.value.trim()
+)
+const emptyDescription = computed(() =>
+  hasNotesOutsideFavorites.value
+    ? '「我的笔记」只显示已收藏的笔记；你的账号下还有其它笔记未加入此列表'
+    : '暂无笔记'
+)
 const totalPages = computed(() => Math.ceil(total.value / pageSize) || 1)
 
 watch(searchQuery, () => {
@@ -112,16 +124,24 @@ onActivated(async () => {
 async function loadNotes() {
   loading.value = true
   try {
-    const res = await noteApi.searchNotes({
-      keyword: searchQuery.value,
-      page: page.value,
-      pageSize,
-      isFavorite: true,
-    })
-    notes.value = res.items || []
-    total.value = res.total || 0
+    const keyword = searchQuery.value
+    const [favRes, allRes] = await Promise.all([
+      noteApi.searchNotes({
+        keyword,
+        page: page.value,
+        pageSize,
+        isFavorite: true,
+      }),
+      keyword.trim()
+        ? Promise.resolve(null)
+        : noteApi.searchNotes({ keyword: '', page: 1, pageSize: 1 }),
+    ])
+    notes.value = favRes.items || []
+    total.value = favRes.total || 0
+    totalAllNotes.value = allRes?.total ?? total.value
   } catch (error) {
     console.error('加载笔记失败:', error)
+    ElMessage.error('加载笔记失败，请确认已登录且后端正常运行')
   } finally {
     loading.value = false
   }
@@ -199,6 +219,10 @@ async function deleteNote(note) {
 /* 笔记内容区 */
 .notes-content {
   min-height: 400px;
+}
+
+.empty-secondary-btn {
+  margin-top: 12px;
 }
 
 /* 分页 */
