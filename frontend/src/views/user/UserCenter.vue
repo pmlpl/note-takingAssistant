@@ -747,8 +747,8 @@ async function handleLogout() {
   } catch {
     return
   }
-  userStore.logout()
-  router.push('/login')
+  await userStore.logout()
+  await router.replace('/')
 }
 
 function goNotes() {

@@ -50,15 +50,25 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('user', JSON.stringify(userData))
   }
 
-  function logout() {
+  async function logout() {
     const noteStore = useNoteStore()
     noteStore.setNotes([])
-    clearLegacyHomeCaches()
-    authSessionEpoch.value += 1
+
+    // 先通知后端撤销令牌（此时 token 还在，API 拦截器能正常携带）
+    try {
+      const { userApi } = await import('@/api/user')
+      await userApi.logout()
+    } catch {
+      // 后端不可用时静默忽略，前端照常清理
+    }
+
+    // 再清除本地状态；authSessionEpoch 须最后递增，避免 keep-alive 首页在仍“已登录”时误拉接口
     token.value = ''
     user.value = null
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    clearLegacyHomeCaches()
+    authSessionEpoch.value += 1
   }
 
   return {

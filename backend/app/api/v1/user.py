@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_db
 from app.models.user import UserCreate, UserLogin, Token, TokenWithUser, UserResponse, LLMSettingsPut, LLMSettingsResponse, ChangePasswordRequest
 from app.crud import user as crud_user
-from app.core.security import create_access_token, verify_password, get_password_hash, get_current_user
+from app.core.security import create_access_token, verify_password, get_password_hash, get_current_user, decode_token_without_verify
 from app.core.field_crypto import SecretCryptoError, encrypt_secret, decrypt_secret, api_key_last_four
+from app.core.redis_client import blacklist_token
 from app.utils.openai_compatible_url import normalize_openai_compatible_base_url
-from datetime import timedelta
+from datetime import timedelta, timezone, datetime
 from app.core.config import settings
 from pydantic import BaseModel
 import os
@@ -53,6 +54,43 @@ async def login(user: UserLogin, db: AsyncSession = Depends(get_async_db)):
             "created_at": db_user.created_at
         }
     }
+
+
+@router.post("/logout", summary="用户退出登录（撤销 JWT 令牌）")
+async def logout(request: Request):
+    """
+    退出登录：将当前 JWT 令牌加入 Redis 黑名单。
+    令牌在 Redis 中保留至其自然过期时间，到期自动清理。
+
+    调用方式：前端在 Authorization header 中携带 Bearer token，
+    就像调用任何需要认证的接口一样。
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="缺少认证令牌")
+
+    token = auth_header[7:]  # 去掉 "Bearer " 前缀
+
+    # 解码令牌获取过期时间（不验证是否过期，我们只关心 exp 字段）
+    payload = decode_token_without_verify(token)
+    if not payload or "exp" not in payload:
+        raise HTTPException(status_code=400, detail="无效的令牌格式")
+
+    # 计算令牌剩余有效秒数
+    exp_timestamp = payload["exp"]
+    now_timestamp = datetime.now(timezone.utc).timestamp()
+    remaining_seconds = int(exp_timestamp - now_timestamp)
+
+    if remaining_seconds <= 0:
+        # 令牌本来就过期了，无所谓
+        return {"message": "退出成功"}
+
+    # 加入 Redis 黑名单，自动过期
+    success = blacklist_token(token, remaining_seconds)
+    if not success:
+        raise HTTPException(status_code=503, detail="服务暂时不可用，请稍后重试")
+
+    return {"message": "退出成功"}
 
 
 @router.get("/me", summary="获取当前用户信息", response_model=UserResponse)

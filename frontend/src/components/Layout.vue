@@ -79,9 +79,9 @@ function navigate(path) {
   router.push(path)
 }
 
-function handleLogout() {
-  userStore.logout()
-  router.push('/login')
+async function handleLogout() {
+  await userStore.logout()
+  await router.replace('/')
 }
 </script>
 

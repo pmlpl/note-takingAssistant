@@ -41,6 +41,12 @@ api.interceptors.response.use(
   (error) => {
     // 只有在访问受保护资源时才处理 401
     if (error.response?.status === 401) {
+      // 排除 logout 接口本身，防止死循环
+      const isLogoutRequest = error.config?.url?.includes('/user/logout')
+      if (isLogoutRequest) {
+        return Promise.reject(error)
+      }
+
       const userStore = useUserStore()
 
       // 检查是否已经登录（有 token）
@@ -53,12 +59,11 @@ api.interceptors.response.use(
           ElMessage.warning('登录已过期，请重新登录')
         })
 
-        userStore.logout()
-
-        // 只在当前不在登录页时才重定向（SPA 内 replace，避免整页刷新）
-        if (router.currentRoute.value.path !== '/login') {
-          router.replace({ path: '/login' })
-        }
+        void userStore.logout().then(() => {
+          if (router.currentRoute.value.path !== '/') {
+            router.replace({ path: '/' })
+          }
+        })
       }
       // 如果没有 token，说明用户本来就没登录，不需要处理
     }

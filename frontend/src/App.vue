@@ -3,7 +3,10 @@
     <router-view v-slot="{ Component, route }">
       <transition :name="getTransitionName(route)" mode="out-in" appear>
         <keep-alive include="Home,AiGenerate,AiSummarize,NoteEdit,NoteList,HistoryNotes,NoteTranslate,UserManual">
-          <component :is="Component" class="page-wrapper" />
+          <component
+            :is="Component"
+            :class="['page-wrapper', { 'page-wrapper--landing': route.meta.guestLanding }]"
+          />
         </keep-alive>
       </transition>
     </router-view>
@@ -42,6 +45,15 @@ function getTransitionName(route) {
   padding: 0 2px;
   border-left:  3px dashed var(--color-muted);
   border-right: 3px dashed var(--color-muted);
+}
+
+/* 欢迎页：去掉两侧虚线框，与全宽 Hero 连成一体 */
+.page-wrapper--landing {
+  min-height: 100vh;
+  background: transparent;
+  backdrop-filter: none;
+  padding: 0;
+  border: none;
 }
 
 /* ── Page Transitions ── */

@@ -8,6 +8,10 @@ export const userApi = {
   register(data) {
     return api.post('/v1/user/register', data)
   },
+
+  logout() {
+    return api.post('/v1/user/logout')
+  },
   
   changePassword(data) {
     return api.put('/v1/user/password', data)

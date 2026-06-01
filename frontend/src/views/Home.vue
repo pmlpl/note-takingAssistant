@@ -429,6 +429,15 @@ watch(
 
 /** 切换账号后 keep-alive 仍保留旧状态：按用户 id + 登录世代重置并重新拉取 */
 async function ensureHomeSessionForCurrentUser() {
+  if (!userStore.isLoggedIn) {
+    if (homeBoundUserId.value != null) {
+      homeBoundUserId.value = null
+      boundAuthEpoch.value = -1
+      clearHomeUiState()
+    }
+    return
+  }
+
   try {
     localStorage.removeItem('home_chat_history')
     localStorage.removeItem('home_current_note')
@@ -461,6 +470,8 @@ async function ensureHomeSessionForCurrentUser() {
 }
 
 async function bootstrapHomeData() {
+  if (!userStore.isLoggedIn) return
+
   loadChatHistory()
   await loadCurrentNoteFromCache()
 
@@ -538,23 +549,30 @@ watch(
 )
 
 async function loadRecentNotes() {
+  if (!userStore.isLoggedIn) return
   try {
     // 使用新的 API 获取最近笔记（从 Redis 缓存）
     const notes = await noteApi.getRecentNotes()
     recentNotes.value = notes
   } catch (error) {
+    if (!userStore.isLoggedIn) return
     ElMessage.error('加载最近笔记失败')
   }
 }
 
 // 加载所有笔记（/note 选择器依赖此列表）
 async function loadAllNotes() {
+  if (!userStore.isLoggedIn) {
+    allNotes.value = []
+    return
+  }
   try {
     const notes = await noteApi.getNotes()
     allNotes.value = Array.isArray(notes) ? notes : []
   } catch (error) {
-    console.error('加载笔记列表失败（/note 将无选项）:', error)
     allNotes.value = []
+    if (!userStore.isLoggedIn) return
+    console.error('加载笔记列表失败（/note 将无选项）:', error)
     ElMessage.error({ message: '加载笔记列表失败，请刷新页面重试', duration: MESSAGE_DURATION.NORMAL })
   }
 }
