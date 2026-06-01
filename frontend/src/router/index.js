@@ -6,7 +6,7 @@ const routes = [
     path: '/',
     name: 'Welcome',
     component: () => import('@/views/auth/Welcome.vue'),
-    meta: { transition: 'slide' }
+    meta: { transition: 'slide', guestLanding: true }
   },
   {
     path: '/home',
@@ -109,16 +109,16 @@ router.beforeEach((to, from, next) => {
       return
     }
     
-    // 如果需要认证但未登录，跳转到登录页
+    // 未登录访问需认证页面 → 欢迎页（非登录页）
     if (to.meta.requiresAuth && !userStore.isLoggedIn) {
-      next('/login')
-    } else {
-      next()
+      next('/')
+      return
     }
+
+    next()
   } catch (error) {
     console.error('Route guard error:', error)
-    // 发生错误时重定向到登录页
-    next('/login')
+    next('/')
   }
 })
 

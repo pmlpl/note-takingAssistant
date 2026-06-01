@@ -91,12 +91,13 @@ export const AI_MINDMAP_QUICK_PROMPT = [
   '```',
   '',
   '若内容含代码、装饰器、列表推导式等，优先用 flowchart TD + 简短节点名；若用 mindmap，节点只能是缩进纯文字或 nodeId[\"说明\"] 形式，禁止在节点行直接写类似 [x for x in range]、@decorator 等源码片段。',
+  'mindmap 节点文案里若含英文冒号 :、半角括号 ()、方括号 [] 等，必须用 nodeId[\"全文\"] 包起来，否则易解析失败；预览页会自动把高风险行改成该形式。',
   '不要用其它语言标记代替 mermaid；不要只用列表或纯文字描述而不给出上述代码块。除代码块外可附一两句简短说明。'
 ].join('\n')
 
 /**
- * mindmap 中一行若以 [ 开头、含 @xxx、或方括号内出现 for…in 等，易与语法冲突导致解析失败。
- * 将此类行改为 mmdfixN["原文"]（Mermaid 官方 nodeId["标签"] 形式）。
+ * mindmap 子行若含冒号、半角括号、裸方括号等，易触发 Mermaid 解析报错（如 SPACELIST）。
+ * 将此类行改为 mmdfixN["原文"]（官方 nodeId["标签"] 形式）。已是 id["…"] 或 id((… 则不动。
  */
 function mindmapLineNeedsQuotedSafeNode(trimmedBody) {
   const s = trimmedBody.trim()
@@ -107,6 +108,15 @@ function mindmapLineNeedsQuotedSafeNode(trimmedBody) {
   if (/^@\w/.test(s)) return true
   if (/(?:^|\s)@\w/.test(s)) return true
   if (/\[[^\]]*\bfor\b[^\]]*\bin\b[^\]]*\]/i.test(s)) return true
+  if (/:/.test(s)) {
+    if (/(^|\s)::(?:icon|fa)\b/i.test(s)) return false
+    return true
+  }
+  if (/\[/.test(s)) return true
+  if (/\(/.test(s) || /\)/.test(s)) {
+    if (/^\(\([^)]*\)\)\s*$/.test(s)) return false
+    return true
+  }
   return false
 }
 
@@ -243,4 +253,48 @@ export function generateId() {
 
 export function stripHtml(html) {
   return html.replace(/<[^>]*>/g, '')
+}
+
+const _OPENAI_BAD_BASE_SUFFIXES = ['/models', '/chat/completions']
+
+/**
+ * 规范化 OpenAI 兼容 API 基址：去掉误填后缀，并在缺少 /v1 时自动补上（LM Studio 等）。
+ * @returns {string|null}
+ */
+export function normalizeOpenAiCompatibleBaseUrl(url) {
+  if (url == null) return null
+  let u = String(url).trim().replace(/\/+$/, '')
+  if (!u) return null
+  let lower = u.toLowerCase()
+  for (;;) {
+    let matched = false
+    for (const suf of _OPENAI_BAD_BASE_SUFFIXES) {
+      if (lower.endsWith(suf)) {
+        u = u.slice(0, -suf.length).replace(/\/+$/, '')
+        lower = u.toLowerCase()
+        matched = true
+        break
+      }
+    }
+    if (!matched) break
+    if (!u) return null
+  }
+  try {
+    const parsed = new URL(u)
+    let path = (parsed.pathname || '').replace(/\/+$/, '')
+    if (path.toLowerCase() === '/v1' || path.toLowerCase().endsWith('/v1')) {
+      return u
+    }
+    if (!path || path === '/') {
+      parsed.pathname = '/v1'
+    } else {
+      parsed.pathname = `${path}/v1`
+    }
+    return parsed.toString().replace(/\/+$/, '')
+  } catch {
+    if (!lower.endsWith('/v1')) {
+      return `${u}/v1`
+    }
+    return u
+  }
 }

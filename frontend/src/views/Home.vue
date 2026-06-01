@@ -198,13 +198,25 @@
               
               <!-- 快捷操作按钮 -->
               <div class="quick-actions">
-                <el-button size="small" @click="sendMindmapQuickPrompt">
+                <el-button
+                  size="small"
+                  :disabled="isAiOutputInProgress"
+                  @click="sendMindmapQuickPrompt"
+                >
                   思维导图
                 </el-button>
-                <el-button size="small" @click="sendQuickMessage('给我一些学习建议')">
+                <el-button
+                  size="small"
+                  :disabled="isAiOutputInProgress"
+                  @click="sendQuickMessage('给我一些学习建议')"
+                >
                   学习建议
                 </el-button>
-                <el-button size="small" @click="sendQuickMessage('解释一下这个概念')">
+                <el-button
+                  size="small"
+                  :disabled="isAiOutputInProgress"
+                  @click="sendQuickMessage('解释一下这个概念')"
+                >
                   概念解释
                 </el-button>
               </div>
@@ -233,11 +245,20 @@
                     <IconPlus :size="16" />
                   </el-button>
                 </div>
-                <el-button 
-                  type="primary" 
+                <el-button
+                  v-if="isAiOutputInProgress"
+                  type="danger"
+                  plain
+                  class="stop-ai-btn"
+                  @click="stopAiChatOutput"
+                >
+                  停止
+                </el-button>
+                <el-button
+                  type="primary"
                   @click="sendMessage"
-                  :disabled="!aiMessage.trim() || isAiThinking"
-                  :loading="isAiThinking"
+                  :disabled="!aiMessage.trim() || isAiOutputInProgress"
+                  :loading="isAiOutputInProgress"
                   class="send-btn"
                   circle
                 >
@@ -253,9 +274,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useNoteStore } from '@/store'
+import { useUserStore } from '@/store'
 import Layout from '@/components/Layout.vue'
 import {IconPlus, IconUpload, IconDocument, IconEdit, IconAI, IconNotebook} from '@/components/icons'
 import { noteApi } from '@/api/note'
@@ -287,14 +308,62 @@ defineOptions({
 /** 首页 AI 助手：聊天（含用户/助手）在内存与 localStorage 中最多保留条数，超出丢弃最早消息 */
 const HOME_CHAT_MAX_MESSAGES = 40
 
+/** 首页 AI 流式对话超时（与翻译/生成页一致） */
+const HOME_CHAT_STREAM_MS =
+  Number(import.meta.env.VITE_AI_REQUEST_TIMEOUT_MS) || 600_000
+
+let homeChatSaveDebounceTimer = null
+function scheduleDebouncedSaveChatHistory() {
+  clearTimeout(homeChatSaveDebounceTimer)
+  homeChatSaveDebounceTimer = setTimeout(() => {
+    homeChatSaveDebounceTimer = null
+    saveChatHistory()
+  }, 350)
+}
+
+let homeChatScrollRaf = 0
+function scheduleHomeChatScroll() {
+  if (homeChatScrollRaf) return
+  homeChatScrollRaf = requestAnimationFrame(async () => {
+    homeChatScrollRaf = 0
+    await scrollToBottom()
+  })
+}
+
+/** 当前首页 AI 流式请求的 AbortController（用户点「停止」或离开页面时中止） */
+let homeChatAbortController = null
+/** 区分用户主动停止与超时等中止，用于提示文案 */
+let homeChatStopWasUser = false
+
 const router = useRouter()
-const noteStore = useNoteStore()
+const userStore = useUserStore()
+
+/** 绑定到首页数据的账号 id；切换用户时必须清空 keep-alive 内的状态 */
+const homeBoundUserId = ref(null)
+const boundAuthEpoch = ref(-1)
+
+/** 当前登录用户在 localStorage 中的隔离标识（无 id 时用 username，避免多人共用 guest） */
+function homeUserScope() {
+  const u = userStore.user
+  if (!u) return null
+  if (u.id != null && u.id !== '') return `u${u.id}`
+  if (u.username) return `name_${u.username}`
+  return null
+}
+
+function homeStorageKey(suffix) {
+  const scope = homeUserScope()
+  if (!scope) return `home_${suffix}_guest`
+  return `home_${suffix}_${scope}`
+}
 
 const recentNotes = ref([])
 const currentNote = ref(null)
 const aiMessage = ref('')
 const chatHistory = ref([])  // 聊天历史
-const isAiThinking = ref(false)  // AI 是否正在思考
+const isAiThinking = ref(false)  // AI 是否正在思考（首包前显示打字动画）
+/** 从发送请求到流结束整段过程，用于禁用发送/快捷操作与显示「停止」 */
+const isAiOutputInProgress = ref(false)
 const chatMessagesRef = ref(null)  // 聊天消息容器引用
 const uploadedNoteContent = ref(null)  // 上传的笔记内容（给AI看，不显示在输入框）
 const uploadedNoteName = ref('')  // 上传的笔记文件名
@@ -302,6 +371,21 @@ const showNoteSelector = ref(false)  // 是否显示笔记选择器
 const allNotes = ref([])  // 所有笔记列表
 /** 聊天区未贴底时显示「↓」跳转按钮 */
 const showScrollToLatestBtn = ref(false)
+
+function clearHomeUiState() {
+  recentNotes.value = []
+  allNotes.value = []
+  currentNote.value = null
+  chatHistory.value = []
+  aiMessage.value = ''
+  uploadedNoteContent.value = null
+  uploadedNoteName.value = ''
+  showNoteSelector.value = false
+  isAiThinking.value = false
+  isAiOutputInProgress.value = false
+  homeChatAbortController?.abort()
+  homeChatAbortController = null
+}
 
 // 过滤后的笔记列表（用于搜索）
 const filteredNotes = computed(() => {
@@ -323,49 +407,103 @@ const renderedContent = computed(() => {
 })
 
 onMounted(async () => {
-  // 1. 从 localStorage 恢复聊天历史
+  await ensureHomeSessionForCurrentUser()
+})
+
+onActivated(async () => {
+  await ensureHomeSessionForCurrentUser()
+})
+
+onBeforeUnmount(() => {
+  homeChatStopWasUser = false
+  homeChatAbortController?.abort()
+  homeChatAbortController = null
+})
+
+watch(
+  () => [userStore.user?.id, userStore.user?.username, userStore.authSessionEpoch],
+  () => {
+    void ensureHomeSessionForCurrentUser()
+  }
+)
+
+/** 切换账号后 keep-alive 仍保留旧状态：按用户 id + 登录世代重置并重新拉取 */
+async function ensureHomeSessionForCurrentUser() {
+  if (!userStore.isLoggedIn) {
+    if (homeBoundUserId.value != null) {
+      homeBoundUserId.value = null
+      boundAuthEpoch.value = -1
+      clearHomeUiState()
+    }
+    return
+  }
+
+  try {
+    localStorage.removeItem('home_chat_history')
+    localStorage.removeItem('home_current_note')
+  } catch {
+    /* ignore */
+  }
+
+  const uid = userStore.user?.id
+  const epoch = userStore.authSessionEpoch
+
+  if (uid == null || uid === undefined) {
+    if (homeBoundUserId.value != null) {
+      homeBoundUserId.value = null
+      boundAuthEpoch.value = -1
+      clearHomeUiState()
+    }
+    return
+  }
+
+  const uidNum = Number(uid)
+  if (homeBoundUserId.value === uidNum && boundAuthEpoch.value === epoch) {
+    return
+  }
+
+  homeBoundUserId.value = uidNum
+  boundAuthEpoch.value = epoch
+  clearHomeUiState()
+
+  await bootstrapHomeData()
+}
+
+async function bootstrapHomeData() {
+  if (!userStore.isLoggedIn) return
+
   loadChatHistory()
-  
-  // 2. 从 localStorage 恢复当前笔记
   await loadCurrentNoteFromCache()
-  
-  // 3. 检查是否有笔记ID参数，如果有则自动加载该笔记（覆盖缓存）
+
   const noteId = router.currentRoute.value.query.noteId
-  
+
   if (noteId) {
     try {
       ElMessage.success({ message: '加载成功', duration: MESSAGE_DURATION.SHORT })
-      
-      // 确保 noteId 是字符串类型（URL参数始终是字符串）
+
       const fullNote = await noteApi.getNote(String(noteId))
-      
+
       currentNote.value = fullNote
-      
-      // 缓存到 localStorage
+
       saveCurrentNoteToCache(fullNote)
-      
-      // 重新加载最近笔记列表
+
       await loadRecentNotes()
-      
-      // 将当前查看的笔记移到列表最前面（如果不在列表中则添加）
+
       updateRecentNotesWithCurrent(fullNote)
-      
-      // 清除URL中的query参数
+
       router.replace({ path: '/home' })
     } catch (error) {
       ElMessage.error({ message: '加载笔记失败', duration: MESSAGE_DURATION.SHORT })
     }
   } else {
-    // 没有noteId参数，正常加载最近笔记
     await loadRecentNotes()
   }
-  
-  // 4. 加载所有笔记用于 /note 命令
+
   await loadAllNotes()
 
   await nextTick()
   onChatScroll()
-})
+}
 
 watch(
   () => chatHistory.value.length,
@@ -411,57 +549,56 @@ watch(
 )
 
 async function loadRecentNotes() {
+  if (!userStore.isLoggedIn) return
   try {
     // 使用新的 API 获取最近笔记（从 Redis 缓存）
     const notes = await noteApi.getRecentNotes()
     recentNotes.value = notes
   } catch (error) {
+    if (!userStore.isLoggedIn) return
     ElMessage.error('加载最近笔记失败')
   }
 }
 
 // 加载所有笔记（/note 选择器依赖此列表）
 async function loadAllNotes() {
+  if (!userStore.isLoggedIn) {
+    allNotes.value = []
+    return
+  }
   try {
     const notes = await noteApi.getNotes()
     allNotes.value = Array.isArray(notes) ? notes : []
   } catch (error) {
-    console.error('加载笔记列表失败（/note 将无选项）:', error)
     allNotes.value = []
+    if (!userStore.isLoggedIn) return
+    console.error('加载笔记列表失败（/note 将无选项）:', error)
     ElMessage.error({ message: '加载笔记列表失败，请刷新页面重试', duration: MESSAGE_DURATION.NORMAL })
   }
 }
 
 // 更新最近笔记列表，将当前笔记移到最前面
-async function updateRecentNotesWithCurrent(note) {
+function updateRecentNotesWithCurrent(note) {
   if (!note || !note.id) return
   
-  // 查找当前笔记在列表中的位置
-  const index = recentNotes.value.findIndex(n => n.id === note.id)
+  // 移除所有重复的笔记（不只是第一个）
+  recentNotes.value = recentNotes.value.filter(n => n.id !== note.id)
   
-  if (index > -1) {
-    // 如果已存在，移除并添加到最前面
-    recentNotes.value.splice(index, 1)
-    recentNotes.value.unshift(note)
-  } else {
-    // 如果不存在，直接添加到最前面
-    recentNotes.value.unshift(note)
-    
-    // 保持列表最多20个笔记（解除5个限制）
-    if (recentNotes.value.length > 20) {
-      recentNotes.value = recentNotes.value.slice(0, 20)
-    }
+  // 添加到最前面
+  recentNotes.value.unshift(note)
+  
+  // 保持列表最多20个笔记
+  if (recentNotes.value.length > 20) {
+    recentNotes.value = recentNotes.value.slice(0, 20)
   }
   
-  // 异步同步到后端Redis缓存（不阻塞UI）
-  // 使用 setTimeout 确保在下一个事件循环执行
+  // 异步同步到后端Redis缓存
   setTimeout(async () => {
     try {
       const noteIds = recentNotes.value.map(n => n.id)
       await noteApi.updateRecentNotesOrder(noteIds)
     } catch (error) {
       console.error('❌ 同步最近笔记顺序失败:', error)
-      // 不显示错误提示，避免影响用户体验
     }
   }, 0)
 }
@@ -775,8 +912,14 @@ function clearUploadedNote() {
 }
 
 // 发送消息（完全异步，不阻塞UI）
+function stopAiChatOutput() {
+  if (!isAiOutputInProgress.value) return
+  homeChatStopWasUser = true
+  homeChatAbortController?.abort()
+}
+
 function sendMessage() {
-  if (!aiMessage.value.trim() || isAiThinking.value) return
+  if (!aiMessage.value.trim() || isAiOutputInProgress.value) return
   
   const userMessage = aiMessage.value.trim()
   aiMessage.value = ''
@@ -798,10 +941,16 @@ function sendMessage() {
   
   // 显示 AI 思考状态
   isAiThinking.value = true
+  isAiOutputInProgress.value = true
   
   // 在后台异步执行 AI 请求，完全不阻塞其他操作
   // 不使用 await，让它在后台独立运行
   ;(async () => {
+    const streamAbort = new AbortController()
+    homeChatAbortController = streamAbort
+    const timeoutId = setTimeout(() => streamAbort.abort(), HOME_CHAT_STREAM_MS)
+    let assistantIdx = -1
+
     try {
       // 构建消息历史
       let messages = chatHistory.value.slice(0, -1).slice(-10).map(msg => ({
@@ -818,36 +967,134 @@ function sendMessage() {
         )
       }
 
-      const result = await aiApi.chat({
+      await aiApi.chatStream({
         message: messageForApi,
-        history: messages
+        history: messages,
+        signal: streamAbort.signal,
+        onChunk: (acc) => {
+          if (assistantIdx < 0) {
+            chatHistory.value.push({
+              role: 'assistant',
+              content: acc,
+              timestamp: new Date()
+            })
+            assistantIdx = chatHistory.value.length - 1
+            isAiThinking.value = false
+          } else {
+            chatHistory.value[assistantIdx].content = acc
+          }
+          scheduleHomeChatScroll()
+          scheduleDebouncedSaveChatHistory()
+        }
       })
-      
-      // 添加 AI 回复到聊天历史
-      chatHistory.value.push({
-        role: 'assistant',
-        content: result.data?.reply || '抱歉，我暂时无法回答这个问题。',
-        timestamp: new Date()
-      })
-      
-      // 保存到 localStorage
-      saveChatHistory()
-      
+
+      if (assistantIdx < 0) {
+        chatHistory.value.push({
+          role: 'assistant',
+          content: '抱歉，我暂时无法回答这个问题。',
+          timestamp: new Date()
+        })
+        isAiThinking.value = false
+      } else {
+        const c = String(chatHistory.value[assistantIdx].content || '').trim()
+        if (!c) {
+          chatHistory.value[assistantIdx].content =
+            '抱歉，我暂时无法回答这个问题。'
+        }
+      }
+
     } catch (error) {
       console.error('AI 回复失败:', error)
-      ElMessage.error({ message: 'AI 服务暂时不可用，请稍后重试', duration: MESSAGE_DURATION.SHORT })
-      chatHistory.value.push({
-        role: 'assistant',
-        content: '抱歉，服务暂时不可用，请稍后重试。',
-        timestamp: new Date()
-      })
-      
-      // 保存错误消息到 localStorage
-      saveChatHistory()
+      const aborted = error?.name === 'AbortError' || streamAbort.signal.aborted
+      let fallback =
+        '抱歉，服务暂时不可用，请稍后重试。'
+
+      if (!aborted) {
+        const d = error?.response?.data?.detail
+        const msg = Array.isArray(d)
+          ? d.map((x) => x.msg || JSON.stringify(x)).join('；')
+          : d || error?.message
+        const s = String(msg || '')
+        if (s.includes('503') || /密钥|ENCRYPTION|crypto/i.test(s)) {
+          fallback = '模型或密钥不可用，请到个人中心检查 LLM / API Key 配置'
+        } else if (typeof msg === 'string' && msg.trim()) {
+          fallback = msg.trim()
+        }
+        ElMessage.error({
+          message: 'AI 服务暂时不可用，请稍后重试',
+          duration: MESSAGE_DURATION.SHORT
+        })
+      } else if (homeChatStopWasUser) {
+        if (assistantIdx >= 0 && String(chatHistory.value[assistantIdx].content || '').trim()) {
+          ElMessage.info({
+            message: '已停止生成',
+            duration: MESSAGE_DURATION.SHORT
+          })
+        } else {
+          ElMessage.info({
+            message: '已停止',
+            duration: MESSAGE_DURATION.SHORT
+          })
+        }
+      } else if (assistantIdx >= 0 && String(chatHistory.value[assistantIdx].content || '').trim()) {
+        ElMessage.warning({
+          message: '回复已中断（可能为超时）',
+          duration: MESSAGE_DURATION.SHORT
+        })
+      } else if (assistantIdx < 0) {
+        ElMessage.info({
+          message: '已取消或超时',
+          duration: MESSAGE_DURATION.SHORT
+        })
+      }
+
+      if (!aborted) {
+        if (assistantIdx >= 0) {
+          if (!String(chatHistory.value[assistantIdx].content || '').trim()) {
+            chatHistory.value[assistantIdx].content = fallback
+          }
+        } else {
+          chatHistory.value.push({
+            role: 'assistant',
+            content: fallback,
+            timestamp: new Date()
+          })
+        }
+      } else if (homeChatStopWasUser) {
+        if (assistantIdx >= 0) {
+          if (!String(chatHistory.value[assistantIdx].content || '').trim()) {
+            chatHistory.value[assistantIdx].content = '（已停止生成）'
+          }
+        } else {
+          chatHistory.value.push({
+            role: 'assistant',
+            content: '（已停止生成）',
+            timestamp: new Date()
+          })
+        }
+      } else {
+        if (assistantIdx >= 0) {
+          if (!String(chatHistory.value[assistantIdx].content || '').trim()) {
+            chatHistory.value[assistantIdx].content = fallback
+          }
+        } else {
+          chatHistory.value.push({
+            role: 'assistant',
+            content: fallback,
+            timestamp: new Date()
+          })
+        }
+      }
     } finally {
+      clearTimeout(timeoutId)
+      clearTimeout(homeChatSaveDebounceTimer)
+      homeChatSaveDebounceTimer = null
       isAiThinking.value = false
-      // 滚动到底部
-      scrollToBottom()
+      isAiOutputInProgress.value = false
+      homeChatAbortController = null
+      homeChatStopWasUser = false
+      saveChatHistory()
+      await scrollToBottom()
     }
   })()
   
@@ -970,7 +1217,7 @@ function saveCurrentNoteToCache(note) {
       updated_at: note.updated_at,
       timestamp: Date.now()  // 记录缓存时间
     }
-    localStorage.setItem('home_current_note', JSON.stringify(cacheData))
+    localStorage.setItem(homeStorageKey('current_note'), JSON.stringify(cacheData))
   } catch (error) {
     console.error('保存笔记缓存失败:', error)
   }
@@ -979,7 +1226,7 @@ function saveCurrentNoteToCache(note) {
 // 从 localStorage 加载当前笔记
 async function loadCurrentNoteFromCache() {
   try {
-    const cached = localStorage.getItem('home_current_note')
+    const cached = localStorage.getItem(homeStorageKey('current_note'))
     if (!cached) return
     
     const cacheData = JSON.parse(cached)
@@ -991,7 +1238,7 @@ async function loadCurrentNoteFromCache() {
     
     if (cacheAge > maxAge) {
       // 缓存过期，清除
-      localStorage.removeItem('home_current_note')
+      localStorage.removeItem(homeStorageKey('current_note'))
       return
     }
     
@@ -999,46 +1246,74 @@ async function loadCurrentNoteFromCache() {
     currentNote.value = cacheData
   } catch (error) {
     console.error('加载笔记缓存失败:', error)
-    localStorage.removeItem('home_current_note')
+    localStorage.removeItem(homeStorageKey('current_note'))
   }
 }
 
-// 保存聊天历史到 localStorage（与内存同步裁剪，避免单页会话无限变长）
+// 保存聊天历史到 localStorage（按用户隔离，带归属校验）
 function saveChatHistory() {
+  if (!homeUserScope()) return
   try {
     if (chatHistory.value.length > HOME_CHAT_MAX_MESSAGES) {
       chatHistory.value = chatHistory.value.slice(-HOME_CHAT_MAX_MESSAGES)
     }
-    localStorage.setItem('home_chat_history', JSON.stringify(chatHistory.value))
+    const payload = {
+      v: 1,
+      ownerId: userStore.user?.id ?? null,
+      ownerUsername: userStore.user?.username ?? '',
+      messages: chatHistory.value
+    }
+    localStorage.setItem(homeStorageKey('chat_history'), JSON.stringify(payload))
   } catch (error) {
     console.error('保存聊天历史失败:', error)
   }
 }
 
-// 从 localStorage 加载聊天历史
+function chatHistoryBelongsToCurrentUser(parsed) {
+  const u = userStore.user
+  if (!u) return false
+  if (parsed.ownerId != null && u.id != null && Number(parsed.ownerId) !== Number(u.id)) {
+    return false
+  }
+  if (parsed.ownerUsername && u.username && parsed.ownerUsername !== u.username) {
+    return false
+  }
+  return true
+}
+
+// 从 localStorage 加载聊天历史（仅恢复当前用户的记录）
 function loadChatHistory() {
+  if (!homeUserScope()) return
   try {
-    const cached = localStorage.getItem('home_chat_history')
+    const cached = localStorage.getItem(homeStorageKey('chat_history'))
     if (!cached) return
 
-    const history = JSON.parse(cached)
-    if (!Array.isArray(history)) {
-      localStorage.removeItem('home_chat_history')
+    const parsed = JSON.parse(cached)
+    let history
+
+    if (Array.isArray(parsed)) {
+      history = parsed
+    } else if (parsed?.v === 1 && Array.isArray(parsed.messages)) {
+      if (!chatHistoryBelongsToCurrentUser(parsed)) {
+        localStorage.removeItem(homeStorageKey('chat_history'))
+        return
+      }
+      history = parsed.messages
+    } else {
+      localStorage.removeItem(homeStorageKey('chat_history'))
       return
     }
 
-    // 恢复聊天历史
     chatHistory.value = history.map((msg) => ({
       ...msg,
-      timestamp: new Date(msg.timestamp) // 恢复 Date 对象
+      timestamp: new Date(msg.timestamp)
     }))
     saveChatHistory()
 
-    // 滚动到底部
     setTimeout(() => scrollToBottom(), 100)
   } catch (error) {
     console.error('加载聊天历史失败:', error)
-    localStorage.removeItem('home_chat_history')
+    localStorage.removeItem(homeStorageKey('chat_history'))
   }
 }
 
@@ -1054,7 +1329,7 @@ async function confirmClearChat() {
   }
   chatHistory.value = []
   try {
-    localStorage.removeItem('home_chat_history')
+    localStorage.removeItem(homeStorageKey('chat_history'))
   } catch {
     /* ignore */
   }
@@ -1079,6 +1354,8 @@ function getNotePreview(content) {
 </script>
 
 <style scoped>
+/* ═══ Home — Hand-Drawn Theme ═══ */
+
 .home-container {
   height: calc(100vh - 60px);
   overflow: hidden;
@@ -1086,23 +1363,26 @@ function getNotePreview(content) {
 
 .main-layout {
   height: 100%;
-  background: #f5f7fa;
+  background: var(--color-paper);
+  background-image: radial-gradient(var(--color-muted) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
-/* 左侧边栏 */
+/* ── Left Sidebar ── */
 .left-sidebar {
-  background: white;
-  border-right: 1px solid #e4e7ed;
+  background: #ffffff;
+  border-right: 3px dashed var(--color-pencil);
   display: flex;
   flex-direction: column;
   padding: 20px;
 }
 
 .sidebar-header h3 {
+  font-family: var(--font-heading);
   font-size: 18px;
-  color: #303133;
-  margin: 0 0 20px 0;
-  font-weight: 600;
+  color: var(--color-pencil);
+  margin: 0 0 20px;
+  font-weight: 700;
 }
 
 .sidebar-actions {
@@ -1124,10 +1404,11 @@ function getNotePreview(content) {
 }
 
 .list-title {
+  font-family: var(--font-body);
   font-size: 14px;
-  color: #909399;
+  color: #999;
   margin-bottom: 12px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .note-item {
@@ -1135,49 +1416,50 @@ function getNotePreview(content) {
   align-items: center;
   gap: 8px;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-wobbly-sm);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   margin-bottom: 4px;
 }
 
 .note-item:hover {
-  background: #f5f7fa;
+  background: var(--color-yellow);
+  transform: rotate(-0.5deg);
 }
 
 .note-title {
+  font-family: var(--font-body);
   font-size: 14px;
-  color: #606266;
+  color: var(--color-pencil);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
 }
 
-/* 更多笔记链接 */
 .more-notes {
   padding: 10px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border-radius: 8px;
+  border-radius: var(--radius-wobbly-sm);
   margin-top: 4px;
 }
 
 .more-notes:hover {
-  background: #f5f7fa;
+  background: var(--color-muted);
 }
 
 .more-text {
+  font-family: var(--font-body);
   font-size: 13px;
-  color: #409eff;
-  font-weight: 500;
+  color: var(--color-blue);
+  font-weight: 600;
 }
 
 .empty-notes {
   text-align: center;
   padding: 40px 20px;
-  color: #909399;
+  color: #999;
 }
 
 .empty-notes p {
@@ -1185,14 +1467,14 @@ function getNotePreview(content) {
   font-size: 14px;
 }
 
-/* 中间预览区 */
+/* ── Center Preview ── */
 .center-preview {
-  background: white;
-  padding: 0;  /* 移除padding，由子元素控制 */
-  overflow: hidden;  /* 隐藏整体滚动条 */
+  background: #ffffff;
+  padding: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: 100%;  /* 确保占满高度 */
+  height: 100%;
 }
 
 .preview-content {
@@ -1208,68 +1490,49 @@ function getNotePreview(content) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 30px 30px 20px 30px;  /* 上左右内边距 */
-  border-bottom: 2px solid #e4e7ed;
-  background: white;
-  flex-shrink: 0;  /* 防止头部被压缩 */
+  padding: 30px 30px 20px;
+  border-bottom: 3px dashed var(--color-pencil);
+  background: #fff;
+  flex-shrink: 0;
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
 .preview-header h2 {
+  font-family: var(--font-heading);
   font-size: 24px;
-  color: #303133;
+  color: var(--color-pencil);
   margin: 0;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .preview-body {
-  flex: 1;  /* 占据剩余空间 */
+  flex: 1;
   overflow-y: auto;
   overflow-x: auto;
-  padding: 0 30px 30px 30px;  /* 下左右内边距 */
+  padding: 0 30px 30px;
   line-height: 1.8;
-  color: #303133;
+  color: var(--color-pencil);
   font-size: 15px;
-  min-height: 0;  /* 重要：允许flex子项缩小 */
+  min-height: 0;
 }
 
 .preview-body :deep(h1),
 .preview-body :deep(h2),
 .preview-body :deep(h3) {
+  font-family: var(--font-heading);
   margin-top: 24px;
   margin-bottom: 12px;
-  color: #303133;
+  color: var(--color-pencil);
 }
 
-.preview-body :deep(p) {
-  margin: 12px 0;
-}
-
-.preview-body :deep(img) {
-  max-width: 100%;
-  height: auto;
-}
-
-.preview-body :deep(table) {
-  display: table;
-  border-collapse: collapse;
-  max-width: 100%;
-  margin: 12px 0;
-}
-
+.preview-body :deep(p)    { margin: 12px 0; }
+.preview-body :deep(img)  { max-width: 100%; height: auto; }
+.preview-body :deep(table) { display: table; border-collapse: collapse; max-width: 100%; margin: 12px 0; }
 .preview-body :deep(td),
-.preview-body :deep(th) {
-  border: 1px solid #dcdfe6;
-  padding: 8px 12px;
-  vertical-align: top;
-}
-
-.preview-body :deep(th) {
-  background: #f5f7fa;
-  font-weight: 600;
-}
+.preview-body :deep(th)   { border: 2px solid var(--color-pencil); padding: 8px 12px; vertical-align: top; }
+.preview-body :deep(th)   { background: var(--color-muted); font-weight: 700; }
 
 .empty-preview {
   display: flex;
@@ -1277,61 +1540,58 @@ function getNotePreview(content) {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #909399;
-  padding: 30px;  /* 添加内边距 */
+  color: #999;
+  padding: 30px;
 }
 
 .empty-preview h3 {
+  font-family: var(--font-heading);
   font-size: 20px;
-  color: #606266;
-  margin: 20px 0 10px 0;
+  color: var(--color-pencil);
+  margin: 20px 0 10px;
 }
 
 .empty-preview p {
+  font-family: var(--font-body);
   font-size: 14px;
   margin: 0;
 }
 
-/* 右侧 AI 面板 */
+/* ── Right AI Panel ── */
 .right-ai-panel {
-  background: white;
-  border-left: 1px solid #e4e7ed;
+  background: #ffffff;
+  border-left: 3px dashed var(--color-pencil);
   display: flex;
   flex-direction: column;
-  height: 100%;  /* 确保占满高度 */
-  overflow: hidden;  /* 隐藏整体滚动条 */
+  height: 100%;
+  overflow: hidden;
 }
 
 .ai-header {
   padding: 20px;
-  border-bottom: 1px solid #e4e7ed;
-  flex-shrink: 0; /* 防止头部被压缩 */
+  border-bottom: 2px dashed var(--color-muted);
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.ai-header-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.ai-header-clear {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
+.ai-header-main { flex: 1; min-width: 0; }
+.ai-header-clear { flex-shrink: 0; margin-top: 2px; }
 
 .ai-header h3 {
+  font-family: var(--font-heading);
   font-size: 18px;
-  color: #303133;
-  margin: 0 0 5px 0;
-  font-weight: 600;
+  color: var(--color-pencil);
+  margin: 0 0 4px;
+  font-weight: 700;
 }
 
 .ai-header p {
-  font-size: 13px;
-  color: #909399;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: #999;
   margin: 0;
 }
 
@@ -1339,8 +1599,8 @@ function getNotePreview(content) {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;  /* 隐藏溢出 */
-  min-height: 0;  /* 重要：允许flex子项缩小 */
+  overflow: hidden;
+  min-height: 0;
 }
 
 .chat-messages-stack {
@@ -1356,7 +1616,7 @@ function getNotePreview(content) {
   overflow-y: auto;
   overflow-x: auto;
   padding: 20px;
-  min-height: 0;  /* 重要：允许flex子项缩小 */
+  min-height: 0;
 }
 
 .chat-scroll-float-btn {
@@ -1368,35 +1628,13 @@ function getNotePreview(content) {
   width: 44px;
   height: 44px;
   padding: 0;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
-  border: none;
 }
 
-.chat-scroll-float-btn__icon,
-.chat-scroll-float-btn__icon svg {
-  color: #ffffff;
-}
-
-.chat-scroll-float-btn:hover {
-  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.35);
-  transform: translate(-50%, -50%);
-}
-
+/* ── Welcome message inside chat ── */
 .welcome-message {
   text-align: center;
   padding: 40px 20px;
-  color: #909399;
-}
-
-.welcome-message p {
-  margin: 8px 0;
-  font-size: 14px;
-}
-
-.welcome-message {
-  text-align: center;
-  padding: 40px 20px;
-  color: #606266;
+  color: var(--color-pencil);
 }
 
 .welcome-icon {
@@ -1405,22 +1643,24 @@ function getNotePreview(content) {
 }
 
 .welcome-message h4 {
+  font-family: var(--font-heading);
   font-size: 18px;
-  color: #303133;
-  margin: 0 0 15px 0;
-  font-weight: 600;
+  color: var(--color-pencil);
+  margin: 0 0 15px;
+  font-weight: 700;
 }
 
 .welcome-message p {
   font-size: 14px;
-  color: #909399;
-  margin: 0 0 10px 0;
+  color: #888;
+  margin: 0 0 10px;
+  font-family: var(--font-body);
 }
 
 .welcome-message ul {
   list-style: none;
   padding: 0;
-  margin: 15px 0 0 0;
+  margin: 15px 0 0;
   text-align: left;
   max-width: 300px;
   margin-left: auto;
@@ -1430,18 +1670,15 @@ function getNotePreview(content) {
 .welcome-message li {
   padding: 8px 12px;
   margin: 5px 0;
-  background: #f5f7fa;
-  border-radius: 8px;
+  background: var(--color-muted);
+  border: 2px solid var(--color-pencil);
+  border-radius: var(--radius-wobbly-sm);
   font-size: 14px;
-  color: #606266;
+  color: var(--color-pencil);
+  font-family: var(--font-body);
 }
 
-/* 用户头像 */
-.user-avatar {
-  font-size: 20px;
-}
-
-/* 聊天消息样式 */
+/* ── Chat Messages ── */
 .message-item {
   display: flex;
   gap: 12px;
@@ -1450,30 +1687,25 @@ function getNotePreview(content) {
 }
 
 @keyframes messageSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.message-item.user {
-  flex-direction: row-reverse;
-}
+.message-item.user { flex-direction: row-reverse; }
 
 .message-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #f0f0f0;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-wobbly);
+  border: 2px solid var(--color-pencil);
+  background: var(--color-muted);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
+
+.user-avatar { font-size: 20px; }
 
 .message-content {
   max-width: 70%;
@@ -1482,33 +1714,31 @@ function getNotePreview(content) {
   gap: 4px;
 }
 
-.message-item.user .message-content {
-  align-items: flex-end;
-}
+.message-item.user .message-content { align-items: flex-end; }
 
 .message-text {
   padding: 12px 16px;
-  border-radius: 12px;
+  border-radius: var(--radius-wobbly-sm);
   font-size: 14px;
   line-height: 1.6;
   word-wrap: break-word;
+  border: 2px solid var(--color-pencil);
+  font-family: var(--font-body);
 }
 
 .message-item.assistant .message-text {
-  background: #f5f7fa;
-  color: #303133;
-  border-top-left-radius: 4px;
+  background: #ffffff;
+  color: var(--color-pencil);
 }
 
 .message-item.user .message-text {
-  background: #409eff;
+  background: var(--color-pencil);
   color: white;
-  border-top-right-radius: 4px;
 }
 
 .message-item.user .message-context-note {
   font-size: 12px;
-  color: #909399;
+  color: #999;
   line-height: 1.4;
   max-width: 100%;
   text-align: right;
@@ -1517,144 +1747,94 @@ function getNotePreview(content) {
   white-space: nowrap;
 }
 
-.message-mindmap-actions {
-  margin-top: 4px;
-}
+.message-mindmap-actions { margin-top: 4px; }
+.message-item.assistant .message-mindmap-actions { align-self: flex-start; }
 
-.message-item.assistant .message-mindmap-actions {
-  align-self: flex-start;
-}
-
-.message-text :deep(p) {
-  margin: 8px 0;
-}
-
-.message-text :deep(p:first-child) {
-  margin-top: 0;
-}
-
-.message-text :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
+.message-text :deep(p) { margin: 8px 0; }
+.message-text :deep(p:first-child) { margin-top: 0; }
+.message-text :deep(p:last-child)  { margin-bottom: 0; }
 .message-text :deep(code) {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--color-muted);
   padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Consolas', monospace;
+  border-radius: 6px;
+  font-family: var(--font-mono);
   font-size: 13px;
 }
-
-.message-item.user .message-text :deep(code) {
-  background: rgba(255, 255, 255, 0.2);
-}
-
+.message-item.user .message-text :deep(code) { background: rgba(255,255,255,0.2); }
 .message-text :deep(pre) {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0,0,0,0.05);
   padding: 12px;
   border-radius: 8px;
   overflow-x: auto;
   margin: 8px 0;
+  border: 2px solid var(--color-muted);
 }
-
-.message-item.user .message-text :deep(pre) {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.message-text :deep(img) {
-  max-width: 100%;
-  height: auto;
-}
-
-.message-text :deep(table) {
-  border-collapse: collapse;
-  max-width: 100%;
-  margin: 8px 0;
-}
-
+.message-item.user .message-text :deep(pre) { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
+.message-text :deep(img)   { max-width: 100%; height: auto; }
+.message-text :deep(table) { border-collapse: collapse; max-width: 100%; margin: 8px 0; }
 .message-text :deep(td),
-.message-text :deep(th) {
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  padding: 6px 10px;
-}
-
+.message-text :deep(th)    { border: 1px solid var(--color-pencil); padding: 6px 10px; }
 .message-item.user .message-text :deep(td),
-.message-item.user .message-text :deep(th) {
-  border-color: rgba(255, 255, 255, 0.35);
-}
+.message-item.user .message-text :deep(th) { border-color: rgba(255,255,255,0.35); }
 
 .message-time {
   font-size: 12px;
-  color: #909399;
+  color: #999;
   padding: 0 4px;
 }
 
-/* 打字指示器 */
+/* ── Typing indicator ── */
 .typing-indicator {
   display: flex;
   gap: 4px;
   padding: 12px 16px;
-  background: #f5f7fa;
-  border-radius: 12px;
-  border-top-left-radius: 4px;
+  background: #fff;
+  border: 2px solid var(--color-pencil);
+  border-radius: var(--radius-wobbly-sm);
 }
 
 .typing-indicator span {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #909399;
+  background: var(--color-pencil);
   animation: typing 1.4s infinite;
 }
 
-.typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
 
 @keyframes typing {
-  0%, 60%, 100% {
-    transform: translateY(0);
-    opacity: 0.7;
-  }
-  30% {
-    transform: translateY(-10px);
-    opacity: 1;
-  }
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-10px); opacity: 1; }
 }
 
+/* ── Input Area ── */
 .input-section {
-  padding: 20px;
-  border-top: 1px solid #e4e7ed;
-  background: #fafafa;
+  padding: 15px 20px;
+  border-top: 2px dashed var(--color-pencil);
+  background: #fff;
+  flex-shrink: 0;
 }
 
-/* 已上传笔记提示条 */
 .uploaded-note-banner {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
   margin-bottom: 12px;
-  background: linear-gradient(135deg, #ccd2ef 0%, #2f7ee4 100%);
-  border-radius: 8px;
-  color: white;
+  background: var(--color-yellow);
+  border: 2px solid var(--color-pencil);
+  border-radius: var(--radius-wobbly-sm);
+  color: var(--color-pencil);
   font-size: 13px;
+  font-family: var(--font-body);
   animation: slideIn 0.3s ease;
 }
 
 @keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .uploaded-note-banner .note-name {
@@ -1662,25 +1842,11 @@ function getNotePreview(content) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 500;
+  font-weight: 600;
 }
 
-.uploaded-note-banner .el-button {
-  color: white;
-  padding: 0;
-  font-size: 12px;
-}
-
-.uploaded-note-banner .el-button:hover {
-  color: #ffeb3b;
-}
-
-.input-section {
-  padding: 15px 20px;
-  border-top: 1px solid #e4e7ed;
-  background: white;
-  flex-shrink: 0;  /* 防止输入区域被压缩 */
-}
+.uploaded-note-banner .el-button { color: var(--color-pencil); padding: 0; font-size: 12px; }
+.uploaded-note-banner .el-button:hover { color: var(--color-accent); }
 
 .quick-actions {
   display: flex;
@@ -1701,10 +1867,7 @@ function getNotePreview(content) {
   align-items: flex-end;
 }
 
-.input-container {
-  position: relative;
-  flex: 1;
-}
+.input-container { position: relative; flex: 1; }
 
 .upload-note-btn {
   position: absolute;
@@ -1713,77 +1876,38 @@ function getNotePreview(content) {
   width: 28px;
   height: 28px;
   padding: 0;
-  background: white;
-  border: 1px solid #dcdfe6;
   z-index: 10;
-  transition: all 0.2s;
 }
 
-.upload-note-btn:hover {
-  background: #409eff;
-  border-color: #409eff;
-  color: white;
-}
-
-.upload-note-btn :deep(.el-icon) {
-  font-size: 16px;
-}
-
-.ai-input {
-  flex: 1;
-}
+.ai-input { flex: 1; }
 
 .ai-input :deep(.el-textarea__inner) {
-  border-radius: 12px;
   padding: 12px 15px 12px 45px;
   font-size: 14px;
   line-height: 1.6;
   resize: none;
+  font-family: var(--font-body);
 }
 
-.send-btn {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-}
+.send-btn { width: 44px; height: 44px; flex-shrink: 0; }
+.stop-ai-btn { flex-shrink: 0; height: 44px; padding: 0 14px; font-size: 13px; }
+.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.send-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 笔记选择器下拉框 */
+/* ── Note Selector Dropdown ── */
 .note-selector-dropdown {
   background: white;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  border: 2px solid var(--color-pencil);
+  border-radius: var(--radius-wobbly-md);
+  box-shadow: var(--shadow-hard);
   max-height: 300px;
   overflow-y: auto;
   animation: slideDown 0.2s ease;
-  margin-bottom: 12px;  /* 与 uploaded-note-banner 保持一致 */
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  margin-bottom: 12px;
 }
 
 @keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .selector-header {
@@ -1791,17 +1915,15 @@ function getNotePreview(content) {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #e4e7ed;
-  background: #f5f7fa;
+  border-bottom: 2px dashed var(--color-muted);
+  background: var(--color-muted);
+  font-family: var(--font-body);
   font-size: 14px;
-  font-weight: 500;
-  color: #303133;
+  font-weight: 600;
+  color: var(--color-pencil);
 }
 
-.note-list-container {
-  max-height: 250px;
-  overflow-y: auto;
-}
+.note-list-container { max-height: 250px; overflow-y: auto; }
 
 .note-option {
   display: flex;
@@ -1809,27 +1931,20 @@ function getNotePreview(content) {
   gap: 12px;
   padding: 12px 16px;
   cursor: pointer;
-  transition: all 0.2s;
-  border-bottom: 1px solid #f0f0f0;
+  transition: all 0.15s;
+  border-bottom: 1px solid var(--color-muted);
 }
 
-.note-option:hover {
-  background: #f5f7fa;
-}
+.note-option:hover { background: var(--color-yellow); }
+.note-option:last-child { border-bottom: none; }
 
-.note-option:last-child {
-  border-bottom: none;
-}
+.note-info { flex: 1; min-width: 0; }
 
-.note-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.note-title {
+.note-info .note-title {
+  font-family: var(--font-heading);
   font-size: 14px;
-  font-weight: 500;
-  color: #303133;
+  font-weight: 600;
+  color: var(--color-pencil);
   margin-bottom: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1838,7 +1953,7 @@ function getNotePreview(content) {
 
 .note-preview {
   font-size: 12px;
-  color: #909399;
+  color: #999;
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1847,63 +1962,6 @@ function getNotePreview(content) {
   -webkit-box-orient: vertical;
 }
 
-.empty-note-list {
-  padding: 40px 20px;
-  text-align: center;
-  color: #909399;
-}
-
-.empty-note-list p {
-  margin: 0;
-  font-size: 14px;
-}
-
-/* ==================== 首页滚动条：默认可辨，悬停区域时更明显 ==================== */
-
-.preview-body::-webkit-scrollbar,
-.chat-messages::-webkit-scrollbar,
-.notes-list::-webkit-scrollbar,
-.note-list-container::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.preview-body::-webkit-scrollbar-track,
-.chat-messages::-webkit-scrollbar-track,
-.notes-list::-webkit-scrollbar-track,
-.note-list-container::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.04);
-  border-radius: 4px;
-}
-
-.preview-body::-webkit-scrollbar-thumb,
-.chat-messages::-webkit-scrollbar-thumb,
-.notes-list::-webkit-scrollbar-thumb,
-.note-list-container::-webkit-scrollbar-thumb {
-  background: rgba(144, 147, 153, 0.35);
-  border-radius: 4px;
-  transition: background 0.2s ease;
-}
-
-.preview-body:hover::-webkit-scrollbar-thumb,
-.chat-messages:hover::-webkit-scrollbar-thumb,
-.notes-list:hover::-webkit-scrollbar-thumb,
-.note-list-container:hover::-webkit-scrollbar-thumb {
-  background: rgba(144, 147, 153, 0.65);
-}
-
-.preview-body::-webkit-scrollbar-thumb:active,
-.chat-messages::-webkit-scrollbar-thumb:active,
-.notes-list::-webkit-scrollbar-thumb:active,
-.note-list-container::-webkit-scrollbar-thumb:active {
-  background: rgba(64, 158, 255, 0.75);
-}
-
-.preview-body,
-.chat-messages,
-.notes-list,
-.note-list-container {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(144, 147, 153, 0.45) rgba(0, 0, 0, 0.06);
-}
+.empty-note-list { padding: 40px 20px; text-align: center; color: #999; }
+.empty-note-list p { margin: 0; font-size: 14px; }
 </style>

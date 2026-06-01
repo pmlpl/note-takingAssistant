@@ -107,7 +107,7 @@ def cache_recent_note(user_id: int, note_data: dict):
         # 从左侧推入（最新笔记在最前面）
         client.lpush(key, note_json)
         
-        # 只保留最近20个笔记（解除5个限制）
+        # 只保留最近20个笔记
         client.ltrim(key, 0, 19)
         
         # 设置过期时间（7天）
@@ -203,7 +203,6 @@ def get_recent_notes(user_id: int, limit: int = 20) -> List[dict]:
     
     try:
         key = f"recent_notes:{user_id}"
-        
         # 获取列表中的所有笔记
         notes_json = client.lrange(key, 0, limit - 1)
         
@@ -237,6 +236,59 @@ def clear_recent_notes(user_id: int):
     try:
         key = f"recent_notes:{user_id}"
         client.delete(key)
-        print(f"✅ 已清除用户 {user_id} 的最近笔记缓存")
     except Exception as e:
         print(f"❌ 清除缓存失败: {e}")
+
+
+# ═══════════════════════════════════════════
+# JWT Token 黑名单（撤销机制）
+# ═══════════════════════════════════════════
+
+BLACKLIST_PREFIX = "token_blacklist:"
+
+
+def blacklist_token(token: str, ttl_seconds: int) -> bool:
+    """
+    将 JWT 令牌加入 Redis 黑名单。
+    令牌在 ttl_seconds 秒后自动从 Redis 删除（与令牌过期时间对齐），
+    所以黑名单不会无限膨胀。
+
+    Args:
+        token:  完整的 JWT 令牌字符串
+        ttl_seconds: 黑名单保留秒数（应设为令牌剩余有效时间）
+
+    Returns:
+        bool: 是否成功加入黑名单
+    """
+    client = redis_client.client
+    if not client:
+        return False
+    try:
+        key = f"{BLACKLIST_PREFIX}{token}"
+        client.setex(key, ttl_seconds, "1")
+        return True
+    except Exception as e:
+        print(f"❌ 令牌加入黑名单失败: {e}")
+        return False
+
+
+def is_token_blacklisted(token: str) -> bool:
+    """
+    检查令牌是否在黑名单中。
+
+    Args:
+        token: 完整的 JWT 令牌字符串
+
+    Returns:
+        bool: True = 已被撤销，不应放行
+    """
+    client = redis_client.client
+    if not client:
+        # Redis 不可用时，降级为不拦截（保持服务可用）
+        return False
+    try:
+        key = f"{BLACKLIST_PREFIX}{token}"
+        return client.exists(key) > 0
+    except Exception as e:
+        print(f"⚠️ 黑名单查询失败，降级放行: {e}")
+        return False

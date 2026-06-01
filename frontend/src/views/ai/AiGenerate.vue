@@ -218,9 +218,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { useNoteStore } from '@/store'
+import { useNoteStore, useUserStore } from '@/store'
 import { aiApi } from '@/api/ai'
 import { noteApi } from '@/api/note'
 import Layout from '@/components/Layout.vue'
@@ -236,6 +236,8 @@ defineOptions({
 
 const router = useRouter()
 const noteStore = useNoteStore()
+const userStore = useUserStore()
+const generateBoundUserId = ref(null)
 
 const form = ref({
   topic: '',
@@ -251,11 +253,53 @@ const sanitizedNoteHtml = computed(() => sanitizeHtml(noteContent.value))
 const rawMarkdown = ref('')  // 原始 Markdown 内容
 const displayMode = ref('rich')  // 显示模式：'rich' 富文本, 'markdown' 原始Markdown
 
+const STREAM_MS = Number(import.meta.env.VITE_AI_REQUEST_TIMEOUT_MS) || 600_000
+let generateAbortController = null
+let generateRunId = 0
+
 // 图片上传相关（预览由 el-upload picture-card 展示，提交时再读为 Data URL）
 const fileList = ref([])
 
 // 参考笔记上传相关（列表由 el-upload 展示，提交时再读取正文）
 const noteFileList = ref([])
+
+function resetGeneratePageForNewUser() {
+  form.value = {
+    topic: '',
+    keyword: '',
+    wordCount: 600,
+    outputFormat: 'md'
+  }
+  loading.value = false
+  saving.value = false
+  noteContent.value = ''
+  rawMarkdown.value = ''
+  displayMode.value = 'rich'
+  fileList.value = []
+  noteFileList.value = []
+}
+
+function ensureGenerateSession() {
+  const uid = userStore.user?.id
+  if (uid == null || uid === undefined) return
+  const uidNum = Number(uid)
+  if (generateBoundUserId.value !== uidNum) {
+    generateBoundUserId.value = uidNum
+    resetGeneratePageForNewUser()
+  }
+}
+
+onMounted(() => {
+  ensureGenerateSession()
+})
+
+onActivated(() => {
+  ensureGenerateSession()
+})
+
+onBeforeUnmount(() => {
+  generateAbortController?.abort()
+})
 
 function goBack() {
   router.back()
@@ -323,14 +367,19 @@ async function generateNote() {
     return
   }
 
+  const runId = ++generateRunId
   loading.value = true
-  noteContent.value = ''  // 清空之前的内容
-  rawMarkdown.value = ''  // 清空原始 Markdown
-  
+  noteContent.value = ''
+  rawMarkdown.value = ''
+
+  generateAbortController?.abort()
+  generateAbortController = new AbortController()
+  const streamSignal = generateAbortController.signal
+  const timeoutId = setTimeout(() => generateAbortController?.abort(), STREAM_MS)
+
   try {
     const images = await fileListToDataUrls(fileList.value)
     const referenceNotePayload = await noteFileListToReferenceNotes(noteFileList.value)
-    // 构建请求数据
     const requestData = {
       topic: form.value.topic,
       keywords: form.value.keyword,
@@ -342,39 +391,46 @@ async function generateNote() {
       })),
     }
 
-    // 使用普通的 API 调用
-    const response = await aiApi.generateNote(requestData)
-    
-    // AI 返回的是 Markdown 格式
-    const markdownContent = response.data.content
-    rawMarkdown.value = markdownContent  // 保存原始 Markdown
-    
-    // 将 Markdown 转换为 HTML（简单转换）
-    const htmlContent = convertMarkdownToHtml(markdownContent)
-    
-    // 模拟流式显示效果 - 逐字显示 HTML
-    let currentIndex = 0
-    const chunkSize = 50  // 每次显示的字符数
-    
-    // 逐块显示内容，模拟打字机效果
-    const displayInterval = setInterval(() => {
-      if (currentIndex < htmlContent.length) {
-        const endIndex = Math.min(currentIndex + chunkSize, htmlContent.length)
-        noteContent.value = htmlContent.substring(0, endIndex)
-        currentIndex = endIndex
-      } else {
-        clearInterval(displayInterval)
+    await aiApi.generateNoteStream({
+      ...requestData,
+      signal: streamSignal,
+      onChunk: (acc) => {
+        if (runId !== generateRunId) return
+        rawMarkdown.value = acc
+        noteContent.value = convertMarkdownToHtml(acc)
       }
-    }, 20)  // 每20ms显示一批字符
-    
+    })
+
+    if (runId !== generateRunId) return
     ElMessage.success('笔记生成成功！')
   } catch (error) {
+    if (runId !== generateRunId) return
     console.error('生成笔记失败:', error)
-    ElMessage.error('生成失败，请重试')
-    noteContent.value = ''  // 清空失败的内容
-    rawMarkdown.value = ''
+    if (error?.name === 'AbortError' || streamSignal.aborted) {
+      if (rawMarkdown.value) {
+        ElMessage.warning('生成已中断（可能为超时或离开页面）')
+      } else {
+        ElMessage.info('已取消或超时')
+      }
+    } else {
+      const d = error?.response?.data?.detail
+      const msg = Array.isArray(d)
+        ? d.map((x) => x.msg || JSON.stringify(x)).join('；')
+        : d || error?.message || '生成失败'
+      const s = String(msg)
+      if (s.includes('503') || /密钥|ENCRYPTION|crypto/i.test(s)) {
+        ElMessage.error('模型或密钥不可用，请到个人中心检查 LLM / API Key 配置')
+      } else {
+        ElMessage.error(typeof msg === 'string' ? msg : '生成失败，请重试')
+      }
+      noteContent.value = ''
+      rawMarkdown.value = ''
+    }
   } finally {
-    loading.value = false
+    clearTimeout(timeoutId)
+    if (runId === generateRunId) {
+      loading.value = false
+    }
   }
 }
 
@@ -456,13 +512,15 @@ function downloadNote() {
   
   // 根据格式处理内容
   if (format === 'md') {
-    // Markdown 格式 - 直接使用原始内容（去掉HTML标签）
-    content = noteContent.value.replace(/<[^>]*>/g, '')
+    content =
+      (rawMarkdown.value && rawMarkdown.value.trim()) ||
+      noteContent.value.replace(/<[^>]*>/g, '')
     filename += '.md'
     mimeType = 'text/markdown'
   } else if (format === 'txt') {
-    // 纯文本格式 - 去掉所有 HTML 标签
-    content = noteContent.value.replace(/<[^>]*>/g, '')
+    content =
+      (rawMarkdown.value && rawMarkdown.value.trim()) ||
+      noteContent.value.replace(/<[^>]*>/g, '')
     filename += '.txt'
     mimeType = 'text/plain'
   } else if (format === 'docx') {

@@ -1,49 +1,26 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
-from app.services import generate_note, analyze_note, chat_with_ai, translate_note
+from fastapi.responses import StreamingResponse
+from app.services import (
+    generate_note_stream,
+    analyze_note,
+    chat_with_ai,
+    chat_with_ai_stream,
+    translate_note_stream,
+)
 from app.core.field_crypto import SecretCryptoError
-from typing import Optional, List
 from app.core.security import get_current_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_db
 from app.crud import user as crud_user
 from app.crud import ai_usage as crud_ai_usage
+from app.models.ai import (
+    GenerateNoteRequest,
+    SummarizeNoteRequest,
+    TranslateNoteRequest,
+    ChatRequest,
+)
 
 router = APIRouter()
-
-
-class ReferenceNote(BaseModel):
-    """参考笔记模型"""
-    filename: str
-    content: str
-
-
-class GenerateNoteRequest(BaseModel):
-    topic: str
-    keywords: Optional[str] = None
-    referenceNotes: Optional[List[ReferenceNote]] = Field(default_factory=list)
-    images: Optional[List[str]] = Field(default_factory=list)  # base64 编码的图片
-    wordCount: Optional[int] = 600  # 期望字数，默认600字
-
-
-class SummarizeNoteRequest(BaseModel):
-    content: str
-
-
-class TranslateNoteRequest(BaseModel):
-    content: str
-    targetLang: str = Field(..., min_length=2, max_length=12)
-
-
-class ChatMessage(BaseModel):
-    """聊天消息模型"""
-    role: str  # 'user' or 'assistant'
-    content: str
-
-
-class ChatRequest(BaseModel):
-    message: str
-    history: Optional[List[ChatMessage]] = Field(default_factory=list)
 
 
 @router.post("/generate-note", summary="AI生成笔记")
@@ -59,20 +36,56 @@ async def generate_note_endpoint(
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
         
-        # 调用 AI 服务（异步 HTTP，不阻塞事件循环）
-        note_content = await generate_note(
+        # 仅保留流式实现：在服务端聚合为完整正文后返回 JSON（与现有前端契约一致）
+        parts: list[str] = []
+        async for chunk in generate_note_stream(
             topic=req.topic,
             keyword=req.keywords,
             reference_notes=req.referenceNotes,
             images=req.images,
-            word_count=req.wordCount,
+            word_count=req.wordCount or 600,
             db_user=db_user,
-        )
+        ):
+            parts.append(chunk)
+        note_content = "".join(parts).strip()
         
         # 记录AI使用
         await crud_ai_usage.log_ai_usage(db, db_user.id, "generate")
         
         return {"code": 200, "message": "生成成功", "data": {"content": note_content}}
+    except HTTPException:
+        raise
+    except SecretCryptoError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"生成失败：{str(e)}")
+
+
+@router.post("/generate-note-stream", summary="流式生成笔记")
+async def generate_note_stream_endpoint(
+    req: GenerateNoteRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """流式生成笔记：响应体为 Markdown 纯文本增量，与翻译流式接口用法一致。"""
+    try:
+        db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+        if not db_user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+
+        async def stream_generator():
+            async for chunk in generate_note_stream(
+                topic=req.topic,
+                keyword=req.keywords,
+                reference_notes=req.referenceNotes,
+                images=req.images,
+                word_count=req.wordCount or 600,
+                db_user=db_user,
+            ):
+                yield chunk
+            await crud_ai_usage.log_ai_usage(db, db_user.id, "generate")
+
+        return StreamingResponse(stream_generator(), media_type="text/plain")
     except HTTPException:
         raise
     except SecretCryptoError as e:
@@ -93,12 +106,12 @@ async def summarize_note_endpoint(
         db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
-        
+
         result = await analyze_note(req.content, db_user=db_user)
-        
+
         # 记录AI使用
         await crud_ai_usage.log_ai_usage(db, db_user.id, "summarize")
-        
+
         return {"code": 200, "message": "分析成功", "data": result}
     except HTTPException:
         raise
@@ -108,13 +121,13 @@ async def summarize_note_endpoint(
         raise HTTPException(status_code=500, detail=f"分析失败：{str(e)}")
 
 
-@router.post("/translate-note", summary="翻译笔记")
-async def translate_note_endpoint(
+@router.post("/translate-note-stream", summary="流式翻译笔记")
+async def translate_note_stream_endpoint(
     req: TranslateNoteRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user),
 ):
-    """将笔记正文译为目标语言（Markdown 全文翻译或 HTML 仅译文本节点保留 DOM），返回带水印。"""
+    """流式翻译笔记：HTML/富文本会先转为 Markdown 再翻译，响应体为纯文本流。"""
     try:
         db_user = await crud_user.get_user_by_username(
             db, username=current_user["username"]
@@ -122,17 +135,21 @@ async def translate_note_endpoint(
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
 
-        result = await translate_note(
-            req.content, req.targetLang, db_user=db_user
-        )
-        await crud_ai_usage.log_ai_usage(db, db_user.id, "translate")
-        return {"code": 200, "message": "翻译成功", "data": result}
+        async def stream_generator():
+            async for chunk in translate_note_stream(
+                req.content, req.targetLang, db_user=db_user
+            ):
+                yield chunk
+            
+            # 记录AI使用
+            await crud_ai_usage.log_ai_usage(db, db_user.id, "translate")
+
+        return StreamingResponse(stream_generator(), media_type="text/plain")
+        
     except HTTPException:
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except SecretCryptoError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"翻译失败：{str(e)}") from e
 
@@ -156,6 +173,34 @@ async def chat_endpoint(
         await crud_ai_usage.log_ai_usage(db, db_user.id, "chat")
         
         return {"code": 200, "message": "回复成功", "data": {"reply": reply}}
+    except HTTPException:
+        raise
+    except SecretCryptoError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"对话失败：{str(e)}")
+
+
+@router.post("/chat-stream", summary="AI对话流式")
+async def chat_stream_endpoint(
+    req: ChatRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """流式对话：响应体为纯文本增量（assistant 全文），与翻译/生成笔记流式用法一致。"""
+    try:
+        db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+        if not db_user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+
+        async def stream_generator():
+            async for chunk in chat_with_ai_stream(
+                req.message, req.history, db_user=db_user
+            ):
+                yield chunk
+            await crud_ai_usage.log_ai_usage(db, db_user.id, "chat")
+
+        return StreamingResponse(stream_generator(), media_type="text/plain")
     except HTTPException:
         raise
     except SecretCryptoError as e:

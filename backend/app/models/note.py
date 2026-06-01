@@ -15,7 +15,8 @@ class NoteBase(BaseModel):
 
 
 class NoteCreate(NoteBase):
-    pass
+    # 新建笔记默认加入「我的笔记」列表（与 NoteList 仅展示 is_favorite=1 一致）
+    is_favorite: Optional[bool] = True
 
 
 class NoteUpdate(BaseModel):

@@ -16,7 +16,7 @@
         <div class="search-bar">
           <el-input
             v-model="searchQuery"
-            placeholder="搜索笔记标题或内容..."
+            placeholder="按标题搜索笔记..."
             prefix-icon="Search"
             clearable
             class="search-input"
@@ -64,13 +64,25 @@
           <h3>暂无笔记</h3>
           <p>点击右上角"新建笔记"开始创建</p>
         </div>
+
+        <!-- 分页 -->
+        <div v-if="totalPages > 1" class="pagination-wrapper">
+          <el-pagination
+            background
+            layout="prev, pager, next"
+            :total="total"
+            :page-size="pageSize"
+            :current-page="page"
+            @current-change="handlePageChange"
+          />
+        </div>
       </el-card>
     </div>
   </Layout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { noteApi } from '@/api/note'
 import Layout from '@/components/Layout.vue'
@@ -83,38 +95,46 @@ defineOptions({
 })
 const router = useRouter()
 
-const allNotes = ref([])
+const notes = ref([])
 const searchQuery = ref('')
 const loading = ref(false)
+const page = ref(1)
+const pageSize = 20
+const total = ref(0)
+let searchTimer = null
 
-// 计算总笔记数
-const totalNotes = computed(() => allNotes.value.length)
+const totalNotes = computed(() => total.value)
 
-// 根据搜索条件过滤笔记
-const filteredNotes = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return allNotes.value
-  }
-  
-  const query = searchQuery.value.toLowerCase()
-  return allNotes.value.filter(note => 
-    note.title.toLowerCase().includes(query) || 
-    note.content.toLowerCase().includes(query)
-  )
+const filteredNotes = computed(() => notes.value)
+
+const totalPages = computed(() => Math.ceil(total.value / pageSize) || 1)
+
+watch(searchQuery, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    page.value = 1
+    loadNotes()
+  }, 300)
 })
 
 onMounted(async () => {
-  await loadAllNotes()
+  await loadNotes()
 })
 
-async function loadAllNotes() {
+onActivated(async () => {
+  await loadNotes()
+})
+
+async function loadNotes() {
   loading.value = true
   try {
-    const notes = await noteApi.getNotes()
-    // 按创建时间倒序排列
-    allNotes.value = notes.sort((a, b) => 
-      new Date(b.created_at) - new Date(a.created_at)
-    )
+    const res = await noteApi.searchNotes({
+      keyword: searchQuery.value,
+      page: page.value,
+      pageSize,
+    })
+    notes.value = res.items || []
+    total.value = res.total || 0
   } catch (error) {
     console.error('加载笔记失败:', error)
     ElMessage.error('加载笔记失败')
@@ -124,7 +144,13 @@ async function loadAllNotes() {
 }
 
 function handleSearch() {
-  // 搜索逻辑已通过 computed 实现
+  page.value = 1
+  loadNotes()
+}
+
+function handlePageChange(newPage) {
+  page.value = newPage
+  loadNotes()
 }
 
 function goBack() {
@@ -335,6 +361,15 @@ function formatDate(dateString) {
 .note-date {
   font-size: 12px;
   color: #909399;
+}
+
+/* 分页 */
+.pagination-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
 }
 
 /* 空状态 */

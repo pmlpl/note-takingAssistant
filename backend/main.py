@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from app.api.v1 import user, note, ai
+from app.api.v1 import user, note, ai, public
 from app.core.database import engine, Base, AsyncSessionLocal
 from app.core.startup_migrations import ensure_user_llm_columns
 from app.core.config import settings
@@ -15,7 +15,7 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
 # 使用 lifespan 替代 on_event
-@asynccontextmanager
+@asynccontextmanager # 这个装饰器用于异步上下文管理，确保在异步操作中正确处理资源释放
 async def lifespan(app: FastAPI):
     # 启动时执行
     if os.environ.get("SKIP_APP_LIFESPAN") == "1":
@@ -53,7 +53,7 @@ app = FastAPI(
 # 跨域配置（必加，否则Vue前端无法访问）
 app.add_middleware(
     CORSMiddleware, # type:ignore
-    allow_origins=["*"],  # 明确指定前端地址
+    allow_origins=[settings.FRONTEND_URL],  # 明确指定前端地址
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,11 +63,11 @@ app.add_middleware(
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
-
 # 注册路由
 app.include_router(user.router, prefix="/api/v1/user", tags=["用户管理"])
 app.include_router(note.router, prefix="/api/v1/note", tags=["笔记管理"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI智能模块"])
+app.include_router(public.router, prefix="/api/v1/public", tags=["公开接口"])
 
 # 测试接口
 @app.get("/", tags=["测试"])

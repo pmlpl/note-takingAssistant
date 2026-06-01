@@ -6,7 +6,7 @@
         <div class="search-action-group">
           <el-input
             v-model="searchQuery"
-            placeholder="搜索笔记..."
+            placeholder="按标题搜索笔记..."
             size="large"
             clearable
             class="search-input"
@@ -28,7 +28,7 @@
       </el-card>
 
       <!-- 笔记网格区 -->
-      <div class="notes-content">
+      <div class="notes-content" v-loading="loading">
         <div v-if="filteredNotes.length > 0" class="notes-grid">
           <NoteCard
             v-for="note in filteredNotes"
@@ -40,15 +40,29 @@
           />
         </div>
 
-        <!-- 空状态 -->
+        <div v-if="filteredNotes.length > 0 && totalPages > 1" class="pagination-wrapper">
+          <el-pagination
+            background
+            layout="prev, pager, next"
+            :total="total"
+            :page-size="pageSize"
+            :current-page="page"
+            @current-change="handlePageChange"
+          />
+        </div>
+
+        <!-- 空状态（勿用 v-else-if 接分页，否则有笔记且仅一页时会误显示） -->
         <el-empty
-          v-else
-          description="暂无笔记"
+          v-if="!loading && filteredNotes.length === 0"
+          :description="emptyDescription"
           :image-size="200"
         >
           <el-button type="primary" @click="navigate('/notes/edit')">
             <IconPlus :size="18" />
             创建第一个笔记
+          </el-button>
+          <el-button v-if="hasNotesOutsideFavorites" class="empty-secondary-btn" @click="navigate('/notes/history')">
+            查看历史笔记（含未加入「我的笔记」的条目）
           </el-button>
         </el-empty>
       </div>
@@ -57,14 +71,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onActivated } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/store'
 import { noteApi } from '@/api/note'
 import Layout from '@/components/Layout.vue'
 import NoteCard from '@/components/NoteCard.vue'
 import { IconPlus, IconSearch } from '@/components/icons'
-import { ElMessage } from 'element-plus'
 import { MESSAGE_DURATION } from '@/utils/common'
 defineOptions({
   name: 'NoteList'
@@ -72,31 +86,70 @@ defineOptions({
 const router = useRouter()
 const noteStore = useNoteStore()
 const searchQuery = ref('')
+const notes = ref([])
+const loading = ref(false)
+const page = ref(1)
+const pageSize = 20
+const total = ref(0)
+const totalAllNotes = ref(0)
+let searchTimer = null
 
-const notes = computed(() => noteStore.notes)
-const filteredNotes = computed(() => {
-  // 只显示已加入"我的笔记"的笔记
-  const favoriteNotes = notes.value.filter(note => note.is_favorite)
-  
-  if (!searchQuery.value) return favoriteNotes
-  const query = searchQuery.value.toLowerCase()
-  return favoriteNotes.filter(note =>
-    note.title.toLowerCase().includes(query) ||
-    note.content.toLowerCase().includes(query)
-  )
+const filteredNotes = computed(() => notes.value)
+const hasNotesOutsideFavorites = computed(
+  () => totalAllNotes.value > 0 && total.value === 0 && !searchQuery.value.trim()
+)
+const emptyDescription = computed(() =>
+  hasNotesOutsideFavorites.value
+    ? '「我的笔记」只显示已收藏的笔记；你的账号下还有其它笔记未加入此列表'
+    : '暂无笔记'
+)
+const totalPages = computed(() => Math.ceil(total.value / pageSize) || 1)
+
+watch(searchQuery, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    page.value = 1
+    loadNotes()
+  }, 300)
 })
 
 onMounted(async () => {
   await loadNotes()
 })
 
+onActivated(async () => {
+  await loadNotes()
+})
+
 async function loadNotes() {
+  loading.value = true
   try {
-    const data = await noteApi.getNotes()
-    noteStore.setNotes(data)
+    const keyword = searchQuery.value
+    const [favRes, allRes] = await Promise.all([
+      noteApi.searchNotes({
+        keyword,
+        page: page.value,
+        pageSize,
+        isFavorite: true,
+      }),
+      keyword.trim()
+        ? Promise.resolve(null)
+        : noteApi.searchNotes({ keyword: '', page: 1, pageSize: 1 }),
+    ])
+    notes.value = favRes.items || []
+    total.value = favRes.total || 0
+    totalAllNotes.value = allRes?.total ?? total.value
   } catch (error) {
     console.error('加载笔记失败:', error)
+    ElMessage.error('加载笔记失败，请确认已登录且后端正常运行')
+  } finally {
+    loading.value = false
   }
+}
+
+function handlePageChange(newPage) {
+  page.value = newPage
+  loadNotes()
 }
 
 function navigate(path) {
@@ -114,15 +167,9 @@ function editNote(note) {
 
 async function deleteNote(note) {
   try {
-    // 将 is_favorite 设置为 false，从“我的笔记”中移除
     await noteApi.updateNote(note.id, { is_favorite: false })
-    
-    // 从 store 中移除
     noteStore.deleteNote(note.id)
-    
     ElMessage.success({ message: '已从我的笔记中移除', duration: MESSAGE_DURATION.SHORT })
-    
-    // 重新加载列表
     await loadNotes()
   } catch (error) {
     console.error('移除笔记失败:', error)
@@ -172,6 +219,18 @@ async function deleteNote(note) {
 /* 笔记内容区 */
 .notes-content {
   min-height: 400px;
+}
+
+.empty-secondary-btn {
+  margin-top: 12px;
+}
+
+/* 分页 */
+.pagination-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  padding: 16px 0;
 }
 
 /* 网格布局 */

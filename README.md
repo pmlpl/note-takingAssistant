@@ -17,7 +17,7 @@
 ### 🤖 AI 智能助手
 - **生成**：主题 / 关键词、字数滑块，可选参考笔记与参考图片（列表仅由上传组件展示，避免重复）；输出格式 Markdown / Word / 纯文本
 - **总结**：基于选定笔记或上传内容
-- **翻译**：多目标语言（非中英文选项附带中文说明），译文含水印与脚注；有单次字数上限（以服务端为准）
+- **翻译**：多目标语言（非中英文选项附带中文说明），译文含水印与脚注；**服务端**将 HTML 先转为 Markdown 再流式翻译，前端以 Markdown 渲染；有单次字数上限（以服务端为准）
 - **对话**：首页助手面板，支持上下文与 `/note` 等指令（详见前端交互）
 
 ### 🗺️ 其它页面
@@ -33,8 +33,11 @@
 ### 💾 缓存（Redis）
 - 用于「最近笔记」等；**未安装或未启动 Redis 时仍可正常使用**（降级逻辑见 `backend/app/core/redis_client.py`）
 
+### 📖 使用手册
+- 登录后通过顶部导航 **「使用手册」** 打开（路由 **`/manual`**），含项目介绍、操作说明、用户协议、隐私说明与反馈入口
+
 ### 🧭 前端路由缓存
-- `keep-alive` 缓存首页、AI 生成/总结/**翻译笔记**、笔记列表/编辑/历史等，切换路由后常见表单状态可保留（见 `frontend/src/App.vue`）
+- `keep-alive` 缓存首页、AI 生成/总结/**翻译笔记**、笔记列表/编辑/历史、使用手册等，切换路由后常见表单状态可保留（见 `frontend/src/App.vue`）
 
 ---
 
@@ -106,6 +109,27 @@ cd frontend && npm ci && npm run test && npm run build
 cd backend && pip install -r requirements.txt -r requirements-dev.txt && pytest -q
 ```
 
+### ☁️ Docker 一键部署
+
+项目根目录下已提供 `docker-compose.yml`，可一键启动全部服务：
+
+```bash
+# 1. 启动所有服务（MySQL + Redis + 后端 + 前端）
+docker-compose up -d
+
+# 2. 访问应用
+# 前端：http://localhost:5174
+# 后端 API：http://localhost:8000/docs
+
+# 3. 查看日志
+docker-compose logs -f
+
+# 4. 停止
+docker-compose down
+```
+
+> **注意**：首次部署请复制 `.env.docker.example` 为 `.env.docker`。AI 功能需配置本地推理端（如 LM Studio），在 `.env.docker` 中设置 `LM_STUDIO_URL`（容器内访问宿主机可用 `host.docker.internal`）。
+
 ### 1. LM Studio（或其它兼容端）
 1. 加载模型并启动 **Local Server**。
 2. 在 `backend/.env` 中设置（模型 ID 须与界面一致）：
@@ -164,11 +188,13 @@ npm run dev
 | 翻译笔记 | `/ai/translate` — 切换路由后表单一般由 `keep-alive` 保留 |
 | 思维导图 | `/mindmap` |
 | 个人中心 / BYOK | `/user` |
+| 使用手册 | `/manual` — 应用内用户文档（需登录） |
 
 ---
 
 ## 📚 更多文档
 
+- **终端用户**：登录后打开 **使用手册**（`/manual`），无需单独维护仓库内 Markdown 用户指南
 - [`backend/README.md`](backend/README.md) — 后端 API 列表与环境变量
 - [`backend/PROMPT_DESIGN_GUIDE.md`](backend/PROMPT_DESIGN_GUIDE.md) — 提示词与模型侧约定（若有）
 

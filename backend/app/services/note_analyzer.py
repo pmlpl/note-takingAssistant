@@ -14,8 +14,6 @@ async def analyze_note(content: str, *, db_user: UserDB) -> Dict[str, Any]:
     """
     对笔记内容进行 AI 分析，返回总结、优缺点和建议。
     """
-    if len(content) > 5000:
-        content = content[:5000] + "...（内容过长，已截断）"
 
     user_prompt = f"""请对以下学习笔记进行专业分析和评估：
 

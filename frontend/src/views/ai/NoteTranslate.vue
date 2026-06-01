@@ -11,7 +11,7 @@
           翻译笔记
         </h2>
         <p class="page-subtitle">
-          左侧载入原文、右侧查看译文；中间选择语言并翻译。单次最多 {{ maxChars }} 字符，译文带「笔记助手」水印。
+          支持多种语言互译，让笔记跨越语言障碍
         </p>
       </header>
 
@@ -122,7 +122,10 @@
           <el-col :xs="24" :lg="10">
             <section class="translate-panel translate-panel--result">
               <div class="panel-head">
-                <span class="panel-label panel-label--target">译文</span>
+                <div class="panel-head-main">
+                  <span class="panel-label panel-label--target">译文</span>
+                  <span class="panel-hint">Markdown 预览 · 平铺水印</span>
+                </div>
                 <el-button
                   v-if="translatedRaw"
                   size="small"
@@ -138,16 +141,14 @@
                   <IconTranslate :size="40" color="#dcdfe6" />
                   <p>翻译结果将显示在这里</p>
                 </div>
-                <div v-else class="doc-preview doc-preview--filled">
-                  <div class="result-wrap">
-                    <div class="watermark-layer" aria-hidden="true">
-                      <span v-for="i in 8" :key="i" class="watermark-tile">笔记助手</span>
-                    </div>
-                    <div
-                      class="preview-body translated-body"
-                      v-html="translatedPreviewHtml"
-                    />
-                  </div>
+                <div
+                  v-else
+                  class="doc-preview doc-preview--translation"
+                >
+                  <div
+                    class="preview-body source-preview-body preview-body--watermarked"
+                    v-html="translatedPreviewHtml"
+                  />
                 </div>
               </div>
             </section>
@@ -159,8 +160,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onActivated, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/store'
 import Layout from '@/components/Layout.vue'
 import { IconTranslate, IconUpload } from '@/components/icons'
 import { DArrowLeft } from '@element-plus/icons-vue'
@@ -176,12 +178,19 @@ import {
 defineOptions({ name: 'NoteTranslate' })
 
 const router = useRouter()
+const userStore = useUserStore()
+const translateBoundUserId = ref(null)
+/** 与首页一致：登出/再登录后递增，避免 keep-alive 沿用旧账号内存态 */
+const translateBoundAuthEpoch = ref(-1)
 const maxChars = 8000
 const notes = ref([])
 const loading = ref(false)
 const translatedRaw = ref('')
-const translatedFormat = ref('markdown')
 const sourceEditOpen = ref([])
+/** 进行中的流式请求，离开页面时中止 */
+let translateAbortController = null
+let translateRunId = 0
+const STREAM_MS = Number(import.meta.env.VITE_AI_REQUEST_TIMEOUT_MS) || 600_000
 
 const langOptions = [
   { value: 'zh', label: '简体中文' },
@@ -191,6 +200,73 @@ const langOptions = [
   { value: 'fr', label: 'French（法语）' },
   { value: 'es', label: 'Spanish（西班牙语）' }
 ]
+
+const TRANSLATE_DRAFT_VERSION = 1
+const LANG_VALUES = new Set(langOptions.map((o) => o.value))
+
+function translateUserScope() {
+  const u = userStore.user
+  if (!u) return null
+  if (u.id != null && u.id !== '') return `u${u.id}`
+  if (u.username) return `name_${u.username}`
+  return null
+}
+
+function translateStorageKey() {
+  const scope = translateUserScope()
+  if (!scope) return null
+  return `note_translate_draft_${scope}`
+}
+
+function loadTranslateDraft() {
+  const key = translateStorageKey()
+  if (!key) return null
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    const o = JSON.parse(raw)
+    if (o.v !== TRANSLATE_DRAFT_VERSION) return null
+    if (typeof o.sourceText !== 'string') return null
+    const targetLang =
+      typeof o.targetLang === 'string' && LANG_VALUES.has(o.targetLang) ? o.targetLang : 'en'
+    return {
+      sourceText: o.sourceText,
+      targetLang,
+      noteId: o.noteId ?? null,
+      translatedRaw: typeof o.translatedRaw === 'string' ? o.translatedRaw : ''
+    }
+  } catch {
+    return null
+  }
+}
+
+let saveDraftTimer = null
+function saveTranslateDraftNow() {
+  const key = translateStorageKey()
+  if (!key || userStore.user?.id == null) return
+  if (Number(userStore.user.id) !== translateBoundUserId.value) return
+  if (translateBoundAuthEpoch.value !== userStore.authSessionEpoch) return
+  try {
+    const payload = {
+      v: TRANSLATE_DRAFT_VERSION,
+      sourceText: form.value.sourceText,
+      targetLang: form.value.targetLang,
+      noteId: form.value.noteId,
+      translatedRaw: translatedRaw.value
+    }
+    localStorage.setItem(key, JSON.stringify(payload))
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function scheduleSaveTranslateDraft() {
+  clearTimeout(saveDraftTimer)
+  saveDraftTimer = setTimeout(() => {
+    saveDraftTimer = null
+    saveTranslateDraftNow()
+  }, 400)
+}
 
 const form = ref({
   noteId: null,
@@ -205,7 +281,7 @@ const effectiveSource = computed(() => {
 const truncationHint = computed(() => {
   const len = form.value.sourceText.length
   if (len > maxChars) {
-    return `原文 ${len} 字符，将仅翻译前 ${maxChars} 字符。`
+    return `原文较长（${len} 字符）。服务端会先将 HTML 转为 Markdown，再按最多 ${maxChars} 字符截断后翻译，避免截断在 HTML 标签中间导致错乱。`
   }
   return ''
 })
@@ -221,13 +297,95 @@ const sourcePreviewHtml = computed(() => {
 
 const translatedPreviewHtml = computed(() => {
   if (!translatedRaw.value) return ''
-  const asHtml =
-    translatedFormat.value === 'html' || isLikelyHtmlContent(translatedRaw.value)
-  if (asHtml) return sanitizeHtml(translatedRaw.value)
   return renderMarkdownToSafeHtml(translatedRaw.value)
 })
 
-onMounted(() => loadNotes())
+onMounted(() => {
+  void ensureTranslateSessionForCurrentUser()
+})
+
+onActivated(() => {
+  void ensureTranslateSessionForCurrentUser()
+})
+
+watch(
+  () => [userStore.user?.id, userStore.user?.username, userStore.authSessionEpoch],
+  () => {
+    void ensureTranslateSessionForCurrentUser()
+  }
+)
+
+watch(
+  () => [
+    form.value.sourceText,
+    form.value.targetLang,
+    form.value.noteId,
+    translatedRaw.value
+  ],
+  () => {
+    if (
+      userStore.user?.id != null &&
+      translateBoundUserId.value === Number(userStore.user.id) &&
+      translateBoundAuthEpoch.value === userStore.authSessionEpoch
+    ) {
+      scheduleSaveTranslateDraft()
+    }
+  }
+)
+
+async function ensureTranslateSessionForCurrentUser() {
+  const uid = userStore.user?.id
+  const epoch = userStore.authSessionEpoch
+
+  if (uid == null || uid === undefined) {
+    if (translateBoundUserId.value != null) {
+      translateBoundUserId.value = null
+      translateBoundAuthEpoch.value = -1
+      form.value = {
+        noteId: null,
+        sourceText: '',
+        targetLang: 'en'
+      }
+      translatedRaw.value = ''
+      sourceEditOpen.value = []
+      loading.value = false
+    }
+    return
+  }
+
+  const uidNum = Number(uid)
+  if (
+    translateBoundUserId.value === uidNum &&
+    translateBoundAuthEpoch.value === epoch
+  ) {
+    await loadNotes()
+    return
+  }
+
+  translateBoundUserId.value = uidNum
+  translateBoundAuthEpoch.value = epoch
+
+  const draft = loadTranslateDraft()
+  if (draft) {
+    form.value = {
+      noteId: draft.noteId,
+      sourceText: draft.sourceText,
+      targetLang: draft.targetLang
+    }
+    translatedRaw.value = draft.translatedRaw
+  } else {
+    form.value = {
+      noteId: null,
+      sourceText: '',
+      targetLang: 'en'
+    }
+    translatedRaw.value = ''
+  }
+  sourceEditOpen.value = []
+  loading.value = false
+
+  await loadNotes()
+}
 
 async function loadNotes() {
   try {
@@ -315,41 +473,66 @@ async function onNotePick(noteId) {
   }
 }
 
+onBeforeUnmount(() => {
+  translateAbortController?.abort()
+  clearTimeout(saveDraftTimer)
+  saveDraftTimer = null
+  saveTranslateDraftNow()
+})
+
 async function runTranslate() {
   if (!canTranslate.value) {
     ElMessage.warning('请先输入或选择原文')
     return
   }
+  const runId = ++translateRunId
   loading.value = true
   translatedRaw.value = ''
-  translatedFormat.value = 'markdown'
+  translateAbortController?.abort()
+  translateAbortController = new AbortController()
+  const streamSignal = translateAbortController.signal
+  const timeoutId = setTimeout(() => translateAbortController?.abort(), STREAM_MS)
   try {
-    const content = form.value.sourceText.slice(0, maxChars)
-    const res = await aiApi.translateNote({
-      content,
-      targetLang: form.value.targetLang
+    const text = (form.value.sourceText || '').trim()
+    await aiApi.translateNoteStream({
+      content: text,
+      targetLang: form.value.targetLang,
+      signal: streamSignal,
+      onChunk: (acc) => {
+        if (runId === translateRunId) {
+          translatedRaw.value = acc
+          scheduleSaveTranslateDraft()
+        }
+      }
     })
-    const payload = res?.data
-    translatedRaw.value = (payload && payload.content) || ''
-    translatedFormat.value =
-      payload?.contentFormat === 'html' ? 'html' : 'markdown'
-    if (payload?.truncated) {
-      ElMessage.warning('原文过长，已按上限截断后翻译')
-    }
+    if (runId !== translateRunId) return
     ElMessage.success('翻译完成')
   } catch (e) {
-    const d = e?.response?.data?.detail
-    const msg = Array.isArray(d)
-      ? d.map((x) => x.msg || JSON.stringify(x)).join('；')
-      : d || e?.message || '翻译失败'
-    const s = String(msg)
-    if (s.includes('503') || /密钥|ENCRYPTION|crypto/i.test(s)) {
-      ElMessage.error('模型或密钥不可用，请到个人中心检查 LLM / API Key 配置')
+    if (runId !== translateRunId) return
+    if (e?.name === 'AbortError' || streamSignal.aborted) {
+      if (translatedRaw.value) {
+        ElMessage.warning('翻译已中断（可能为超时或离开页面）')
+      } else {
+        ElMessage.info('已取消或超时')
+      }
     } else {
-      ElMessage.error(typeof msg === 'string' ? msg : '翻译失败，请重试')
+      const d = e?.response?.data?.detail
+      const msg = Array.isArray(d)
+        ? d.map((x) => x.msg || JSON.stringify(x)).join('；')
+        : d || e?.message || '翻译失败'
+      const s = String(msg)
+      if (s.includes('503') || /密钥|ENCRYPTION|crypto/i.test(s)) {
+        ElMessage.error('模型或密钥不可用，请到个人中心检查 LLM / API Key 配置')
+      } else {
+        ElMessage.error(typeof msg === 'string' ? msg : '翻译失败，请重试')
+      }
     }
   } finally {
-    loading.value = false
+    clearTimeout(timeoutId)
+    if (runId === translateRunId) {
+      loading.value = false
+      saveTranslateDraftNow()
+    }
   }
 }
 
@@ -446,6 +629,19 @@ async function copyTranslation() {
   border-bottom: 1px solid #ebeef5;
   background: #fafbfc;
   flex-shrink: 0;
+}
+
+.panel-head-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.panel-head-main .panel-hint {
+  padding-left: 13px;
+  line-height: 1.4;
 }
 
 .panel-label {
@@ -551,22 +747,6 @@ async function copyTranslation() {
 
 .doc-preview-empty p {
   margin: 0;
-}
-
-.doc-preview--filled {
-  position: relative;
-  border: none;
-  background: transparent;
-  overflow: visible;
-  max-height: none;
-}
-
-.doc-preview--filled .result-wrap {
-  border: 1px solid #e4e7ed;
-  border-radius: 10px;
-  background: #fff;
-  max-height: min(62vh, 640px);
-  overflow: auto;
 }
 
 .source-preview-body {
@@ -723,65 +903,66 @@ async function copyTranslation() {
   }
 }
 
-/* ---------- 富文本 / 水印 ---------- */
+/* ---------- 富文本 / 译文水印（平铺整篇，随内容增高） ---------- */
+.doc-preview--translation {
+  border-color: #d9ecff;
+  box-shadow: inset 0 0 0 1px rgba(64, 158, 255, 0.06);
+  background: #fff;
+}
+
+/* 对角平铺「笔记助手」SVG：repeat 覆盖整块预览（含滚动全长），避免 absolute 水印仅盖住可视窗口 */
+.preview-body--watermarked {
+  position: relative;
+  z-index: 0;
+  min-height: 200px;
+  background-color: #fcfdff;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='200' viewBox='0 0 260 200'%3E%3Ctext x='130' y='102' fill='%23409eff' fill-opacity='0.085' font-size='17' font-weight='700' font-family='Microsoft YaHei,system-ui,sans-serif' text-anchor='middle' dominant-baseline='middle' transform='rotate(-22 130 100)'%3E%E7%AC%94%E8%AE%B0%E5%8A%A9%E6%89%8B%3C/text%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 260px 200px;
+  background-position: 0 0;
+}
+
 .source-preview-body :deep(img),
-.translated-body :deep(img) {
+.preview-body--watermarked :deep(img) {
   max-width: 100%;
   height: auto;
 }
 
 .source-preview-body :deep(table),
-.translated-body :deep(table) {
+.preview-body--watermarked :deep(table) {
   border-collapse: collapse;
   max-width: 100%;
 }
 
 .source-preview-body :deep(td),
 .source-preview-body :deep(th),
-.translated-body :deep(td),
-.translated-body :deep(th) {
+.preview-body--watermarked :deep(td),
+.preview-body--watermarked :deep(th) {
   border: 1px solid #e4e7ed;
   padding: 6px 10px;
 }
 
-.result-wrap {
-  position: relative;
-  min-height: 200px;
-}
-
-.watermark-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  justify-content: space-around;
-  gap: 40px 28px;
-  padding: 20px;
-  opacity: 0.1;
-  font-size: 20px;
-  font-weight: 700;
-  color: #409eff;
-  transform: rotate(-18deg);
-  user-select: none;
-}
-
-.watermark-tile {
-  white-space: nowrap;
-}
-
 .preview-body {
   position: relative;
-  z-index: 2;
+  z-index: 0;
   line-height: 1.8;
   color: #303133;
   font-size: 15px;
 }
 
-.translated-body {
-  padding: 16px 20px 24px;
+.preview-body--watermarked :deep(p),
+.preview-body--watermarked :deep(li),
+.preview-body--watermarked :deep(h1),
+.preview-body--watermarked :deep(h2),
+.preview-body--watermarked :deep(h3),
+.preview-body--watermarked :deep(td),
+.preview-body--watermarked :deep(th),
+.preview-body--watermarked :deep(pre),
+.preview-body--watermarked :deep(blockquote),
+.preview-body--watermarked :deep(ul),
+.preview-body--watermarked :deep(ol) {
+  position: relative;
+  z-index: 1;
 }
 
 .preview-body :deep(h1),
@@ -798,22 +979,23 @@ async function copyTranslation() {
 
 .preview-body :deep(pre) {
   overflow-x: auto;
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 12px 14px;
+  border: 1px solid #ebeef5;
 }
 
-.doc-preview::-webkit-scrollbar,
-.result-wrap::-webkit-scrollbar {
+.doc-preview::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.doc-preview::-webkit-scrollbar-thumb,
-.result-wrap::-webkit-scrollbar-thumb {
+.doc-preview::-webkit-scrollbar-thumb {
   background: rgba(144, 147, 153, 0.35);
   border-radius: 4px;
 }
 
-.doc-preview:hover::-webkit-scrollbar-thumb,
-.result-wrap:hover::-webkit-scrollbar-thumb {
+.doc-preview:hover::-webkit-scrollbar-thumb {
   background: rgba(144, 147, 153, 0.6);
 }
 </style>

@@ -8,7 +8,9 @@ from app.models.user import UserDB
 from app.services.llm_runtime import openai_client_and_model_for_user
 from .prompts import NOTE_GENERATION_SYSTEM_PROMPT
 
-
+"""
+归参考笔记列表，确保每个笔记都有 filename 和 content 字段
+"""
 def _normalize_reference_notes(reference_notes: Optional[List[Any]]) -> List[dict]:
     if not reference_notes:
         return []
@@ -17,6 +19,7 @@ def _normalize_reference_notes(reference_notes: Optional[List[Any]]) -> List[dic
         if isinstance(note, dict):
             out.append(note)
         elif hasattr(note, "model_dump"):
+            # 处理Pydantic 模型，确保转换为字典
             out.append(note.model_dump())
         else:
             out.append({
@@ -90,35 +93,5 @@ async def generate_note_stream(
             delta = chunk.choices[0].delta
             if delta and delta.content is not None:
                 yield delta.content
-    except Exception as e:
-        raise Exception(f"AI生成笔记失败：{str(e)}") from e
-
-
-async def generate_note(
-    topic: str,
-    keyword: Optional[str] = None,
-    reference_notes: Optional[List[Any]] = None,
-    images: Optional[list] = None,
-    word_count: int = 600,
-    *,
-    db_user: UserDB,
-) -> str:
-    """根据主题、关键词、参考笔记等生成笔记正文。"""
-    normalized = _normalize_reference_notes(reference_notes)
-    user_prompt = _build_generation_prompt(topic, keyword, normalized, word_count)
-
-    try:
-        client, model = openai_client_and_model_for_user(db_user)
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": NOTE_GENERATION_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.7,
-            max_tokens=word_count * 3,
-        )
-        text = response.choices[0].message.content
-        return (text or "").strip()
     except Exception as e:
         raise Exception(f"AI生成笔记失败：{str(e)}") from e

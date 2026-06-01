@@ -1,37 +1,41 @@
 <template>
-  <el-card 
-    class="note-card" 
-    hover
+  <div
+    class="note-card"
     @click="handleClick"
   >
+    <!-- Thumbtack -->
+    <div class="thumbtack"></div>
+
     <div class="card-header">
-      <h3 class="note-title"  :title="note.title">{{ note.title }}</h3>
+      <h3 class="note-title" :title="note.title">{{ note.title }}</h3>
       <span class="note-date">{{ formatDate(note.created_at) }}</span>
     </div>
+
     <div class="card-footer">
       <span class="note-tags">
-        <el-tag v-for="tag in displayedTags" :key="tag" size="small">
+        <span v-for="tag in displayedTags" :key="tag" class="tag">
           {{ tag }}
-        </el-tag>
-        <el-tag v-if="hasMoreTags" size="small" type="info" effect="plain">
+        </span>
+        <span v-if="hasMoreTags" class="tag tag--more">
           +{{ remainingCount }}
-        </el-tag>
+        </span>
       </span>
       <div class="card-actions">
-        <el-button 
-          link 
-          size="small" 
+        <el-button
+          link
+          size="small"
+          class="action-link"
           @click.stop="emit('edit', note)"
         >编辑</el-button>
-        <el-button 
-          link 
-          size="small" 
+        <el-button
+          link
+          size="small"
+          class="action-link action-link--delete"
           @click.stop="emit('delete', note)"
-          class="delete-btn"
         >删除</el-button>
       </div>
     </div>
-  </el-card>
+  </div>
 </template>
 
 <script setup>
@@ -46,26 +50,14 @@ const props = defineProps({
 
 const emit = defineEmits(['click', 'edit', 'delete'])
 
-// 获取所有标签
 const allTags = computed(() => {
   if (!props.note.tags) return []
   return props.note.tags.split(',').filter(tag => tag.trim())
 })
 
-// 显示的标签（最多3个）
-const displayedTags = computed(() => {
-  return allTags.value.slice(0, 3)
-})
-
-// 是否有更多标签
-const hasMoreTags = computed(() => {
-  return allTags.value.length > 3
-})
-
-// 剩余标签数量
-const remainingCount = computed(() => {
-  return allTags.value.length - 3
-})
+const displayedTags = computed(() => allTags.value.slice(0, 3))
+const hasMoreTags = computed(() => allTags.value.length > 3)
+const remainingCount = computed(() => allTags.value.length - 3)
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -83,29 +75,58 @@ function handleClick() {
 </script>
 
 <style scoped>
+/* ═══ Note Card — Hand-Drawn Wobbly Card ═══ */
+
 .note-card {
+  position: relative;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  background: #ffffff;
+  border: 2.5px solid var(--color-pencil);
+  border-radius: var(--radius-wobbly-md);
+  box-shadow: var(--shadow-hard);
+  padding: 20px 18px 16px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .note-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px) rotate(0.5deg);
+  box-shadow: 6px 6px 0px 0px var(--color-pencil);
+}
+
+.note-card:active {
+  transform: translateY(2px);
+  box-shadow: 2px 2px 0px 0px var(--color-pencil);
+}
+
+/* ── Red thumbtack ── */
+.thumbtack {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%) rotate(5deg);
+  width: 18px;
+  height: 18px;
+  background: var(--color-accent);
+  border-radius: 50%;
+  box-shadow: 1px 1px 0px rgba(0,0,0,0.3);
+  border: 3px solid #fff;
+  z-index: 2;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   gap: 10px;
 }
 
 .note-title {
+  font-family: var(--font-heading);
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
-  color: #303133;
+  color: var(--color-pencil);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -113,121 +134,56 @@ function handleClick() {
 }
 
 .note-date {
+  font-family: var(--font-body);
   font-size: 12px;
-  color: #909399;
+  color: #999;
+  white-space: nowrap;
 }
 
-/* Markdown 渲染样式 */
-.note-content :deep(h1),
-.note-content :deep(h2),
-.note-content :deep(h3),
-.note-content :deep(h4),
-.note-content :deep(h5),
-.note-content :deep(h6) {
-  margin: 8px 0;
-  font-weight: 600;
-  line-height: 1.4;
+/* ── Tags (hand-drawn style, no Element Plus el-tag) ── */
+.note-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
-.note-content :deep(h1) { font-size: 1.5em; }
-.note-content :deep(h2) { font-size: 1.3em; }
-.note-content :deep(h3) { font-size: 1.1em; }
-
-.note-content :deep(p) {
-  margin: 4px 0;
+.tag {
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 2px 10px;
+  background: var(--color-muted);
+  border: 2px solid var(--color-pencil);
+  border-radius: var(--radius-wobbly-sm);
+  color: var(--color-pencil);
+  white-space: nowrap;
 }
 
-.note-content :deep(code) {
-  background-color: #f5f7fa;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: 'Courier New', monospace;
-  font-size: 0.9em;
-}
-
-.note-content :deep(pre) {
-  background-color: #f5f7fa;
-  padding: 10px;
-  border-radius: 4px;
-  overflow-x: auto;
-  margin: 8px 0;
-}
-
-.note-content :deep(pre code) {
-  background-color: transparent;
-  padding: 0;
-}
-
-.note-content :deep(blockquote) {
-  border-left: 3px solid #409eff;
-  padding-left: 12px;
-  margin: 8px 0;
-  color: #606266;
-}
-
-.note-content :deep(ul),
-.note-content :deep(ol) {
-  margin: 8px 0;
-  padding-left: 20px;
-}
-
-.note-content :deep(li) {
-  margin: 4px 0;
-}
-
-.note-content :deep(a) {
-  color: #409eff;
-  text-decoration: none;
-}
-
-.note-content :deep(a:hover) {
-  text-decoration: underline;
-}
-
-.note-content :deep(img) {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-}
-
-.note-content :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 8px 0;
-}
-
-.note-content :deep(th),
-.note-content :deep(td) {
-  border: 1px solid #e4e7ed;
-  padding: 6px 10px;
-  text-align: left;
-}
-
-.note-content :deep(th) {
-  background-color: #f5f7fa;
-  font-weight: 600;
+.tag--more {
+  background: #fff;
+  border-style: dashed;
+  color: #999;
 }
 
 .card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 15px;
-  padding-top: 10px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.note-tags {
-  display: flex;
-  gap: 5px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 2px dashed var(--color-muted);
 }
 
 .card-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
-.delete-btn {
-  color: #f56c6c;
+.action-link {
+  font-family: var(--font-body) !important;
+  font-size: 14px !important;
+}
+
+.action-link--delete {
+  color: var(--color-accent) !important;
 }
 </style>
