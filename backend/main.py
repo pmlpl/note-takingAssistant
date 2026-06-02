@@ -52,8 +52,8 @@ app = FastAPI(
 
 # 跨域配置（必加，否则Vue前端无法访问）
 app.add_middleware(
-    CORSMiddleware, # type:ignore
-    allow_origins=[settings.FRONTEND_URL],  # 明确指定前端地址
+    CORSMiddleware,  # type:ignore
+    allow_origins=[settings.FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,4 +83,3 @@ if __name__ == "__main__":
         port=settings.API_PORT,
         reload=True
     )
-

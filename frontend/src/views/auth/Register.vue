@@ -4,7 +4,7 @@
       <el-card class="register-card">
         <!-- Tape strip decoration -->
         <div class="register-header">
-          <IconNotebook :size="52" color="var(--color-pencil)" />
+          <AppLogo :size="52" />
           <h2>智能笔记助手</h2>
           <p class="register-subtitle">创建新账号</p>
         </div>
@@ -46,7 +46,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { userApi } from '@/api/user'
-import { IconNotebook } from '@/components/icons'
+import { AppLogo } from '@/components/icons'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()

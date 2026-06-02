@@ -1,17 +1,52 @@
 <template>
   <BaseIcon :size="size" viewBox="0 0 100 100">
-    <defs>
-      <linearGradient id="appLogoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#667eea"/>
-        <stop offset="100%" style="stop-color:#764ba2"/>
-      </linearGradient>
-    </defs>
-    <!-- 圆角矩形背景 -->
-    <rect width="100" height="100" rx="20" fill="url(#appLogoGradient)"/>
-    <!-- AI 符号 - 类似闪电的形状 -->
-    <path d="M30 70 L50 30 L70 70" stroke="white" stroke-width="8" fill="none" stroke-linecap="round"/>
-    <!-- 中心圆点 -->
-    <circle cx="50" cy="55" r="8" fill="white"/>
+    <!-- 品牌：手绘风便签底 + 翻开笔记 + 小笔尖 -->
+    <rect
+      x="10"
+      y="10"
+      width="80"
+      height="80"
+      rx="18"
+      fill="#fff9c4"
+      stroke="#2d2d2d"
+      stroke-width="3.5"
+      stroke-linejoin="round"
+    />
+
+    <!-- 左页 -->
+    <path
+      fill="#fdfbf7"
+      stroke="#2d2d2d"
+      stroke-width="2.5"
+      stroke-linejoin="round"
+      d="M50 30 C40 30 34 36 34 46 V70 H50 V30Z"
+    />
+    <!-- 右页 -->
+    <path
+      fill="#fdfbf7"
+      stroke="#2d2d2d"
+      stroke-width="2.5"
+      stroke-linejoin="round"
+      d="M50 30 C60 30 66 36 66 46 V70 H50 V30Z"
+    />
+    <!-- 书脊 -->
+    <line x1="50" y1="30" x2="50" y2="70" stroke="#2d2d2d" stroke-width="2.5" stroke-linecap="round" />
+
+    <!-- 页内横线 -->
+    <line x1="38" y1="44" x2="46" y2="44" stroke="#2d2d2d" stroke-width="1.8" stroke-linecap="round" opacity="0.35" />
+    <line x1="38" y1="52" x2="46" y2="52" stroke="#2d2d2d" stroke-width="1.8" stroke-linecap="round" opacity="0.35" />
+    <line x1="54" y1="44" x2="62" y2="44" stroke="#2d2d2d" stroke-width="1.8" stroke-linecap="round" opacity="0.35" />
+    <line x1="54" y1="52" x2="62" y2="52" stroke="#2d2d2d" stroke-width="1.8" stroke-linecap="round" opacity="0.35" />
+
+    <!-- AI 点缀：笔尖 -->
+    <path
+      fill="#2d5da1"
+      stroke="#2d2d2d"
+      stroke-width="1.5"
+      stroke-linejoin="round"
+      d="M72 24 L78 20 L76 28 L72 32 Z"
+    />
+    <line x1="72" y1="32" x2="68" y2="38" stroke="#2d2d2d" stroke-width="2" stroke-linecap="round" />
   </BaseIcon>
 </template>
 
@@ -21,8 +56,7 @@ import BaseIcon from './BaseIcon.vue'
 defineProps({
   size: {
     type: [String, Number],
-    default: 32
-  }
+    default: 32,
+  },
 })
 </script>
-

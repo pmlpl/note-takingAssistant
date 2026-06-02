@@ -3,7 +3,7 @@
     <div class="stats-inner">
       <header class="stats-head">
         <h2>平台数据一览</h2>
-        <p>真实统计来自当前数据库（公开接口，无需登录）</p>
+        <p>近 30 日注册用户趋势（公开统计，无需登录）</p>
       </header>
 
       <div v-if="!visible" class="stats-skeleton">
@@ -19,17 +19,20 @@
             <div class="stat-card">
               <span class="stat-label">注册用户</span>
               <span class="stat-value">{{ stats.user_count }}</span>
+              <span class="stat-hint">累计</span>
             </div>
             <div class="stat-card stat-card--yellow">
-              <span class="stat-label">笔记总量</span>
-              <span class="stat-value">{{ stats.note_count }}</span>
-            </div>
-            <div class="stat-card stat-card--blue">
               <span class="stat-label">近 30 日新增</span>
-              <span class="stat-value">{{ recentTotal }}</span>
+              <span class="stat-value">{{ usersRecent30 }}</span>
+              <span class="stat-hint">新注册</span>
             </div>
           </div>
-          <div ref="chartEl" class="chart-box" />
+
+          <div class="chart-panel">
+            <h3 class="chart-title">注册用户 · 每日新增</h3>
+            <p class="chart-desc">柱状为当日新注册，折线为平台累计用户趋势</p>
+            <div ref="userChartEl" class="chart-box" />
+          </div>
         </template>
       </template>
     </div>
@@ -37,20 +40,36 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useLazyReveal } from '@/composables/useLazyReveal'
 import { publicApi } from '@/api/public'
+import {
+  WELCOME_CHART,
+  baseGrid,
+  axisCategory,
+  axisValue,
+  tooltipAxis,
+  legendBottom,
+} from '@/utils/welcomeChartTheme'
 
 const { root, visible } = useLazyReveal({ rootMargin: '0px 0px -5% 0px' })
 
 const loading = ref(false)
-const stats = ref({ user_count: 0, note_count: 0, daily_new_notes: [] })
-const chartEl = ref(null)
-let chartInstance = null
+const stats = ref({
+  user_count: 0,
+  daily_users: [],
+})
 
-const recentTotal = computed(() =>
-  (stats.value.daily_new_notes || []).reduce((s, d) => s + (d.count || 0), 0)
+const userChartEl = ref(null)
+let userChart = null
+
+const usersRecent30 = computed(() =>
+  (stats.value.daily_users || []).reduce((s, d) => s + (d.new_users || 0), 0)
 )
+
+function formatDates(series) {
+  return (series || []).map((d) => d.date.slice(5))
+}
 
 async function fetchStats() {
   loading.value = true
@@ -58,62 +77,68 @@ async function fetchStats() {
     stats.value = await publicApi.getWelcomeStats()
   } catch (e) {
     console.error('欢迎页统计加载失败', e)
-    stats.value = { user_count: 0, note_count: 0, daily_new_notes: [] }
+    stats.value = { user_count: 0, daily_users: [] }
   } finally {
     loading.value = false
   }
 }
 
-async function renderChart() {
-  if (!chartEl.value || !stats.value.daily_new_notes?.length) return
-
+async function renderUserChart() {
+  if (!userChartEl.value) return
   const echartsNs = await import('echarts')
   const echarts = echartsNs.default ?? echartsNs
-  if (chartInstance) {
-    chartInstance.dispose()
-  }
-  chartInstance = echarts.init(chartEl.value)
+  const series = stats.value.daily_users || []
+  if (!series.length) return
 
-  const dates = stats.value.daily_new_notes.map((d) => d.date.slice(5))
-  const counts = stats.value.daily_new_notes.map((d) => d.count)
+  userChart?.dispose()
+  userChart = echarts.init(userChartEl.value)
 
-  chartInstance.setOption({
-    grid: { left: 48, right: 24, top: 32, bottom: 40 },
-    tooltip: { trigger: 'axis' },
-    xAxis: {
-      type: 'category',
-      data: dates,
-      axisLine: { lineStyle: { color: '#2d2d2d' } },
-    },
-    yAxis: {
-      type: 'value',
-      name: '新增笔记',
-      minInterval: 1,
-      splitLine: { lineStyle: { type: 'dashed', color: '#e5e0d8' } },
-    },
+  const dates = formatDates(series)
+  const dailyNew = series.map((d) => d.new_users ?? 0)
+  const totalNew = dailyNew.reduce((a, b) => a + b, 0)
+  let cumulative = Math.max(0, (stats.value.user_count || 0) - totalNew)
+  const cumLine = dailyNew.map((n) => {
+    cumulative += n
+    return cumulative
+  })
+
+  userChart.setOption({
+    grid: baseGrid(),
+    tooltip: tooltipAxis(),
+    legend: legendBottom(['当日新增', '注册用户累计']),
+    xAxis: axisCategory(dates),
+    yAxis: [
+      { ...axisValue('新增'), position: 'left' },
+      {
+        ...axisValue('累计'),
+        position: 'right',
+        splitLine: { show: false },
+        axisLine: { show: false },
+      },
+    ],
     series: [
       {
-        name: '每日新增',
+        name: '当日新增',
+        type: 'bar',
+        barMaxWidth: 28,
+        itemStyle: {
+          color: WELCOME_CHART.yellow,
+          borderColor: WELCOME_CHART.pencil,
+          borderWidth: 2,
+          borderRadius: [4, 4, 0, 0],
+        },
+        data: dailyNew,
+      },
+      {
+        name: '注册用户累计',
         type: 'line',
+        yAxisIndex: 1,
         smooth: true,
         symbol: 'circle',
         symbolSize: 6,
-        lineStyle: { width: 3, color: '#2d5da1' },
-        itemStyle: { color: '#2d5da1' },
-        areaStyle: {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(45, 93, 161, 0.35)' },
-              { offset: 1, color: 'rgba(45, 93, 161, 0.02)' },
-            ],
-          },
-        },
-        data: counts,
+        lineStyle: { width: 3, color: WELCOME_CHART.blue },
+        itemStyle: { color: WELCOME_CHART.blue },
+        data: cumLine,
       },
     ],
   })
@@ -124,16 +149,17 @@ watch(visible, (v) => {
 })
 
 watch(
-  () => [loading.value, stats.value.daily_new_notes, visible.value],
+  () => [loading.value, stats.value.daily_users, visible.value],
   async ([isLoading, , vis]) => {
     if (vis && !isLoading) {
-      await renderChart()
+      await nextTick()
+      await renderUserChart()
     }
   }
 )
 
 function onResize() {
-  chartInstance?.resize()
+  userChart?.resize()
 }
 
 watch(visible, (v) => {
@@ -143,8 +169,8 @@ watch(visible, (v) => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
-  chartInstance?.dispose()
-  chartInstance = null
+  userChart?.dispose()
+  userChart = null
 })
 
 defineExpose({ visible })
@@ -196,14 +222,17 @@ defineExpose({ visible })
 
 .stat-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   margin-bottom: 24px;
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .stat-card {
   text-align: center;
-  padding: 20px 12px;
+  padding: 18px 12px 14px;
   border: 2px solid var(--color-pencil);
   border-radius: var(--radius-wobbly-sm);
   background: #faf9f6;
@@ -213,22 +242,47 @@ defineExpose({ visible })
   background: var(--color-yellow);
 }
 
-.stat-card--blue {
-  background: rgba(45, 93, 161, 0.12);
-}
-
 .stat-label {
   display: block;
   font-size: 14px;
   color: #555;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .stat-value {
   font-family: var(--font-heading);
-  font-size: 36px;
+  font-size: 34px;
   font-weight: 700;
   color: var(--color-pencil);
+  line-height: 1.1;
+}
+
+.stat-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #888;
+}
+
+.chart-panel {
+  padding: 16px 12px 8px;
+  border: 2px dashed var(--color-pencil);
+  border-radius: var(--radius-wobbly-sm);
+  background: var(--color-paper);
+}
+
+.chart-title {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  margin: 0 0 4px;
+  text-align: center;
+}
+
+.chart-desc {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #777;
+  text-align: center;
 }
 
 .chart-box {
@@ -243,6 +297,7 @@ defineExpose({ visible })
 @media (max-width: 640px) {
   .stat-cards {
     grid-template-columns: 1fr;
+    max-width: none;
   }
   .chart-box {
     height: 220px;

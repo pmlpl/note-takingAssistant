@@ -3,7 +3,7 @@
     <div class="login-wrapper">
       <el-card class="login-card">
         <div class="login-header">
-          <IconNotebook :size="52" color="var(--color-pencil)" />
+          <AppLogo :size="52" />
           <h2>智能笔记助手</h2>
           <p class="login-subtitle">登录您的账号</p>
         </div>
@@ -41,7 +41,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
 import { userApi } from '@/api/user'
-import { IconNotebook } from '@/components/icons'
+import { AppLogo } from '@/components/icons'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()

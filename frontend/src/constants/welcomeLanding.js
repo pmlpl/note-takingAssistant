@@ -46,12 +46,44 @@ export const WELCOME_FEATURES = [
 
 export const GITHUB_REPO_URL = 'https://github.com/pmlpl/note-takingAssistant'
 
+export const GITHUB_ISSUES_URL = `${GITHUB_REPO_URL}/issues`
+
+/** 标准页脚导航分组 */
+export const FOOTER_NAV_GROUPS = [
+  {
+    id: 'product',
+    title: '产品',
+    links: [
+      { label: '核心功能', anchor: '#features' },
+      { label: '客户端下载', anchor: '#download' },
+      { label: '平台数据', anchor: '#stats' },
+    ],
+  },
+  {
+    id: 'resources',
+    title: '资源',
+    links: [
+      { label: '使用手册', route: '/manual' },
+      { label: '开源仓库', external: GITHUB_REPO_URL },
+      { label: '问题反馈', external: GITHUB_ISSUES_URL },
+    ],
+  },
+  {
+    id: 'account',
+    title: '账户',
+    links: [
+      { label: '登录', route: '/login' },
+      { label: '免费注册', route: '/register' },
+    ],
+  },
+]
+
 export const DOWNLOAD_PLACEHOLDERS = [
   {
     id: 'windows',
     label: 'Windows 客户端',
     ext: '.exe',
-    hint: '桌面端开发中，敬请期待',
+    hint: '桌面客户端规划中，请使用 Web 版或 Docker 部署',
     icon: 'monitor',
   },
   {

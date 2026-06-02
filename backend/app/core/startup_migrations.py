@@ -2,9 +2,13 @@
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import engine
+
 
 async def ensure_user_llm_columns(db: AsyncSession) -> None:
-    """Add BYOK / LLM override columns to users if missing."""
+    """Add BYOK / LLM override columns to users if missing（仅 MySQL）。"""
+    if engine.dialect.name != "mysql":
+        return
     pairs = [
         ("llm_base_url", "ALTER TABLE users ADD COLUMN llm_base_url TEXT NULL"),
         ("llm_model", "ALTER TABLE users ADD COLUMN llm_model VARCHAR(512) NULL"),

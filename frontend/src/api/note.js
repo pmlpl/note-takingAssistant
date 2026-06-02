@@ -48,5 +48,5 @@ export const noteApi = {
 
   updateRecentNotesOrder(noteIds) {
     return api.post('/v1/note/recent/update', noteIds)
-  }
+  },
 }

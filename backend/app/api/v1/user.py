@@ -259,7 +259,6 @@ async def upload_avatar(
     file_extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
     unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
     
-    # 确保上传目录存在
     upload_dir = Path("uploads/avatars")
     upload_dir.mkdir(parents=True, exist_ok=True)
     

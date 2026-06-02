@@ -5,7 +5,7 @@
         <!-- 左侧：笔记管理 -->
         <el-aside width="240px" class="left-sidebar">
           <div class="sidebar-header">
-            <h3><IconNotebook :size="32" color="#409eff" />笔记管理</h3>
+            <h3><IconNotebook :size="32" />笔记管理</h3>
           </div>
           <div class="sidebar-actions">
             <el-button type="primary" @click="createNewNote" class="action-btn">
@@ -1628,6 +1628,14 @@ function getNotePreview(content) {
   width: 44px;
   height: 44px;
   padding: 0;
+}
+
+/* 覆盖全局 .el-button:hover 的 translate(2px,2px)，避免浮动按钮悬停时位移 */
+.chat-scroll-float-btn:hover,
+.chat-scroll-float-btn:focus,
+.chat-scroll-float-btn:active {
+  transform: translate(-50%, -50%) !important;
+  box-shadow: var(--shadow-hard) !important;
 }
 
 /* ── Welcome message inside chat ── */

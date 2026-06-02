@@ -3,37 +3,37 @@
     <!-- ═══ Hand-Drawn Header ═══ -->
     <el-header class="header">
       <div class="logo">
-        <AppLogo :size="36" color="var(--color-pencil)" />
+        <AppLogo :size="36" />
         <span class="title">智能笔记助手</span>
       </div>
 
       <el-menu :default-active="activeMenu" mode="horizontal" class="nav-menu">
         <el-menu-item index="/home" @click="navigate('/home')">
-          <IconHome :size="20" />
+          <IconHome :size="20" :color="NAV_ICON_COLOR" />
           <span>首页</span>
         </el-menu-item>
         <el-menu-item index="/notes" @click="navigate('/notes')">
-          <IconDocument :size="20" />
+          <IconDocument :size="20" :color="NAV_ICON_COLOR" />
           <span>我的笔记</span>
         </el-menu-item>
         <el-menu-item index="/ai/generate" @click="navigate('/ai/generate')">
-          <IconMagic :size="20" />
+          <IconMagic :size="20" :color="NAV_ICON_COLOR" />
           <span>AI 生成</span>
         </el-menu-item>
         <el-menu-item index="/ai/summarize" @click="navigate('/ai/summarize')">
-          <IconTrend :size="20" />
+          <IconTrend :size="20" :color="NAV_ICON_COLOR" />
           <span>AI 总结</span>
         </el-menu-item>
         <el-menu-item index="/ai/translate" @click="navigate('/ai/translate')">
-          <IconTranslate :size="20" />
+          <IconTranslate :size="20" :color="NAV_ICON_COLOR" />
           <span>翻译</span>
         </el-menu-item>
         <el-menu-item index="/mindmap" @click="navigate('/mindmap')">
-          <IconMindmap :size="20"/>
+          <IconMindmap :size="20" :color="NAV_ICON_COLOR" />
           <span>导图</span>
         </el-menu-item>
         <el-menu-item index="/manual" @click="navigate('/manual')">
-          <IconNotebook :size="20" />
+          <IconNotebook :size="20" :color="NAV_ICON_COLOR" />
           <span>手册</span>
         </el-menu-item>
       </el-menu>
@@ -41,7 +41,7 @@
       <div class="user-info">
         <el-dropdown v-if="userStore.isLoggedIn">
           <span class="user-name">
-            <IconUser :size="18" />
+            <IconUser :size="18" :color="NAV_ICON_COLOR" />
             {{ userStore.user.username }}
           </span>
           <template #dropdown>
@@ -69,6 +69,8 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
 import {AppLogo, IconHome, IconDocument, IconMagic, IconTrend, IconUser, IconMindmap, IconTranslate, IconNotebook} from '@/components/icons'
+
+const NAV_ICON_COLOR = '#2d2d2d'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -138,12 +140,16 @@ async function handleLogout() {
 }
 
 .nav-menu :deep(.el-menu-item) {
-  color: var(--color-pencil);
+  color: #2d2d2d;
   font-family: var(--font-body);
   font-size: 16px;
   border-bottom: none !important;
   border-radius: var(--radius-wobbly-sm);
   margin: 0 2px;
+}
+
+.nav-menu :deep(.el-menu-item svg) {
+  color: #2d2d2d;
 }
 
 .nav-menu :deep(.el-menu-item:hover) {
@@ -171,9 +177,13 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: var(--color-pencil);
+  color: #2d2d2d;
   font-family: var(--font-body);
   font-size: 15px;
+}
+
+.user-name svg {
+  color: #2d2d2d;
 }
 
 .auth-buttons {

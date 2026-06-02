@@ -7,17 +7,19 @@
     >
       <div class="nav-inner">
         <div class="nav-brand" @click="scrollToTop">
-          <IconNotebook :size="32" color="var(--color-pencil)" />
+          <AppLogo :size="32" />
           <span>智能笔记助手</span>
         </div>
         <nav class="nav-links">
           <a
-            class="nav-link"
+            class="nav-link-github"
             :href="GITHUB_REPO_URL"
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="GitHub 开源仓库"
+            title="GitHub"
           >
-            GitHub
+            <IconGitHub :size="22" color="currentColor" />
           </a>
           <el-button link class="nav-btn-link" @click="navigate('/login')">登录</el-button>
           <el-button type="primary" class="nav-btn-primary" @click="navigate('/register')">
@@ -59,13 +61,13 @@
 
     <!-- 下方内容：与 Hero 同列宽，留出呼吸间距 -->
     <div class="landing-flow">
-      <div ref="statsAnchor" class="landing-flow__panel">
+      <div id="stats" ref="statsAnchor" class="landing-flow__panel">
         <WelcomeStatsBlock />
       </div>
 
       <hr class="landing-divider" aria-hidden="true" />
 
-      <div class="features-wrap">
+      <div id="features" class="features-wrap">
         <header class="section-title">
           <h2>核心能力</h2>
           <p>滚动浏览各项功能，图文随视野逐步呈现</p>
@@ -80,7 +82,7 @@
 
       <hr class="landing-divider" aria-hidden="true" />
 
-      <section ref="downloadRoot" class="download-section" :class="{ 'is-visible': downloadVisible }">
+      <section id="download" ref="downloadRoot" class="download-section" :class="{ 'is-visible': downloadVisible }">
       <div class="download-inner">
         <h2>客户端下载</h2>
         <p class="download-lead">桌面端与手机端正在开发，可先收藏仓库获取更新</p>
@@ -106,26 +108,19 @@
         </a>
       </div>
       </section>
-
-      <hr class="landing-divider" aria-hidden="true" />
-
-      <footer class="welcome-footer">
-      <p>© 智能笔记助手 · 毕业设计作品</p>
-      <div class="footer-actions">
-        <el-button link @click="navigate('/login')">登录</el-button>
-        <el-button type="primary" @click="navigate('/register')">注册</el-button>
-      </div>
-      </footer>
     </div>
+
+    <SiteFooter @navigate="navigate" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { IconNotebook } from '@/components/icons'
+import { AppLogo, IconGitHub } from '@/components/icons'
 import WelcomeStatsBlock from '@/components/welcome/WelcomeStatsBlock.vue'
 import WelcomeFeatureRow from '@/components/welcome/WelcomeFeatureRow.vue'
+import SiteFooter from '@/components/SiteFooter.vue'
 import { useLazyReveal } from '@/composables/useLazyReveal'
 import {
   WELCOME_FEATURES,
@@ -233,16 +228,29 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
-.nav-link {
+.nav-link-github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
   color: var(--color-pencil);
   text-decoration: none;
-  font-size: 15px;
-  padding: 6px 10px;
-  border-radius: 8px;
+  border: 2px solid rgba(45, 45, 45, 0.2);
+  border-radius: var(--radius-wobbly-sm);
+  background: rgba(255, 255, 255, 0.5);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
-.nav-link:hover {
+.nav-link-github:hover {
   background: var(--color-yellow);
+  border-color: var(--color-pencil);
+  transform: translateY(-1px);
+}
+
+.welcome-nav--scrolled .nav-link-github {
+  background: #faf9f6;
+  border-color: rgba(45, 45, 45, 0.35);
 }
 
 .nav-btn-link {
@@ -378,6 +386,12 @@ onBeforeUnmount(() => {
   padding-top: 8px;
 }
 
+#stats,
+#features,
+#download {
+  scroll-margin-top: 72px;
+}
+
 .landing-flow__eyebrow {
   text-align: center;
   margin: 0 0 12px;
@@ -496,25 +510,6 @@ onBeforeUnmount(() => {
 
 .repo-link:hover {
   text-decoration: underline;
-}
-
-.welcome-footer {
-  width: 100%;
-  box-sizing: border-box;
-  text-align: center;
-  padding: 40px clamp(16px, 3vw, 40px) 56px;
-  margin-top: 8px;
-  border-top: none;
-  color: #666;
-  font-size: 14px;
-  background: transparent;
-}
-
-.footer-actions {
-  margin-top: 12px;
-  display: flex;
-  justify-content: center;
-  gap: 8px;
 }
 
 @media (max-width: 900px) {

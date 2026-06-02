@@ -24,8 +24,11 @@ from app.core.config import settings
 
 router = APIRouter()
 
-# 图片存储目录
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "uploads", "images")
+UPLOAD_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+    "uploads",
+    "images",
+)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
