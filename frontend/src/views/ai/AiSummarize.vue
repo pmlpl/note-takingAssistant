@@ -1,5 +1,4 @@
-<template>
-  <Layout>
+﻿<template>
     <div class="ai-summarize-page">
       <!-- 页面头部 -->
       <div class="page-header">
@@ -198,7 +197,6 @@
         </el-col>
       </el-row>
     </div>
-  </Layout>
 </template>
 
 <script setup>
@@ -207,7 +205,6 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
 import { noteApi } from '@/api/note'
 import { aiApi } from '@/api/ai'
-import Layout from '@/components/Layout.vue'
 import { IconTrend } from '@/components/icons'
 import { DArrowLeft, Document, ScaleToOriginal, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'

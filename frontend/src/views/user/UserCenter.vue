@@ -1,5 +1,4 @@
-<template>
-  <Layout>
+﻿<template>
     <div class="user-center-container">
       <div class="user-center-toolbar">
         <el-button size="small" :loading="profileLoading || statsLoading || llmLoading" @click="reloadAll">
@@ -397,7 +396,6 @@
         </div>
       </el-dialog>
     </div>
-  </Layout>
 </template>
 
 <script setup>
@@ -405,7 +403,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
 import { userApi } from '@/api/user'
-import Layout from '@/components/Layout.vue'
 import { IconDocument, IconMagic, IconClock, IconLogout, IconEdit } from '@/components/icons'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Message, Calendar, ArrowDown } from '@element-plus/icons-vue'

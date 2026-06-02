@@ -1,12 +1,24 @@
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { resolve } from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [vue()],
+    plugins: [
+      vue(),
+      Components({
+        resolvers: [
+          ElementPlusResolver({
+            importStyle: 'css'
+          })
+        ],
+        dts: 'src/components.d.ts'
+      })
+    ],
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src')
@@ -18,8 +30,15 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: env.VITE_API_BASE_URL || 'http://localhost:8000',
           changeOrigin: true
+        },
+        '/uploads': {
+          target: env.VITE_API_BASE_URL || 'http://localhost:8000',
+          changeOrigin: true
         }
       }
+    },
+    optimizeDeps: {
+      include: ['vue', 'vue-router', 'pinia', 'axios', 'element-plus']
     },
     test: {
       environment: 'happy-dom',
@@ -27,6 +46,7 @@ export default defineConfig(({ mode }) => {
       include: ['src/**/*.test.js']
     },
     build: {
+      chunkSizeWarningLimit: 1600,
       rollupOptions: {
         output: {
           manualChunks(id) {

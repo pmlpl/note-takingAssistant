@@ -1,5 +1,4 @@
-<template>
-  <Layout>
+﻿<template>
     <div class="note-list-page">
       <!-- 顶部操作区 -->
       <el-card class="top-bar" shadow="never">
@@ -67,7 +66,6 @@
         </el-empty>
       </div>
     </div>
-  </Layout>
 </template>
 
 <script setup>
@@ -76,7 +74,6 @@ import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useNoteStore } from '@/store'
 import { noteApi } from '@/api/note'
-import Layout from '@/components/Layout.vue'
 import NoteCard from '@/components/NoteCard.vue'
 import { IconPlus, IconSearch } from '@/components/icons'
 import { MESSAGE_DURATION } from '@/utils/common'

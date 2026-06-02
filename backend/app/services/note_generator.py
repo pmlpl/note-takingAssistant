@@ -6,12 +6,12 @@ from typing import Any, AsyncIterator, List, Optional
 
 from app.models.user import UserDB
 from app.services.llm_runtime import openai_client_and_model_for_user
+from app.utils.llm_errors import format_llm_error
 from .prompts import NOTE_GENERATION_SYSTEM_PROMPT
 
-"""
-归参考笔记列表，确保每个笔记都有 filename 和 content 字段
-"""
+
 def _normalize_reference_notes(reference_notes: Optional[List[Any]]) -> List[dict]:
+    """规范化参考笔记列表，确保每项含 filename 与 content。"""
     if not reference_notes:
         return []
     out: List[dict] = []
@@ -94,4 +94,4 @@ async def generate_note_stream(
             if delta and delta.content is not None:
                 yield delta.content
     except Exception as e:
-        raise Exception(f"AI生成笔记失败：{str(e)}") from e
+        raise Exception(format_llm_error("AI生成笔记", e)) from e

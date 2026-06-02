@@ -9,10 +9,6 @@ graph TB
         Axios[Axios HTTP 客户端]
     end
 
-    subgraph 网关层
-        Nginx[Nginx 反向代理<br/>/api -> 后端 /uploads -> 后端]
-    end
-
     subgraph 后端层
         FastAPI[FastAPI 框架]
         RouterAPI[API 路由层]
@@ -32,13 +28,10 @@ graph TB
         Uploads[本地文件存储<br/>头像/图片]
     end
 
-    %% 前端调用关系
-    Axios --> Nginx
-    Nginx --> FastAPI
+    Axios --> FastAPI
     Vue3 --> Router
     Vue3 --> Pinia
 
-    %% 后端调用关系
     FastAPI --> RouterAPI
     RouterAPI --> Auth
     RouterAPI --> Service
@@ -49,13 +42,14 @@ graph TB
     CRUD --> Redis
     RouterAPI --> Uploads
 
-    %% 数据流标注
     classDef layer fill:#f0f4ff,stroke:#409eff,stroke-width:2px
     classDef data fill:#f0fff0,stroke:#67c23a,stroke-width:2px
     classDef ai fill:#fff7e6,stroke:#e6a23c,stroke-width:2px
 
-    class Vue3,Router,Pinia,Axios,Nginx layer
+    class Vue3,Router,Pinia,Axios layer
     class FastAPI,RouterAPI,Service,CRUD,Auth layer
     class MySQL,Redis,Uploads data
     class LMStudio,BYOK ai
 ```
+
+本地开发时，Vite 将 `/api` 代理到 FastAPI；生产环境可按需增加反向代理与静态资源托管，本仓库以本地联调为主。

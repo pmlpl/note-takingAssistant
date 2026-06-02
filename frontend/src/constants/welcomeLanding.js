@@ -83,7 +83,7 @@ export const DOWNLOAD_PLACEHOLDERS = [
     id: 'windows',
     label: 'Windows 客户端',
     ext: '.exe',
-    hint: '桌面客户端规划中，请使用 Web 版或 Docker 部署',
+    hint: '桌面客户端规划中，请使用 Web 版',
     icon: 'monitor',
   },
   {

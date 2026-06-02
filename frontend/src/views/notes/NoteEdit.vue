@@ -1,5 +1,4 @@
-<template>
-  <Layout>
+﻿<template>
     <div class="note-edit-container">
       <div class="edit-header">
         <el-button @click="goBack">
@@ -45,7 +44,6 @@
         </el-form>
       </el-card>
     </div>
-  </Layout>
 </template>
 
 <script setup>
@@ -53,11 +51,11 @@ import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNoteStore, useUserStore } from '@/store'
 import { noteApi } from '@/api/note'
-import Layout from '@/components/Layout.vue'
 import RichText from '@/components/RichText.vue'
 import { IconUpload } from '@/components/icons'
 import { sanitizeHtml, renderMarkdownToSafeHtml } from '@/utils/htmlSanitize'
 import { ElMessage } from 'element-plus'
+import { ArrowLeft } from '@element-plus/icons-vue'
 
 defineOptions({
   name: 'NoteEdit'

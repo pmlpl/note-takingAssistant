@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from app.models.user import UserDB
 from app.services.llm_runtime import openai_client_and_model_for_user
 from app.services.prompts import NOTE_TRANSLATION_SYSTEM_PROMPT
+from app.utils.llm_errors import format_llm_error
 
 MAX_INPUT_CHARS = 8000
 
@@ -137,7 +138,7 @@ async def translate_note_stream(
                 acc += piece
                 yield piece
     except Exception as e:
-        raise RuntimeError(f"流式翻译失败：{str(e)}") from e
+        raise RuntimeError(format_llm_error("AI翻译", e)) from e
 
     if WATERMARK_SNIPPET not in acc:
         yield WATERMARK_MD

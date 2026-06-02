@@ -78,6 +78,7 @@ const userStore = useUserStore()
 const activeMenu = computed(() => router.currentRoute.value.path)
 
 function navigate(path) {
+  if (router.currentRoute.value.path === path) return
   router.push(path)
 }
 

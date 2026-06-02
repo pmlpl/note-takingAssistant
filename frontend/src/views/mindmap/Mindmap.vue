@@ -1,5 +1,4 @@
-<template>
-  <Layout>
+﻿<template>
     <div class="mindmap-page">
       <div class="page-header">
         <h2>
@@ -77,13 +76,11 @@
         </el-col>
       </el-row>
     </div>
-  </Layout>
 </template>
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import Layout from '@/components/Layout.vue'
 import { IconMindmap } from '@/components/icons'
 import {
   MINDMAP_LOCAL_STORAGE_KEY,

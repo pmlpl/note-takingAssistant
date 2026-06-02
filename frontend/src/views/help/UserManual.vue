@@ -1,5 +1,4 @@
-<template>
-  <Layout>
+﻿<template>
     <div class="manual-page">
       <div class="manual-split" :class="{ 'manual-split--collapsed': tocCollapsed }">
         <aside class="manual-toc" aria-label="目录">
@@ -367,13 +366,11 @@
         </div>
       </div>
     </div>
-  </Layout>
 </template>
 
 <script setup>
 import { computed, ref, nextTick } from 'vue'
 import { CaretRight, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
-import Layout from '@/components/Layout.vue'
 
 defineOptions({
   name: 'UserManual'

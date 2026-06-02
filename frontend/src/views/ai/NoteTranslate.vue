@@ -1,5 +1,4 @@
-<template>
-  <Layout>
+﻿<template>
     <div class="note-translate-page">
       <header class="page-header">
         <el-button link class="back-btn" @click="goBack">
@@ -156,14 +155,12 @@
         </el-row>
       </div>
     </div>
-  </Layout>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, onActivated, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
-import Layout from '@/components/Layout.vue'
 import { IconTranslate, IconUpload } from '@/components/icons'
 import { DArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

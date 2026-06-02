@@ -1,5 +1,4 @@
-<template>
-  <Layout>
+﻿<template>
     <div class="history-notes-page">
       <!-- 页面头部 -->
       <div class="page-header">
@@ -78,14 +77,12 @@
         </div>
       </el-card>
     </div>
-  </Layout>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { noteApi } from '@/api/note'
-import Layout from '@/components/Layout.vue'
 import { IconDocument, IconPlus } from '@/components/icons'
 import { DArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'

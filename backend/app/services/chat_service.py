@@ -7,6 +7,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 
 from app.models.user import UserDB
 from app.services.llm_runtime import openai_client_and_model_for_user
+from app.utils.llm_errors import format_llm_error
 from .prompts import CHAT_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ async def chat_with_ai(
         return (text or "").strip()
     except Exception as e:
         logger.exception("chat_with_ai 调用失败")
-        raise Exception(f"AI对话失败：{str(e)}") from e
+        raise Exception(format_llm_error("AI对话", e)) from e
 
 
 async def chat_with_ai_stream(
@@ -114,4 +115,4 @@ async def chat_with_ai_stream(
                 yield delta.content
     except Exception as e:
         logger.exception("chat_with_ai_stream 调用失败")
-        raise Exception(f"AI对话失败：{str(e)}") from e
+        raise Exception(format_llm_error("AI对话", e)) from e

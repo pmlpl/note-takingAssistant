@@ -7,6 +7,7 @@ from typing import Any, Dict
 
 from app.models.user import UserDB
 from app.services.llm_runtime import openai_client_and_model_for_user
+from app.utils.llm_errors import format_llm_error
 from .prompts import NOTE_ANALYSIS_SYSTEM_PROMPT
 
 
@@ -68,4 +69,4 @@ async def analyze_note(content: str, *, db_user: UserDB) -> Dict[str, Any]:
             "suggestions": result.get("suggestions", ["建议补充相关案例"]),
         }
     except Exception as e:
-        raise Exception(f"AI分析失败：{str(e)}") from e
+        raise Exception(format_llm_error("AI分析", e)) from e

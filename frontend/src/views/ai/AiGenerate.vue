@@ -1,6 +1,5 @@
 <template>
-  <Layout>
-    <div class="ai-generate-page">
+  <div class="ai-generate-page">
       <!-- 页面头部 -->
       <div class="page-header">
         <div class="page-title">
@@ -213,8 +212,7 @@
           </el-card>
         </el-col>
       </el-row>
-    </div>
-  </Layout>
+  </div>
 </template>
 
 <script setup>
@@ -223,7 +221,6 @@ import { useRouter } from 'vue-router'
 import { useNoteStore, useUserStore } from '@/store'
 import { aiApi } from '@/api/ai'
 import { noteApi } from '@/api/note'
-import Layout from '@/components/Layout.vue'
 import { IconMagic, IconPlus, IconEdit, IconUpload, IconDocument } from '@/components/icons'
 import { ElMessage } from 'element-plus'
 import {IconNotebook} from "@/components/icons/index.js";
