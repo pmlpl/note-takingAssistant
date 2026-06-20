@@ -16,6 +16,12 @@ async def get_user_by_username(db: AsyncSession, username: str):
     return result.scalar_one_or_none()
 
 
+async def get_user_by_email(db: AsyncSession, email: str):
+    """根据邮箱获取用户"""
+    result = await db.execute(select(UserDB).where(UserDB.email == email))
+    return result.scalar_one_or_none()
+
+
 async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100):
     """获取用户列表"""
     result = await db.execute(select(UserDB).offset(skip).limit(limit))

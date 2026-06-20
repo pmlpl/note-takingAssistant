@@ -57,14 +57,14 @@ async def count_notes(
     return result.scalar() or 0
 
 
-async def create_note(db: AsyncSession, user_id: int, title: str, content: str, tags: str = None, is_favorite: int = 1):
+async def create_note(db: AsyncSession, user_id: int, title: str, content: str, tags: str = None, is_favorite: bool = True):
     """创建笔记"""
     db_note = NoteDB(
         user_id=user_id,
         title=title,
         content=content,
         tags=tags,
-        is_favorite=is_favorite
+        is_favorite=(1 if is_favorite else 0),
     )
     db.add(db_note)
     await db.commit()
@@ -72,18 +72,19 @@ async def create_note(db: AsyncSession, user_id: int, title: str, content: str, 
     return db_note
 
 
-async def update_note(db: AsyncSession, note_id: int, user_id: int, title: str = None, content: str = None, tags: str = None, is_favorite: int = None):
+async def update_note(db: AsyncSession, note_id: int, user_id: int, title: str = None, content: str = None, tags: str = None, is_favorite: bool = None):
     """更新笔记"""
     db_note = await get_note(db, note_id, user_id)
-    if db_note:
-        if title is not None:
-            db_note.title = title
-        if content is not None:
-            db_note.content = content
-        if tags is not None:
-            db_note.tags = tags
-        if is_favorite is not None:
-            db_note.is_favorite = is_favorite
+    if not db_note:
+        return None
+    if title is not None:
+        db_note.title = title
+    if content is not None:
+        db_note.content = content
+    if tags is not None:
+        db_note.tags = tags
+    if is_favorite is not None:
+        db_note.is_favorite = (1 if is_favorite else 0)
         await db.commit()
         await db.refresh(db_note)
     return db_note
@@ -105,5 +106,16 @@ async def get_note_by_title_and_content(db: AsyncSession, user_id: int, title: s
             NoteDB.title == title,
             NoteDB.content == content
         )
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_note_by_title(db: AsyncSession, user_id: int, title: str) -> type[NoteDB] | None:
+    """按 (user_id, title) 精确查询，用于重复标题检测。"""
+    result = await db.execute(
+        select(NoteDB).where(
+            NoteDB.user_id == user_id,
+            NoteDB.title == title,
+        ).limit(1)
     )
     return result.scalar_one_or_none()

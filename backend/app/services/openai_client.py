@@ -1,9 +1,16 @@
-"""Shared httpx client and helpers for AsyncOpenAI — per-request clients use user or server defaults."""
+"""Shared httpx client and helpers for AsyncOpenAI — per-request clients use user or server defaults.
+
+SSRF 防御：在构造用户自定义 base_url 的客户端前，会调用 `assert_safe_llm_url` 拦截私有 IP / 元数据服务 / 非白名单端口。
+"""
 import httpx
 from openai import AsyncOpenAI
 
 from app.core.config import settings
-from app.utils.openai_compatible_url import normalize_openai_compatible_base_url
+from app.utils.openai_compatible_url import (
+    normalize_openai_compatible_base_url,
+    assert_safe_llm_url,
+    UnsafeLlmUrlError,
+)
 
 # 本地 LM Studio 常见「冷启动 + 首 token」远超默认 5min 读超时，单独放宽 read
 _llm_http_timeout = httpx.Timeout(
@@ -33,9 +40,14 @@ async_openai_client = AsyncOpenAI(
 
 
 def make_async_openai_client(base_url: str, api_key: str) -> AsyncOpenAI:
-    """Build an AsyncOpenAI instance sharing the process-wide httpx pool/timeouts."""
+    """Build an AsyncOpenAI instance sharing the process-wide httpx pool/timeouts.
+
+    额外执行 SSRF 安全校验：拒绝私有 IP / 云元数据 / 非白名单端口；若 URL 不安全则抛 UnsafeLlmUrlError。
+    """
     key = (api_key or "").strip() or "not-needed"
     raw = (base_url or "").strip()
+    if raw:
+        assert_safe_llm_url(raw)  # SSRF 安全拦截
     base = normalize_openai_compatible_base_url(raw) or raw.rstrip("/")
     return AsyncOpenAI(
         base_url=base,

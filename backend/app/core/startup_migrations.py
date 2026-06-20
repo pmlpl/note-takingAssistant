@@ -3,16 +3,18 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import engine
+from app.core.logger import app_logger as logger
 
 
 async def ensure_user_llm_columns(db: AsyncSession) -> None:
-    """Add BYOK / LLM override columns to users if missing（仅 MySQL）。"""
+    """Add BYOK / LLM override columns + token_gen to users if missing（仅 MySQL）。"""
     if engine.dialect.name != "mysql":
         return
     pairs = [
         ("llm_base_url", "ALTER TABLE users ADD COLUMN llm_base_url TEXT NULL"),
         ("llm_model", "ALTER TABLE users ADD COLUMN llm_model VARCHAR(512) NULL"),
         ("llm_api_key_encrypted", "ALTER TABLE users ADD COLUMN llm_api_key_encrypted TEXT NULL"),
+        ("token_gen", "ALTER TABLE users ADD COLUMN token_gen INT NOT NULL DEFAULT 0"),
     ]
     for column_name, ddl in pairs:
         r = await db.execute(
@@ -28,3 +30,4 @@ async def ensure_user_llm_columns(db: AsyncSession) -> None:
         )
         if (r.scalar() or 0) == 0:
             await db.execute(text(ddl))
+            logger.info(f"已添加列 users.{column_name}")

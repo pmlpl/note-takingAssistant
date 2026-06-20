@@ -1,243 +1,330 @@
-# 智能笔记助手（AI 个人智能笔记助手）
+<div align="center">
 
-一个面向个人学习与写作的 **Web 全栈应用**：用 Vue 3 构建交互界面，用 FastAPI 提供 REST API，通过 **OpenAI 兼容协议** 对接 [LM Studio](https://lmstudio.ai/) 或其它本地/云端大模型，实现笔记管理与 AI 辅助创作。
+![智能笔记助手](https://img.shields.io/badge/AI%20智能笔记助手-v1.0.0-8b5cf6?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.0.0-10b981?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)
 
-![Vue](https://img.shields.io/badge/Vue-3.3-brightgreen)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-blue)
-![Python](https://img.shields.io/badge/Python-3.10+-yellow)
-![MySQL](https://img.shields.io/badge/MySQL-8.0-orange)
+</div>
 
----
+<div align="center">
 
-## 项目简介
+![Vue](https://img.shields.io/badge/Vue-3.3-42b883?style=for-the-badge&logo=vuedotjs&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)
 
-本系统采用前后端分离架构，用户注册登录后即可：
-
-- 创建、编辑、检索与收藏笔记（富文本 / Markdown）；
-- 使用 AI 生成、总结、翻译笔记，或在首页与助手对话；
-- 在个人中心配置自带模型地址与 API Key（BYOK）。
-
-未登录访客可浏览**欢迎页**（产品介绍、功能说明、平台注册趋势统计）。
+</div>
 
 ---
 
-## 功能特性
+## 🌠 项目简介
 
-### 欢迎页与站点导航
+> 面向个人学习与创作的 **Web 全栈智能笔记应用**
 
-| 能力 | 说明 |
+- **前端**：Vue 3 + Element Plus，流畅的交互体验
+- **后端**：FastAPI + 异步 MySQL/Redis，高并发稳
+- **AI 能力**：基于 **OpenAI 兼容协议**，可对接 LM Studio 本地推理或云端大模型
+- **BYOK 支持**：用户可在个人中心配置自带模型与 API Key
+
+**v1.0.0 功能总览**
+
+| 模块 | 能力 |
 |------|------|
-| 产品介绍 | 功能亮点、下载占位、锚点导航 |
-| 平台统计 | 公开接口展示注册用户总量与近 30 日每日新增（ECharts 图表） |
-| 统一页脚 | 品牌、产品/资源/账户链接；GitHub 外链 |
-| 登录 / 注册 | 独立认证页，手绘风格图标与品牌视觉 |
-
-### 笔记管理
-
-| 能力 | 说明 |
-|------|------|
-| 双模式编辑 | WangEditor 富文本 + Markdown（Marked 渲染，DOMPurify 消毒） |
-| 组织与检索 | 标签、搜索、筛选、收藏 |
-| 历史笔记 | 独立历史列表入口 |
-| 导入 | Word（`.docx`，Mammoth）、纯文本；支持与后端校验的合并/覆盖流程 |
-| 图片上传 | 笔记内图片上传至服务端静态目录 |
-
-### AI 智能能力
-
-| 能力 | 说明 |
-|------|------|
-| **AI 生成** | 按主题/关键词与字数生成笔记；可选参考笔记、参考图；输出 Markdown / Word / 纯文本 |
-| **AI 总结** | 基于选定笔记或上传内容生成摘要 |
-| **AI 翻译** | 多目标语言；服务端 HTML→Markdown 后**流式**翻译，前端 Markdown 展示；含水印与脚注 |
-| **AI 对话** | 首页助手面板，支持多轮上下文；提供流式接口 `/chat-stream` |
-| **流式输出** | 生成、翻译、对话均支持流式响应，降低首字等待时间 |
-| **超时与连接** | 可配置 LLM HTTP 读超时；本地推理默认不走系统代理（`LLM_HTTP_TRUST_ENV`） |
-
-推理默认读取 `backend/.env` 中的 `LM_STUDIO_URL`、`LM_STUDIO_MODEL`；用户可在个人中心覆盖基址、模型与 Key。
-
-### 首页与数据展示
-
-- 笔记数量等统计（ECharts）
-- **最近笔记**（Redis 缓存加速，未启用 Redis 时自动降级）
-- AI 助手聊天区：上下文对话、`/note` 等快捷指令、跳转最新消息
-
-### 其它功能页面
-
-| 路由 | 功能 |
-|------|------|
-| `/mindmap` | 思维导图（需登录） |
-| `/manual` | 应用内使用手册（协议、隐私、操作说明） |
-| `/user` | 个人中心：资料、密码、LLM / BYOK 配置 |
-
-### 用户与安全
-
-- **JWT** 注册、登录、退出；令牌黑名单（Redis）
-- **BYOK**：用户 API Key 使用 Fernet 加密存库（`ENCRYPTION_KEY` 可选，否则由 `SECRET_KEY` 派生）
-- **OpenAI 兼容 URL 规范化**：自动纠正误填的 `/v1/models` 等路径
-
-### 工程与体验
-
-- 前端 `keep-alive` 缓存主要业务页，切换路由时保留表单状态
-- 前端按路由懒加载；`mermaid` / `echarts` 等大库在对应页面动态 `import`，减小首屏体积
-- Element Plus 图标按需在各页面引入，避免全量注册
-- GitHub Actions CI：前端 `vitest` + 构建、后端 `pytest`
-- AI 调用失败时返回可操作的连接/鉴权/模型提示（见 `app/utils/llm_errors.py`）
+| 📝 **笔记管理** | 创建 / 编辑 / 搜索 / 收藏 / 富文本 & Markdown |
+| 🤖 **AI 辅助** | 生成笔记 / 总结 / 翻译 / 多轮对话（流式输出） |
+| 🧠 **思维导图** | 笔记结构可视化 |
+| 📊 **数据统计** | 个人笔记统计 + 平台注册趋势图 |
+| 🔐 **安全体系** | JWT 认证 / 密码复杂度校验 / 速率限制 / SSRF 防护 / BYOK 密钥加密 |
+| 🐳 **一键部署** | Docker Compose 全套拉起，HTTPS 自动续期 |
 
 ---
 
-## 技术栈
+## ✨ 功能亮点
+
+### 核心功能
+
+| 能力 | 说明 |
+|------|------|
+| **富文本 & Markdown 双模式** | WangEditor 富文本 + Marked 渲染，切换流畅 |
+| **AI 笔记生成** | 按主题、关键词、字数生成；可参考已有笔记做扩展 |
+| **AI 流式翻译** | HTML→Markdown 预处理，逐段流式返回，首字等待时间短 |
+| **AI 对话助手** | 首页多轮对话面板，支持上下文与快捷指令 |
+| **本地/云端推理自由切换** | 既可走服务端默认 LM Studio，也可用户自带模型 Key |
+
+### 工程与安全
+
+| 方面 | 说明 |
+|------|------|
+| **JWT 加固** | 2 小时短有效期 + 令牌代数(Token Gen) + Redis 黑名单登出 |
+| **速率限制** | 匿名接口 60 次/分；AI 生成限流；防暴力注册/登录 |
+| **SSRF 防护** | LLM 自定义 URL 校验协议/IP/端口，拦截内网请求 |
+| **密码安全** | bcrypt 哈希 + 前端 8 位含字母数字强度校验 |
+| **BYOK 加密** | 用户自带 API Key 使用 Fernet 对称加密存库 |
+| **文件上传安全** | 魔数校验 + 扩展名白名单 + 随机文件名重命名 |
+| **日志体系** | 结构化 JSON 日志，便于排障与审计 |
+
+---
+
+## 🛠️ 技术栈
 
 ### 前端
 
-| 类别 | 技术 | 用途 |
-|------|------|------|
-| 框架 | **Vue 3**（Composition API） | 视图与组件 |
-| 路由 / 状态 | **Vue Router 4**、**Pinia** | 页面路由、用户态 |
-| UI | **Element Plus** | 表单、布局、反馈 |
-| 构建 | **Vite 5** | 开发服务器（默认 **5174**）、生产构建 |
-| 富文本 | **WangEditor 4** | 笔记编辑 |
-| 图表 | **ECharts 6** | 统计与欢迎页图表 |
-| Markdown | **Marked** + **isomorphic-dompurify** | 渲染与安全过滤 |
-| 文档处理 | **Mammoth** | Word 导入 |
-| 图表 / 导出 | **Mermaid**、**canvg**、**html-to-image** | 导图与导出相关能力 |
-| HTTP | **Axios** | API 请求（开发环境 `/api` 代理至后端） |
-| 测试 | **Vitest** + **happy-dom** | 单元测试 |
+| 技术 | 用途 |
+|------|------|
+| **Vue 3**（Composition API） | 视图与组件 |
+| **Vue Router 4** + **Pinia** | 路由与状态 |
+| **Element Plus** | 表单、布局、交互反馈 |
+| **Vite 5** | 构建与开发服务器（5174 端口） |
+| **WangEditor 4** | 富文本编辑 |
+| **ECharts 6** | 统计图表 |
+| **Marked** + **isomorphic-dompurify** | Markdown 渲染与 XSS 过滤 |
+| **Axios** | 前后端通信 |
+| **Mammoth** | Word 文档导入 |
 
 ### 后端
 
-| 类别 | 技术 | 用途 |
-|------|------|------|
-| 框架 | **FastAPI**、**Pydantic v2**、**Uvicorn** | 异步 API 服务 |
-| ORM | **SQLAlchemy 2.x** + **aiomysql** | 异步访问 MySQL |
-| 认证 | **python-jose**、**bcrypt** | JWT、密码哈希 |
-| AI 调用 | **openai**（AsyncOpenAI）+ **httpx** | 兼容 LM Studio / OpenAI API |
-| 缓存 | **Redis** | 最近笔记、JWT 黑名单（可选） |
-| 文档 | **python-docx** | Word 导出 |
-| HTML 处理 | **BeautifulSoup4**、**html2text** | 翻译前 HTML 转换 |
-| 加密 | **cryptography**（Fernet） | BYOK 密钥加密 |
-| 测试 | **pytest** | 接口与工具函数测试 |
-
-### 基础设施
-
-| 类别 | 技术 |
+| 技术 | 用途 |
 |------|------|
-| 数据库 | **MySQL 8.0** |
-| 缓存 | **Redis 7**（可选） |
-| CI | **GitHub Actions** |
+| **FastAPI** + **Pydantic v2** + **Uvicorn** | 异步 REST API 服务 |
+| **SQLAlchemy 2.x** + **aiomysql** | 异步 MySQL ORM |
+| **python-jose** + **bcrypt** | JWT 认证与密码哈希 |
+| **openai** (AsyncOpenAI) + **httpx** | LLM 推理客户端 |
+| **Redis** (redis-py 异步) | 缓存 + JWT 黑名单 + 限流 |
+| **python-docx** | Word 导出 |
+| **BeautifulSoup4** + **html2text** | HTML 预处理 |
+| **cryptography** (Fernet) | BYOK 密钥加密 |
+| **pytest** | 单元测试 |
 
-### AI 接入方式
+### 部署
 
-```
-浏览器 → FastAPI → openai.AsyncOpenAI → LM Studio / 其它 OpenAI 兼容端点
-                      ↑
-              用户 BYOK（个人中心，可选）
-```
-
-更完整的分层说明见 [`docs/architecture.md`](docs/architecture.md)、数据模型见 [`docs/er-diagram.md`](docs/er-diagram.md)。
+| 技术 | 用途 |
+|------|------|
+| **Docker** + **Docker Compose** | 容器化一键部署 |
+| **Nginx** | 前端托管 + 反向代理 + HTTPS |
+| **Certbot (Let's Encrypt)** | 免费 SSL 证书自动申请与续期 |
 
 ---
 
-## 项目结构
+## 📁 项目结构
 
 ```
 note-takingAssistant/
 ├── .github/workflows/ci.yml      # CI：前端测试/构建 + 后端 pytest
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/               # user, note, ai, public
-│   │   ├── core/                 # config, database, security, redis, field_crypto
-│   │   ├── crud/                 # 数据访问
-│   │   ├── models/               # Pydantic / ORM 模型
-│   │   ├── services/             # AI 生成/总结/翻译/对话、LLM 运行时
-│   │   └── utils/
-│   ├── tests/
-│   ├── main.py
+│   │   ├── api/v1/                # user, note, ai, public 路由
+│   │   ├── core/                  # config, database, security, redis, logger
+│   │   ├── crud/                  # 数据访问层
+│   │   ├── models/                # Pydantic 请求/响应 + SQLAlchemy ORM
+│   │   ├── services/              # AI 生成/总结/翻译/对话
+│   │   └── utils/                 # 文件上传校验、LLM 错误处理、URL 安全
+│   ├── main.py                    # FastAPI 入口
 │   ├── requirements.txt
-│   └── .env.example
+│   ├── .env.example
+│   └── tests/
 ├── frontend/
 │   ├── src/
-│   │   ├── api/                  # Axios 封装
-│   │   ├── components/           # 布局、页脚、图标、欢迎页模块
-│   │   ├── views/                  # auth, notes, ai, user, mindmap, help
+│   │   ├── api/                   # Axios 请求封装
+│   │   ├── components/            # 布局、图标、业务组件
+│   │   ├── views/                 # auth, notes, ai, user, mindmap
 │   │   ├── router/, store/, utils/
 │   │   └── App.vue
+│   ├── nginx.http.conf            # HTTP 模式配置（证书到位前）
+│   ├── nginx.https.conf           # HTTPS 模式配置（证书到位后自动切换）
+│   ├── entrypoint.sh              # Nginx 启动脚本（HTTP/HTTPS 自动切换）
 │   ├── vite.config.js
 │   └── package.json
-├── docs/                         # 架构图、ER 图等
-└── README.md
+├── docker-compose.yml             # ⭐ 生产部署核心文件
+├── .env.docker                    # 生产环境变量模板
+├── docs/                          # 架构图、ER 图等
+└── README.md                      # 就是本文件
 ```
 
 ---
 
-## 快速开始
+## 🚀 快速开始
 
-### 环境要求
+### 方式一：本地开发（推荐用于调试）
 
-| 依赖 | 版本建议 | 说明 |
-|------|----------|------|
-| Node.js | ≥ 18（推荐 20） | 前端 |
-| Python | ≥ 3.10 | 后端 |
-| MySQL | ≥ 8.0 | 主数据库 |
-| Redis | 可选 | 缓存与令牌黑名单 |
-| LM Studio 等 | — | OpenAI 兼容 API，`…/v1` 为基址 |
+**环境要求**：Node.js ≥ 18、Python ≥ 3.10、MySQL ≥ 8.0、Redis（可选）
 
-### 本地开发
+#### 1. 启动 LM Studio（或其它 OpenAI 兼容服务）
 
-**1. 配置 LM Studio（或其它兼容端）**
+```
+下载模型 → 启动 Local Server → 基址形如 http://127.0.0.1:1234/v1
+```
 
-- 加载模型并启动 **Local Server**
-- 若开启 API Token，需在 `.env` 配置 `OPENAI_API_KEY=<你的 Token>`
-- 设置 `LM_STUDIO_URL=http://127.0.0.1:1234/v1`（须含 `/v1`）
-- `LM_STUDIO_MODEL` 与 LM Studio 中模型 ID 一致
-
-**2. 后端**
+#### 2. 启动后端
 
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate   # Linux / macOS
+# Windows:   .venv\Scripts\activate
+# Linux/Mac: source .venv/bin/activate
+
 pip install -r requirements.txt
-copy .env.example .env          # 编辑 DB_*、SECRET_KEY、LM_STUDIO_* 等
-```
+copy .env.example .env      # 编辑 DB_*、SECRET_KEY、LM_STUDIO_* 等
 
-```sql
-CREATE DATABASE note_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
+# 创建数据库
+mysql -uroot -p -e "CREATE DATABASE note_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-```bash
+# 启动
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**3. 前端**
+#### 3. 启动前端
 
 ```bash
 cd frontend
 npm install
-copy .env.example .env          # VITE_API_BASE_URL 指向后端
+copy .env.example .env       # VITE_API_BASE_URL 指向后端
 npm run dev
 ```
 
 访问 http://localhost:5174
 
+### 方式二：Docker Compose（生产部署 ⭐ 推荐）
+
+#### 1. 服务器准备（Ubuntu 20.04+）
+
+```bash
+# 安装 Docker（官方脚本）
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+```
+
+#### 2. 拉取代码并构建前端
+
+```bash
+git clone <你的仓库地址> note-app
+cd note-app
+
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+#### 3. 生成随机密钥
+
+```bash
+cp .env.docker .env
+# ⚠️ 把 .env 里的 DB_PASSWORD / REDIS_PASSWORD / SECRET_KEY 都换成随机长字符串
+# 生成建议：
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+nano .env
+```
+
+#### 4. 一键启动
+
+```bash
+docker compose up -d --build
+
+# 等 2-3 分钟，检查状态
+docker compose ps
+# 全部状态应为 Up / Up (healthy)
+```
+
+#### 5. 申请免费 HTTPS 证书（替换邮箱为你的）
+
+```bash
+docker compose run --rm certbot certonly --webroot \
+    -w /var/www/certbot \
+    -d momo.makeup -d www.momo.makeup \
+    --email your@email.com --agree-tos --no-eff-email
+
+# 证书到位后重启前端容器，自动从 HTTP 切换到 HTTPS
+docker compose restart frontend
+```
+
+#### 6. 验证
+
+```bash
+# 浏览器打开
+https://momo.makeup
+# 应有 🔒 图标
+```
+
+> 💡 **证书自动续期**：certbot 容器每 12 小时检查一次，到期前自动续期，无需手动干预。
+
 ---
 
-## 主要页面
+## 📄 API 文档
 
-| 路径 | 说明 |
+后端启动后访问：
+
+- **Swagger UI**：http://localhost:8000/docs
+- **Redoc**：http://localhost:8000/redoc
+
+**主要接口一览**
+
+| 模块 | 接口 |
 |------|------|
-| `/` | 欢迎页（未登录）/ 首页（已登录，含 AI 助手） |
-| `/login`、`/register` | 登录、注册 |
-| `/notes`、`/notes/edit/:id` | 笔记列表与编辑 |
-| `/history` | 历史笔记 |
-| `/ai/generate`、`/ai/summarize`、`/ai/translate` | AI 生成 / 总结 / 翻译 |
-| `/mindmap` | 思维导图 |
-| `/user` | 个人中心（含 BYOK） |
-| `/manual` | 使用手册 |
+| 👤 用户 | `POST /api/v1/user/register` · `POST /api/v1/user/login` · `GET /api/v1/user/me` |
+| 📝 笔记 | `POST /api/v1/note/` · `GET /api/v1/note/` · `GET /api/v1/note/{id}` · `PUT /api/v1/note/{id}` · `DELETE /api/v1/note/{id}` |
+| 🤖 AI | `POST /api/v1/ai/generate-note` · `POST /api/v1/ai/summarize-note` · `POST /api/v1/ai/translate-note-stream` · `POST /api/v1/ai/chat-stream` |
+| 🌐 公开统计 | `GET /api/v1/public/stats` · `GET /api/v1/public/daily-registrations` |
 
 ---
 
-## 开发命令
+## 🌐 页面路由
+
+| 路径 | 页面 | 登录要求 |
+|------|------|---------|
+| `/` | 欢迎页 / 首页（AI 助手） | 未登录/已登录 |
+| `/login`、`/register` | 登录 / 注册 | 否 |
+| `/notes`、`/notes/edit/:id` | 笔记列表 / 编辑 | 是 |
+| `/history` | 历史笔记 | 是 |
+| `/ai/generate`、`/ai/summarize`、`/ai/translate` | AI 创作工具 | 是 |
+| `/mindmap` | 思维导图 | 是 |
+| `/user` | 个人中心（BYOK 配置） | 是 |
+| `/manual` | 使用手册 | 否 |
+
+---
+
+## 🛡️ 安全设计要点
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                      安全分层防护                            │
+├────────────────────────────────────────────────────────────┤
+│  ① 网络层 — Nginx HTTPS + HSTS + 同源代理 / CORS 收紧      │
+│  ② 认证层 — JWT 2h 短有效期 + Token Gen 代数 + 登出黑名单   │
+│  ③ 速率层 — Redis 滑动窗口限流：注册/登录/AI 分级控制       │
+│  ④ 输入层 — 用户名正则 + 密码强度 + HTML DOMPurify 过滤    │
+│  ⑤ 输出层 — SSRF 防护（协议/IP/端口三重校验 + DNS 解析）   │
+│  ⑥ 存储层 — bcrypt 密码哈希 + BYOK Fernet 对称加密          │
+│  ⑦ 文件层 — 图片魔数校验 + 扩展名白名单 + 随机文件名         │
+│  ⑧ 监控层 — 结构化日志 + 异常告警 + 数据库/Redis 健康检查   │
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ❓ 常见问题
+
+**Q1：AI 报错 Connection error / 无法对话？**
+- 确认 LM Studio Local Server 已启动，且 `LM_STUDIO_URL` 端口正确
+- 若有 API Token，在 `backend/.env` 设置 `OPENAI_API_KEY`，或在个人中心填写
+- 自测：`curl http://127.0.0.1:1234/v1/models -H "Authorization: Bearer <token>"`
+
+**Q2：AI 响应很慢或超时？**
+- 换更小的模型；或增大 `LLM_HTTP_READ_TIMEOUT_SECONDS`
+
+**Q3：Redis 连接失败？**
+- Redis 为可选组件，不启动时核心功能仍可用，缓存自动降级
+
+**Q4：BYOK 基址怎么填？**
+- `base_url` 应止于 `/v1`（例如 `https://api.openai.com/v1`），不要填到 `/v1/models`
+
+**Q5：前端接口 404 / 跨域？**
+- 检查 `VITE_API_BASE_URL` 与 Vite 代理配置是否与后端端口一致
+
+---
+
+## 📦 开发命令速查
 
 ```bash
 # 后端
@@ -246,13 +333,20 @@ cd backend && pytest -q
 
 # 前端
 cd frontend && npm run dev
-cd frontend && npm run build && npm run preview
+cd frontend && npm run build
 cd frontend && npm run test
+
+# 生产
+docker compose up -d --build
+docker compose logs -f backend        # 查看后端日志
+docker compose logs -f frontend       # 查看前端日志
+docker compose restart                # 重启所有服务
+docker compose down                   # 停止并移除容器（保留数据）
 ```
 
 ---
 
-## 更多文档
+## 📚 更多文档
 
 | 文档 | 内容 |
 |------|------|
@@ -264,36 +358,24 @@ cd frontend && npm run test
 
 ---
 
-## 常见问题
+## 🤝 贡献
 
-**AI 报错 `Connection error` 或无法对话**
-
-- 确认 LM Studio（或其它端）已启动 Local Server，且 `LM_STUDIO_URL` 端口正确。
-- 若 LM Studio 要求 API Token，在 `backend/.env` 设置 `OPENAI_API_KEY`，或在个人中心填写 API Key。
-- 用 PowerShell 自测：`Invoke-RestMethod http://127.0.0.1:1234/v1/models -Headers @{ Authorization = "Bearer 你的token" }`
-
-**AI 很慢或超时**
-
-- 换更小模型；增大 `LLM_HTTP_READ_TIMEOUT_SECONDS`（见 `backend/.env.example`）。
-
-**Redis 连接失败**
-
-- 可暂不启动 Redis，核心功能仍可用；最近笔记缓存会降级。
-
-**BYOK / 基址填写**
-
-- OpenAI 兼容 `base_url` 应止于 `/v1`，不要填 `/v1/models`；模型名须与推理端一致。
-
-**前端接口 404 / 跨域**
-
-- 检查 `VITE_API_BASE_URL` 与 Vite 代理（`vite.config.js`）是否与后端端口一致。
+欢迎提交 Issue / Pull Request！
 
 ---
 
-## 贡献与许可
+## 📄 License
 
-欢迎提交 Issue / Pull Request。若无另行声明，可按 **MIT** 思路使用；若仓库包含 `LICENSE` 文件，以文件为准。
+**MIT License**
 
 ---
 
-**最后更新**：2026-06-02
+<div align="center">
+
+**🌟 如果你觉得这个项目还不错，点个 Star 支持一下～**
+
+<br>
+
+**v1.0.0** · 最后更新：2026-06-20
+
+</div>

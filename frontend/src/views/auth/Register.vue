@@ -10,17 +10,37 @@
         </div>
 
         <el-form :model="form" ref="formRef" label-width="80px">
-          <el-form-item label="用户名" prop="username" :rules="[{ required: true, message: '请输入用户名' }]">
-            <el-input v-model="form.username" placeholder="请输入用户名" />
+          <el-form-item label="用户名" prop="username" :rules="[
+            { required: true, message: '请输入用户名' },
+            { min: 3, max: 32, message: '用户名长度为3-32个字符' },
+            { pattern: /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/, message: '用户名只能包含字母、数字、下划线、短横线，且必须以字母或数字开头' }
+          ]">
+            <el-input v-model="form.username" placeholder="请输入用户名（3-32位，字母数字开头）" />
           </el-form-item>
           <el-form-item label="邮箱" prop="email" :rules="[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '请输入正确的邮箱格式' }]">
             <el-input v-model="form.email" placeholder="请输入邮箱" />
           </el-form-item>
-          <el-form-item label="密码" prop="password" :rules="[{ required: true, message: '请输入密码' }, { min: 6, message: '密码至少6位' }]">
-            <el-input v-model="form.password" type="password" placeholder="请输入密码" show-password />
+          <el-form-item label="密码" prop="password" :rules="[
+            { required: true, message: '请输入密码' },
+            { min: 8, message: '密码至少8位' },
+            { pattern: /^(?=.*[A-Za-z])(?=.*\d)/, message: '密码必须同时包含字母和数字' }
+          ]">
+            <el-input v-model="form.password" type="password" placeholder="请输入密码（至少8位，含字母和数字）" show-password />
           </el-form-item>
-          <el-form-item label="确认密码" prop="confirmPassword" :rules="[{ required: true, message: '请确认密码' }]">
-            <el-input v-model="form.confirmPassword" type="password" placeholder="请确认密码" show-password />
+          <el-form-item label="确认密码" prop="confirmPassword" :rules="[
+            { required: true, message: '请确认密码' },
+            {
+              validator: (rule, value, callback) => {
+                if (value !== form.password) {
+                  callback(new Error('两次输入的密码不一致'))
+                } else {
+                  callback()
+                }
+              },
+              trigger: 'blur'
+            }
+          ]">
+            <el-input v-model="form.confirmPassword" type="password" placeholder="请再次输入密码" show-password />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleRegister" :loading="loading" class="register-btn">
@@ -61,8 +81,8 @@ const form = ref({
 })
 
 async function handleRegister() {
-  if (form.value.password !== form.value.confirmPassword) {
-    ElMessage.warning('两次输入的密码不一致')
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) {
     return
   }
   loading.value = true
@@ -79,6 +99,8 @@ async function handleRegister() {
       const detail = error.response.data?.detail
       if (detail && detail.includes('用户名')) {
         ElMessage.error('用户名已存在，请更换用户名')
+      } else if (detail && detail.includes('邮箱')) {
+        ElMessage.error('该邮箱已被注册')
       } else {
         ElMessage.error(detail || '注册失败，请检查输入信息')
       }

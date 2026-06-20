@@ -6,29 +6,87 @@ from app.crud import user as crud_user
 from app.core.security import create_access_token, verify_password, get_password_hash, get_current_user, decode_token_without_verify
 from app.core.field_crypto import SecretCryptoError, encrypt_secret, decrypt_secret, api_key_last_four
 from app.core.redis_client import blacklist_token
-from app.utils.openai_compatible_url import normalize_openai_compatible_base_url
+from app.core.rate_limit import rate_limit_anon, rate_limit_user
+from app.core.logger import app_logger as logger
+from app.utils.openai_compatible_url import (
+    normalize_openai_compatible_base_url,
+    assert_safe_llm_url,
+    UnsafeLlmUrlError,
+)
 from datetime import timedelta, timezone, datetime
 from app.core.config import settings
 from pydantic import BaseModel
 import os
+import re
 import uuid
 from pathlib import Path
 
 router = APIRouter()
 
 
+# ====== 输入校验工具 ======
+_USERNAME_RE = re.compile(r"^[a-zA-Z0-9_][a-zA-Z0-9_\-]{2,31}$")
+
+
+def _validate_username(username: str) -> None:
+    """用户名：3-32 字符，只允许字母/数字/下划线/短横线，字母数字开头。"""
+    if not username or len(username) < 3 or len(username) > 32:
+        raise HTTPException(status_code=400, detail="用户名长度必须在 3-32 之间")
+    if not _USERNAME_RE.match(username):
+        raise HTTPException(
+            status_code=400,
+            detail="用户名只能包含字母、数字、下划线、短横线，且必须以字母或数字开头",
+        )
+
+
+def _validate_password(password: str) -> None:
+    """密码：至少 8 位，同时包含字母与数字。"""
+    if not password or len(password) < 8:
+        raise HTTPException(status_code=400, detail="密码至少需要 8 个字符")
+    if len(password) > 128:
+        raise HTTPException(status_code=400, detail="密码过长")
+    if not re.search(r"[A-Za-z]", password) or not re.search(r"[0-9]", password):
+        raise HTTPException(status_code=400, detail="密码必须同时包含字母和数字")
+
+
+def _validate_email(email: str | None) -> None:
+    if not email:
+        return
+    # 简单 RFC 5322 子集
+    email_re = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
+    if not email_re.match(email):
+        raise HTTPException(status_code=400, detail="邮箱格式不正确")
+
+
 @router.post("/register", summary="用户注册", response_model=UserResponse)
-async def register(user: UserCreate, db: AsyncSession = Depends(get_async_db)):
+async def register(
+    user: UserCreate,
+    db: AsyncSession = Depends(get_async_db),
+    _: None = Depends(rate_limit_anon("register")),
+):
     """用户注册接口"""
+    _validate_username(user.username)
+    _validate_password(user.password)
+    _validate_email(user.email)
+
     db_user = await crud_user.get_user_by_username(db, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="用户名已存在")
+
+    if user.email:
+        db_user_by_email = await crud_user.get_user_by_email(db, email=user.email)
+        if db_user_by_email:
+            raise HTTPException(status_code=400, detail="该邮箱已被注册")
 
     return await crud_user.create_user(db=db, username=user.username, email=user.email, password=user.password)
 
 
 @router.post("/login", summary="用户登录", response_model=TokenWithUser)
-async def login(user: UserLogin, db: AsyncSession = Depends(get_async_db)):
+async def login(
+    user: UserLogin,
+    db: AsyncSession = Depends(get_async_db),
+    _: None = Depends(rate_limit_anon("login")),
+):
     """用户登录接口"""
     db_user = await crud_user.authenticate_user(db, username=user.username, password=user.password)
     if not db_user:
@@ -39,8 +97,11 @@ async def login(user: UserLogin, db: AsyncSession = Depends(get_async_db)):
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    current_tgen = getattr(db_user, "token_gen", 0) or 0
     access_token = create_access_token(
-        data={"sub": db_user.username}, expires_delta=access_token_expires
+        data={"sub": db_user.username},
+        expires_delta=access_token_expires,
+        token_gen=current_tgen,
     )
 
     return {
@@ -57,36 +118,36 @@ async def login(user: UserLogin, db: AsyncSession = Depends(get_async_db)):
 
 
 @router.post("/logout", summary="用户退出登录（撤销 JWT 令牌）")
-async def logout(request: Request):
+async def logout(
+    request: Request,
+    _: None = Depends(rate_limit_anon("login")),
+):
     """
-    退出登录：将当前 JWT 令牌加入 Redis 黑名单。
+    退出登录：将当前 JWT 令牌的 jti 加入 Redis 黑名单。
     令牌在 Redis 中保留至其自然过期时间，到期自动清理。
-
-    调用方式：前端在 Authorization header 中携带 Bearer token，
-    就像调用任何需要认证的接口一样。
     """
+    from app.core.security import get_jti_from_token, get_token_exp_seconds
+
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="缺少认证令牌")
 
     token = auth_header[7:]  # 去掉 "Bearer " 前缀
 
-    # 解码令牌获取过期时间（不验证是否过期，我们只关心 exp 字段）
-    payload = decode_token_without_verify(token)
-    if not payload or "exp" not in payload:
-        raise HTTPException(status_code=400, detail="无效的令牌格式")
+    jti = get_jti_from_token(token)
+    remaining = get_token_exp_seconds(token)
 
-    # 计算令牌剩余有效秒数
-    exp_timestamp = payload["exp"]
-    now_timestamp = datetime.now(timezone.utc).timestamp()
-    remaining_seconds = int(exp_timestamp - now_timestamp)
-
-    if remaining_seconds <= 0:
-        # 令牌本来就过期了，无所谓
+    if remaining is None or remaining <= 0:
+        # 令牌本来就过期或格式异常，直接返回成功
         return {"message": "退出成功"}
 
-    # 加入 Redis 黑名单，自动过期
-    success = blacklist_token(token, remaining_seconds)
+    # 用 jti 作 key 加入黑名单（比整串 token 短得多，且稳定）
+    if jti:
+        success = blacklist_token(jti, remaining)
+    else:
+        # 老 token（无 jti）降级为整串 key
+        success = blacklist_token(token, remaining)
+
     if not success:
         raise HTTPException(status_code=503, detail="服务暂时不可用，请稍后重试")
 
@@ -94,7 +155,11 @@ async def logout(request: Request):
 
 
 @router.get("/me", summary="获取当前用户信息", response_model=UserResponse)
-async def get_current_user_info(current_user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_async_db)):
+async def get_current_user_info(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+    _: None = Depends(rate_limit_user("notes")),
+):
     """获取当前用户信息（需要JWT认证）"""
     db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
     if not db_user:
@@ -118,6 +183,7 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user), 
 async def get_llm_settings(
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user),
+    _: None = Depends(rate_limit_user("notes")),
 ):
     db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
     if not db_user:
@@ -133,10 +199,16 @@ async def get_llm_settings(
                 status_code=503,
                 detail="无法解密已保存的 API 密钥，请确认服务端加密配置（ENCRYPTION_KEY 或与保存时一致的 SECRET_KEY）未改动",
             ) from None
+    # 再次校验存储的 base_url：防止通过其他渠道写入不安全地址
+    normalized_url = None
+    if db_user.llm_base_url:
+        try:
+            assert_safe_llm_url(db_user.llm_base_url)
+            normalized_url = normalize_openai_compatible_base_url(db_user.llm_base_url)
+        except UnsafeLlmUrlError:
+            normalized_url = None  # 不安全则不返回，让用户重新填写
     return LLMSettingsResponse(
-        base_url=normalize_openai_compatible_base_url(db_user.llm_base_url)
-        if db_user.llm_base_url
-        else None,
+        base_url=normalized_url,
         llm_model=db_user.llm_model,
         api_key_last4=last4,
         has_stored_api_key=has_key,
@@ -153,12 +225,18 @@ async def put_llm_settings(
     body: LLMSettingsPut,
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user),
+    _: None = Depends(rate_limit_user("notes")),
 ):
     db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
     stripped_base = body.base_url.strip()
+    if stripped_base:
+        try:
+            assert_safe_llm_url(stripped_base)
+        except UnsafeLlmUrlError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from None
     db_user.llm_base_url = (
         normalize_openai_compatible_base_url(stripped_base) if stripped_base else None
     )
@@ -197,78 +275,96 @@ async def put_llm_settings(
 
 
 @router.put("/password", summary="修改密码")
-async def change_password(req: ChangePasswordRequest, db: AsyncSession = Depends(get_async_db), current_user: dict = Depends(get_current_user)):
-    """修改密码接口"""
+async def change_password(
+    req: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(rate_limit_user("notes")),
+):
+    """修改密码接口。改密后所有历史 token 失效（通过 token_gen 递增 + Redis 最小值同步）。"""
+    from app.core.redis_client import redis_client
+    from app.core.config import settings
+
     if req.newPassword != req.confirmPassword:
         raise HTTPException(status_code=400, detail="两次输入的密码不一致")
-    
-    # 从 JWT token 中获取用户信息
+
+    _validate_password(req.newPassword)
+
     db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
-    
+
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
+
     if not verify_password(req.currentPassword, db_user.hashed_password):
         raise HTTPException(status_code=400, detail="当前密码不正确")
-    
+
+    # 更新密码哈希
     db_user.hashed_password = get_password_hash(req.newPassword)
+    # 递增令牌代数：所有旧 token 的 tgen 都小于新值
+    db_user.token_gen = (getattr(db_user, "token_gen", 0) or 0) + 1
     await db.commit()
     await db.refresh(db_user)
-    
-    return {"message": "密码修改成功"}
+
+    # 将新的最小有效 tgen 同步到 Redis，让所有已签发的旧 token 在认证期立即失效
+    # TTL 设置为 2 倍的 token 有效期，兜底极端情况下还在 token 有效期内的请求
+    ttl = int(settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60 * 2)
+    try:
+        if redis_client.client:
+            redis_client.client.setex(
+                f"tgen_min:{db_user.username}", ttl, str(db_user.token_gen)
+            )
+    except Exception as e:
+        logger.info(f"⚠️ 同步 tgen_min 失败（不阻断改密成功）: {e}")
+
+    return {"message": "密码修改成功，所有旧登录会话已失效"}
 
 
 @router.post("/avatar", summary="上传头像")
 async def upload_avatar(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_async_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(rate_limit_user("notes")),
 ):
-    """上传用户头像"""
-    # 验证文件类型
-    allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
-    if file.content_type not in allowed_types:
-        raise HTTPException(status_code=400, detail="只支持图片格式（JPG、PNG、GIF、WebP）")
-    
-    # 验证文件大小（限制5MB）
-    file_size = 0
+    """上传用户头像（做扩展名 + 魔数双重校验）。"""
+    from app.utils.file_upload import validate_image_bytes, safe_image_filename
+
     content = await file.read()
-    file_size = len(content)
-    if file_size > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="文件大小不能超过5MB")
-    
+
+    # 魔数 + 扩展名校验
+    ok, ext, err = validate_image_bytes(content, file.filename or "")
+    if not ok:
+        raise HTTPException(status_code=400, detail=err)
+
     # 获取当前用户信息
     db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
-    # 如果用户已有头像，先删除旧文件
+
+    # 如果用户已有头像，先删除旧文件（路径仅保留相对部分，防止 ../ 遍历）
     if db_user.avatar_url:
         try:
-            # 从URL中提取文件路径
-            old_avatar_path = db_user.avatar_url.lstrip('/')
-            old_file = Path(old_avatar_path)
-            if old_file.exists():
-                old_file.unlink()
-                print(f"已删除旧头像: {old_avatar_path}")
+            old_avatar_path = db_user.avatar_url.lstrip("/")
+            # 只允许删除 uploads/avatars/ 下的文件，避免路径遍历到系统其它位置
+            normalized = os.path.normpath(old_avatar_path)
+            if normalized.startswith("uploads" + os.sep + "avatars"):
+                old_file = Path(normalized)
+                if old_file.exists():
+                    old_file.unlink()
         except Exception as e:
-            print(f"删除旧头像失败: {e}")
-            # 不阻断上传流程，继续执行
-    
-    # 生成唯一文件名
-    file_extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
-    
+            logger.info(f"删除旧头像失败: {e}")  # 不阻断上传
+
     upload_dir = Path("uploads/avatars")
     upload_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 保存文件
-    file_path = upload_dir / unique_filename
+
+    # 安全化文件名：使用随机 hex + 标准扩展名
+    safe_name = safe_image_filename(file.filename or f"avatar{ext}", ext)
+    file_path = upload_dir / safe_name
     with open(file_path, "wb") as f:
         f.write(content)
-    
-    # 生成访问URL
-    avatar_url = f"/uploads/avatars/{unique_filename}"
+
+    # 生成访问 URL
+    avatar_url = f"/uploads/avatars/{safe_name}"
     
     # 更新数据库
     db_user.avatar_url = avatar_url
@@ -281,7 +377,8 @@ async def upload_avatar(
 @router.get("/stats", summary="获取用户统计信息")
 async def get_user_stats(
     db: AsyncSession = Depends(get_async_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(rate_limit_user("notes")),
 ):
     """获取用户统计信息：笔记数量、AI使用次数、活跃天数"""
     from sqlalchemy import select, func, distinct

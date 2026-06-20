@@ -6,6 +6,7 @@ import redis
 from app.core.config import settings
 import json
 from typing import Optional, List
+from app.core.logger import app_logger as logger
 
 
 class RedisClient:
@@ -42,8 +43,8 @@ class RedisClient:
             # 测试连接
             self._client.ping()
         except Exception as e:
-            print(f"⚠️ Redis 连接失败: {e}")
-            print("💡 提示：请确保已安装并启动 Redis 服务")
+            logger.info(f"⚠️ Redis 连接失败: {e}")
+            logger.info("💡 提示：请确保已安装并启动 Redis 服务")
             self._client = None
     
     @property
@@ -80,7 +81,7 @@ def cache_recent_note(user_id: int, note_data: dict):
     """
     client = redis_client.client
     if not client:
-        print("⚠️ Redis 不可用，跳过缓存")
+        logger.info("⚠️ Redis 不可用，跳过缓存")
         return
     
     try:
@@ -114,7 +115,7 @@ def cache_recent_note(user_id: int, note_data: dict):
         client.expire(key, 7 * 24 * 60 * 60)
 
     except Exception as e:
-        print(f"❌ 缓存笔记失败: {e}")
+        logger.info(f"❌ 缓存笔记失败: {e}")
 
 
 def remove_recent_note_by_id(user_id: int, note_id: int) -> None:
@@ -146,7 +147,7 @@ def remove_recent_note_by_id(user_id: int, note_id: int) -> None:
             pipe.expire(key, 7 * 24 * 60 * 60)
         pipe.execute()
     except Exception as e:
-        print(f"❌ 从最近笔记移除 id={note_id} 失败: {e}")
+        logger.info(f"❌ 从最近笔记移除 id={note_id} 失败: {e}")
 
 
 def batch_cache_recent_notes(user_id: int, notes_data: List[dict]):
@@ -160,7 +161,7 @@ def batch_cache_recent_notes(user_id: int, notes_data: List[dict]):
     """
     client = redis_client.client
     if not client:
-        print("⚠️ Redis 不可用，跳过缓存")
+        logger.info("⚠️ Redis 不可用，跳过缓存")
         return
     
     try:
@@ -183,7 +184,7 @@ def batch_cache_recent_notes(user_id: int, notes_data: List[dict]):
         client.expire(key, 7 * 24 * 60 * 60)
 
     except Exception as e:
-        print(f"❌ 批量缓存笔记失败: {e}")
+        logger.info(f"❌ 批量缓存笔记失败: {e}")
 
 
 def get_recent_notes(user_id: int, limit: int = 20) -> List[dict]:
@@ -213,12 +214,12 @@ def get_recent_notes(user_id: int, limit: int = 20) -> List[dict]:
                 note = json.loads(note_json)
                 notes.append(note)
             except json.JSONDecodeError as e:
-                print(f"⚠️ 解析笔记数据失败: {e}")
+                logger.info(f"⚠️ 解析笔记数据失败: {e}")
                 continue
         
         return notes
     except Exception as e:
-        print(f"❌ 获取最近笔记失败: {e}")
+        logger.info(f"❌ 获取最近笔记失败: {e}")
         return []
 
 
@@ -237,7 +238,7 @@ def clear_recent_notes(user_id: int):
         key = f"recent_notes:{user_id}"
         client.delete(key)
     except Exception as e:
-        print(f"❌ 清除缓存失败: {e}")
+        logger.info(f"❌ 清除缓存失败: {e}")
 
 
 # ═══════════════════════════════════════════
@@ -247,48 +248,105 @@ def clear_recent_notes(user_id: int):
 BLACKLIST_PREFIX = "token_blacklist:"
 
 
-def blacklist_token(token: str, ttl_seconds: int) -> bool:
+def blacklist_token(jti_or_token: str, ttl_seconds: int) -> bool:
     """
-    将 JWT 令牌加入 Redis 黑名单。
-    令牌在 ttl_seconds 秒后自动从 Redis 删除（与令牌过期时间对齐），
-    所以黑名单不会无限膨胀。
-
-    Args:
-        token:  完整的 JWT 令牌字符串
-        ttl_seconds: 黑名单保留秒数（应设为令牌剩余有效时间）
-
-    Returns:
-        bool: 是否成功加入黑名单
+    将 jti 加入 Redis 黑名单（ttl_seconds 应等于 token 剩余有效期）。
+    入参优先使用 jti（短而稳定），但也兼容老调用直接传入原 token 字符串。
     """
     client = redis_client.client
     if not client:
         return False
     try:
-        key = f"{BLACKLIST_PREFIX}{token}"
-        client.setex(key, ttl_seconds, "1")
+        # 取 jti 作为 key：如果入参包含 ':'，说明已是 jti；否则按旧 token 做一次 hash 降级
+        if ":" in jti_or_token:
+            key = f"{BLACKLIST_PREFIX}{jti_or_token}"
+        else:
+            key = f"{BLACKLIST_PREFIX}{hash(jti_or_token)}"
+        client.setex(key, max(ttl_seconds, 1), "1")
         return True
     except Exception as e:
-        print(f"❌ 令牌加入黑名单失败: {e}")
+        logger.info(f"❌ 令牌加入黑名单失败: {e}")
         return False
 
 
 def is_token_blacklisted(token: str) -> bool:
     """
-    检查令牌是否在黑名单中。
-
-    Args:
-        token: 完整的 JWT 令牌字符串
-
-    Returns:
-        bool: True = 已被撤销，不应放行
+    检查 jti 是否在 Redis 黑名单中。
+    安全策略：Redis 不可用时返回 True（拒绝），避免在 Redis 重启窗口期绕过撤销。
     """
     client = redis_client.client
     if not client:
-        # Redis 不可用时，降级为不拦截（保持服务可用）
-        return False
+        # 降级为拒绝：Redis 挂了就不能确认 token 没被撤销，保守拒绝
+        return True
     try:
-        key = f"{BLACKLIST_PREFIX}{token}"
+        # 从 token 提取 jti（本地 decode，不依赖网络）
+        from app.core.security import get_jti_from_token
+        jti = get_jti_from_token(token)
+        if not jti:
+            # 如果 token 根本没有 jti（老 token 格式），降级为用 hash(token) 作 key
+            key = f"{BLACKLIST_PREFIX}{hash(token)}"
+        else:
+            key = f"{BLACKLIST_PREFIX}{jti}"
         return client.exists(key) > 0
     except Exception as e:
-        print(f"⚠️ 黑名单查询失败，降级放行: {e}")
-        return False
+        logger.info(f"⚠️ 黑名单查询失败（保守拒绝）: {e}")
+        return True
+
+
+def _rate_limit_bump(key: str, window_seconds: int) -> int | None:
+    """
+    速率限制原语：对 key 做 INCR，并在首次写入时设置 TTL=window_seconds。
+    返回当前窗口内的累计计数；Redis 不可用时返回 None。
+
+    注意：这是一个「近似滑动窗口」——在 TTL 到期前计数累加，到期后自动归零。
+    足够防御暴力破解与高频滥用，实现成本远低于精确滑动窗口。
+    """
+    client = redis_client.client
+    if not client:
+        return None
+    try:
+        # 先 INCR，若返回 1 说明是 key 新建 → 需要设置 TTL
+        current = client.incr(key)
+        if current == 1:
+            client.expire(key, window_seconds)
+        return int(current)
+    except Exception as e:
+        logger.info(f"⚠️ 速率限制计数失败（降级放行）: {e}")
+        return None
+
+
+# ═══════════════════════════════════════════
+# 异步安全包装：在线程池中执行同步 Redis 调用，避免阻塞事件循环
+# ═══════════════════════════════════════════
+
+import asyncio as _asyncio
+
+
+async def _run_in_pool(func, *args):
+    """在默认线程池中运行同步函数，返回其结果，失败返回 None。"""
+    loop = _asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, func, *args)
+    except Exception as e:
+        logger.info(f"⚠️ Redis 线程池调用失败: {e}")
+        return None
+
+
+async def cache_recent_note_async(user_id: int, note_data: dict) -> None:
+    await _run_in_pool(cache_recent_note, user_id, note_data)
+
+
+async def get_recent_notes_async(user_id: int, limit: int = 20) -> list:
+    return (await _run_in_pool(redis_get_recent_notes, user_id, limit)) or []
+
+
+async def batch_cache_recent_notes_async(user_id: int, notes_data: list) -> None:
+    await _run_in_pool(batch_cache_recent_notes, user_id, notes_data)
+
+
+async def clear_recent_notes_async(user_id: int) -> None:
+    await _run_in_pool(clear_recent_notes, user_id)
+
+
+async def remove_recent_note_by_id_async(user_id: int, note_id: int) -> None:
+    await _run_in_pool(remove_recent_note_by_id, user_id, note_id)

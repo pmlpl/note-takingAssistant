@@ -9,6 +9,7 @@ from app.services import (
 )
 from app.core.field_crypto import SecretCryptoError
 from app.core.security import get_current_user
+from app.core.rate_limit import rate_limit_user
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_db
 from app.crud import user as crud_user
@@ -22,12 +23,16 @@ from app.models.ai import (
 
 router = APIRouter()
 
+# 共享依赖：所有 AI 接口都用同一 rate_limit_user("ai") 策略
+_ai_rate_limit = Depends(rate_limit_user("ai"))
+
 
 @router.post("/generate-note", summary="AI生成笔记")
 async def generate_note_endpoint(
     req: GenerateNoteRequest,
     db: AsyncSession = Depends(get_async_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
 ):
     """AI生成笔记接口，支持参考笔记和图片"""
     try:
@@ -66,6 +71,7 @@ async def generate_note_stream_endpoint(
     req: GenerateNoteRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
 ):
     """流式生成笔记：响应体为 Markdown 纯文本增量，与翻译流式接口用法一致。"""
     try:
@@ -98,7 +104,8 @@ async def generate_note_stream_endpoint(
 async def summarize_note_endpoint(
     req: SummarizeNoteRequest,
     db: AsyncSession = Depends(get_async_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
 ):
     """AI总结笔记接口，返回内容总结、优缺点和建议"""
     try:
@@ -126,6 +133,7 @@ async def translate_note_stream_endpoint(
     req: TranslateNoteRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
 ):
     """流式翻译笔记：HTML/富文本会先转为 Markdown 再翻译，响应体为纯文本流。"""
     try:
@@ -158,7 +166,8 @@ async def translate_note_stream_endpoint(
 async def chat_endpoint(
     req: ChatRequest,
     db: AsyncSession = Depends(get_async_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
 ):
     """AI 对话接口，支持上下文聊天"""
     try:
@@ -186,6 +195,7 @@ async def chat_stream_endpoint(
     req: ChatRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
 ):
     """流式对话：响应体为纯文本增量（assistant 全文），与翻译/生成笔记流式用法一致。"""
     try:

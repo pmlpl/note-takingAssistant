@@ -9,6 +9,7 @@ from app.models.user import UserDB
 from app.services.llm_runtime import openai_client_and_model_for_user
 from app.utils.llm_errors import format_llm_error
 from .prompts import NOTE_ANALYSIS_SYSTEM_PROMPT
+from app.core.logger import app_logger as logger
 
 
 async def analyze_note(content: str, *, db_user: UserDB) -> Dict[str, Any]:
@@ -53,8 +54,8 @@ async def analyze_note(content: str, *, db_user: UserDB) -> Dict[str, Any]:
         try:
             result = json.loads(result_text)
         except json.JSONDecodeError as e:
-            print(f"JSON 解析失败，原始内容: {result_text[:200]}")
-            print(f"错误信息: {str(e)}")
+            logger.info(f"JSON 解析失败，原始内容: {result_text[:200]}")
+            logger.info(f"错误信息: {str(e)}")
             return {
                 "summary": "AI 分析完成，但返回格式有误",
                 "strengths": ["笔记结构清晰", "内容较为完整"],

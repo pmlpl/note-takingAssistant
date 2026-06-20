@@ -1,4 +1,4 @@
-﻿<template>
+<template>
     <div class="user-center-container">
       <div class="user-center-toolbar">
         <el-button size="small" :loading="profileLoading || statsLoading || llmLoading" @click="reloadAll">
@@ -319,7 +319,7 @@
                 <el-input
                   v-model="passwordForm.newPassword"
                   type="password"
-                  placeholder="请输入新密码（至少6位）"
+                  placeholder="请输入新密码（至少8位，含字母和数字）"
                   show-password
                   clearable
                 />
@@ -503,8 +503,8 @@ const passwordStrength = computed(() => {
     return { score: 0, label: '', color: '#909399' }
   }
   let score = 0
-  if (p.length >= 6) score += 20
-  if (p.length >= 10) score += 15
+  if (p.length >= 8) score += 20
+  if (p.length >= 12) score += 15
   if (/[a-z]/.test(p)) score += 15
   if (/[A-Z]/.test(p)) score += 15
   if (/\d/.test(p)) score += 15
@@ -712,8 +712,12 @@ async function changePassword() {
     ElMessage.warning('两次输入的密码不一致')
     return
   }
-  if (passwordForm.value.newPassword.length < 6) {
-    ElMessage.warning('密码长度至少为6位')
+  if (passwordForm.value.newPassword.length < 8) {
+    ElMessage.warning('密码长度至少为8位')
+    return
+  }
+  if (!/[A-Za-z]/.test(passwordForm.value.newPassword) || !/\d/.test(passwordForm.value.newPassword)) {
+    ElMessage.warning('密码必须同时包含字母和数字')
     return
   }
 

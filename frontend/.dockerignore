@@ -1,0 +1,23 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# IDE
+.idea
+.vscode
+
+# Git
+.git
+
+# Environment
+.env
+.env.local
+
+# Tests
+src/**/*.test.js
+
+# Docker
+Dockerfile
+.dockerignore

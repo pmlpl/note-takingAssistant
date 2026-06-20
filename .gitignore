@@ -61,6 +61,17 @@ dist/
 dist-ssr/
 .vite/
 
+# Docker env template (使用 .env.example 即可)
+.env.docker
+
+# Deployment artifacts
+note-app.tar.gz
+
+# Local tools & IDE config
+.reasonix/
+.trae/
+reasonix.toml
+
 # Testing
 .pytest_cache/
 .coverage

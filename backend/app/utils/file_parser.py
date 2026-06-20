@@ -4,6 +4,7 @@
 """
 from typing import Optional
 import os
+from app.core.logger import app_logger as logger
 
 
 def parse_text_file(file_path: str) -> Optional[str]:
@@ -21,7 +22,7 @@ def parse_text_file(file_path: str) -> Optional[str]:
             content = f.read()
         return content
     except Exception as e:
-        print(f"❌ 解析TXT文件失败: {e}")
+        logger.info(f"❌ 解析TXT文件失败: {e}")
         return None
 
 
@@ -41,7 +42,7 @@ def parse_markdown_file(file_path: str) -> Optional[str]:
         # Markdown可以直接作为HTML显示，或者后续可以转换为HTML
         return content
     except Exception as e:
-        print(f"❌ 解析MD文件失败: {e}")
+        logger.info(f"❌ 解析MD文件失败: {e}")
         return None
 
 
@@ -72,10 +73,10 @@ def parse_word_file(file_path: str) -> Optional[str]:
         
         return content
     except ImportError:
-        print("❌ 未安装 python-docx 库，请运行: pip install python-docx")
+        logger.info("❌ 未安装 python-docx 库，请运行: pip install python-docx")
         return None
     except Exception as e:
-        print(f"❌ 解析Word文件失败: {e}")
+        logger.info(f"❌ 解析Word文件失败: {e}")
         return None
 
 
@@ -101,7 +102,7 @@ def parse_file(file_path: str, filename: str) -> Optional[str]:
     elif ext == '.docx':
         return parse_word_file(file_path)
     else:
-        print(f"⚠️ 不支持的文件格式: {ext}")
+        logger.info(f"⚠️ 不支持的文件格式: {ext}")
         return None
 
 

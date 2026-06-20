@@ -66,14 +66,14 @@ class ChangePasswordRequest(BaseModel):
 
 
 # SQLAlchemy数据库模型
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Column, Integer, String, DateTime, Text, text
 from sqlalchemy.sql import func
 from app.core.database import Base
 
 
 class UserDB(Base):
     __tablename__ = "users"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=True)
@@ -82,4 +82,6 @@ class UserDB(Base):
     llm_base_url = Column(Text, nullable=True)
     llm_model = Column(String(512), nullable=True)
     llm_api_key_encrypted = Column(Text, nullable=True)
+    # 令牌代数：改密后自增 1，任何 token 中携带的 tgen 若小于此值即失效
+    token_gen = Column(Integer, nullable=False, server_default=text('0'), default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

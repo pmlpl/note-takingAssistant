@@ -6,6 +6,7 @@ from app.api.v1 import user, note, ai, public
 from app.core.database import engine, Base, AsyncSessionLocal
 from app.core.startup_migrations import ensure_user_llm_columns
 from app.core.config import settings
+from app.core.logger import app_logger as logger
 import os
 
 # 异步初始化数据库表
@@ -32,15 +33,15 @@ async def lifespan(app: FastAPI):
     try:
         await engine.dispose()
     except Exception as e:
-        print(f"⚠️ 关闭数据库连接池时出错: {e}")
-    
+        logger.warning(f"关闭数据库连接池时出错: {e}")
+
     # 关闭 Redis 连接
     try:
         from app.core.redis_client import redis_client
         if redis_client.is_available():
             redis_client.client.close()
     except Exception as e:
-        print(f"⚠️ 关闭 Redis 连接时出错: {e}")
+        logger.warning(f"关闭 Redis 连接时出错: {e}")
 
 # 初始化FastAPI
 app = FastAPI(
@@ -51,12 +52,17 @@ app = FastAPI(
 )
 
 # 跨域配置（必加，否则Vue前端无法访问）
+# 安全：不允许同时设置 "*" 和 allow_credentials=True（浏览器会拒绝）；
+# 若配置为通配符，则自动改为 allow_credentials=False，并只放行该来源。
+_cors_origin = settings.FRONTEND_URL.strip() if isinstance(settings.FRONTEND_URL, str) else "*"
+_is_wildcard = _cors_origin == "*"
 app.add_middleware(
     CORSMiddleware,  # type:ignore
-    allow_origins=[settings.FRONTEND_URL],
-    allow_credentials=True,
+    allow_origins=[_cors_origin],
+    allow_credentials=(not _is_wildcard),  # 通配符时禁用凭证，防止越权
     allow_methods=["*"],
     allow_headers=["*"],
+    max_age=600,  # Preflight 缓存 10 分钟，减少 OPTIONS 请求
 )
 
 # 配置静态文件服务（用于访问上传的图片）
@@ -74,12 +80,13 @@ app.include_router(public.router, prefix="/api/v1/public", tags=["公开接口"]
 def home():
     return {"message": "AI个人智能笔记助手后端运行成功！"}
 
-# 启动服务器
+# 启动服务器（是否 auto-reload 由配置项控制，生产环境必须关闭）
 if __name__ == "__main__":
     import uvicorn
+    reload_enabled = getattr(settings, "DEBUG", False) or False
     uvicorn.run(
         "main:app",
         host=settings.API_HOST,
         port=settings.API_PORT,
-        reload=True
+        reload=reload_enabled,
     )
