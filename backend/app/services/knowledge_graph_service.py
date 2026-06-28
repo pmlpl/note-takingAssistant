@@ -19,10 +19,10 @@ from app.services.llm_runtime import openai_client_and_model_for_user
 from app.core.logger import app_logger as logger
 
 
-SIMILARITY_THRESHOLD = 0.4
+SIMILARITY_THRESHOLD = 0.3
 MAX_RELATIONS_PER_NOTE = 5
 MAX_CONCEPTS_PER_NOTE = 8
-MIN_CONCEPT_FREQ = 2
+MIN_CONCEPT_FREQ = 1
 
 
 def _clean_html(text: str) -> str:
