@@ -37,7 +37,7 @@ async def generate_note_endpoint(
     """AI生成笔记接口，支持参考笔记和图片"""
     try:
         # 获取用户ID
-        db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+        db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
         
@@ -75,7 +75,7 @@ async def generate_note_stream_endpoint(
 ):
     """流式生成笔记：响应体为 Markdown 纯文本增量，与翻译流式接口用法一致。"""
     try:
-        db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+        db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -110,7 +110,7 @@ async def summarize_note_endpoint(
     """AI总结笔记接口，返回内容总结、优缺点和建议"""
     try:
         # 获取用户ID
-        db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+        db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -137,8 +137,8 @@ async def translate_note_stream_endpoint(
 ):
     """流式翻译笔记：HTML/富文本会先转为 Markdown 再翻译，响应体为纯文本流。"""
     try:
-        db_user = await crud_user.get_user_by_username(
-            db, username=current_user["username"]
+        db_user = await crud_user.get_user_by_email(
+            db, email=current_user["email"]
         )
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
@@ -172,7 +172,7 @@ async def chat_endpoint(
     """AI 对话接口，支持上下文聊天"""
     try:
         # 获取用户ID
-        db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+        db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
         
@@ -199,7 +199,7 @@ async def chat_stream_endpoint(
 ):
     """流式对话：响应体为纯文本增量（assistant 全文），与翻译/生成笔记流式用法一致。"""
     try:
-        db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+        db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
 

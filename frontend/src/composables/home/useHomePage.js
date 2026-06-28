@@ -1,4 +1,4 @@
-﻿import { ref, computed, onMounted, onActivated, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
 import { noteApi } from '@/api/note'
@@ -67,6 +67,7 @@ function homeUserScope() {
   const u = userStore.user
   if (!u) return null
   if (u.id != null && u.id !== '') return `u${u.id}`
+  if (u.email) return `email_${u.email}`
   if (u.username) return `name_${u.username}`
   return null
 }
@@ -141,7 +142,7 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [userStore.user?.id, userStore.user?.username, userStore.authSessionEpoch],
+  () => [userStore.user?.id, userStore.user?.email, userStore.authSessionEpoch],
   () => {
     void ensureHomeSessionForCurrentUser()
   }
@@ -980,6 +981,7 @@ function saveChatHistory() {
     const payload = {
       v: 1,
       ownerId: userStore.user?.id ?? null,
+      ownerEmail: userStore.user?.email ?? '',
       ownerUsername: userStore.user?.username ?? '',
       messages: chatHistory.value
     }
@@ -993,6 +995,9 @@ function chatHistoryBelongsToCurrentUser(parsed) {
   const u = userStore.user
   if (!u) return false
   if (parsed.ownerId != null && u.id != null && Number(parsed.ownerId) !== Number(u.id)) {
+    return false
+  }
+  if (parsed.ownerEmail && u.email && parsed.ownerEmail !== u.email) {
     return false
   }
   if (parsed.ownerUsername && u.username && parsed.ownerUsername !== u.username) {

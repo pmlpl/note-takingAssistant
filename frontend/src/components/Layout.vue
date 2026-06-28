@@ -32,6 +32,10 @@
           <IconMindmap :size="20" :color="NAV_ICON_COLOR" />
           <span>导图</span>
         </el-menu-item>
+        <el-menu-item index="/knowledge-graph" @click="navigate('/knowledge-graph')">
+          <IconMindmap :size="20" :color="NAV_ICON_COLOR" />
+          <span>知识图谱</span>
+        </el-menu-item>
         <el-menu-item index="/manual" @click="navigate('/manual')">
           <IconNotebook :size="20" :color="NAV_ICON_COLOR" />
           <span>手册</span>
@@ -42,7 +46,7 @@
         <el-dropdown v-if="userStore.isLoggedIn">
           <span class="user-name">
             <IconUser :size="18" :color="NAV_ICON_COLOR" />
-            {{ userStore.user.username }}
+            {{ displayName }}
           </span>
           <template #dropdown>
             <el-dropdown-menu>
@@ -76,6 +80,12 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const activeMenu = computed(() => router.currentRoute.value.path)
+
+const displayName = computed(() => {
+  const u = userStore.user
+  if (!u) return ''
+  return u.nickname || u.username || (u.email ? u.email.split('@')[0] : '')
+})
 
 function navigate(path) {
   if (router.currentRoute.value.path === path) return

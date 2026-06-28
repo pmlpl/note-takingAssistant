@@ -31,7 +31,10 @@ yarn-error.log*
 *.ipr
 *.iws
 
-# Environment variables
+# Docker env template（用户复制 cp .env.docker .env 后再填真实密钥）
+# ⚠️ .env.docker 要提交！不要忽略！
+!.env.docker
+# .env（实际密钥）不要提交
 .env
 .env.local
 .env.*.local
@@ -61,11 +64,10 @@ dist/
 dist-ssr/
 .vite/
 
-# Docker env template (使用 .env.example 即可)
-.env.docker
-
 # Deployment artifacts
 note-app.tar.gz
+*.zip
+*.tar.gz
 
 # Local tools & IDE config
 .reasonix/

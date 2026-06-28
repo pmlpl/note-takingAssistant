@@ -39,10 +39,11 @@
             </el-upload>
           </div>
           <div class="user-details">
-            <h2 class="username">{{ userStore.user?.username }}</h2>
+            <h2 class="username">{{ displayName }}</h2>
             <p class="user-email">
               <el-icon><Message /></el-icon>
-              {{ userStore.user?.email }}
+              {{ userStore.user?.email || '未绑定邮箱' }}
+              <el-tag v-if="userStore.user?.email_verified" size="small" type="success" effect="light" style="margin-left: 8px;">已验证</el-tag>
             </p>
             <p class="join-date">
               <el-icon><Calendar /></el-icon>
@@ -356,6 +357,210 @@
         </Transition>
       </el-card>
 
+      <!-- 账号绑定卡片 -->
+      <el-card class="bindings-card" shadow="hover">
+        <template #header>
+          <div class="card-header card-header--fold">
+            <span class="card-title">账号绑定</span>
+            <el-button
+              text
+              type="primary"
+              class="section-toggle-btn"
+              @click="showBindingsPanel = !showBindingsPanel"
+            >
+              <el-icon class="section-toggle-icon" :class="{ 'is-open': showBindingsPanel }">
+                <ArrowDown />
+              </el-icon>
+              <span>展开</span>
+            </el-button>
+          </div>
+        </template>
+        <Transition name="section-fold">
+          <div v-show="showBindingsPanel" class="section-fold-panel" v-loading="bindingsLoading">
+            <!-- 昵称修改 -->
+            <div class="binding-section">
+              <div class="binding-item">
+                <div class="binding-info">
+                  <span class="binding-label">昵称</span>
+                  <span class="binding-value">{{ displayName }}</span>
+                </div>
+                <el-button size="small" @click="showNicknameDialog = true">修改</el-button>
+              </div>
+            </div>
+
+            <el-divider />
+
+            <!-- GitHub 绑定 -->
+            <div class="binding-section">
+              <div class="binding-item">
+                <div class="binding-info">
+                  <div class="binding-platform">
+                    <img v-if="bindings.github?.avatar_url" :src="bindings.github.avatar_url" class="platform-avatar" alt="GitHub Avatar" />
+                    <span v-else class="platform-icon">🐙</span>
+                    <div>
+                      <div class="binding-label-row">
+                        <span class="binding-label">GitHub</span>
+                        <span v-if="bindings.github" class="binding-status binding-status--bound">已绑定</span>
+                        <span v-else class="binding-status binding-status--unbound">未绑定</span>
+                      </div>
+                      <span v-if="bindings.github?.provider_username" class="binding-sub">
+                        @{{ bindings.github.provider_username }}
+                      </span>
+                      <span v-if="bindings.github && !bindings.github.provider_username" class="binding-sub">
+                        ID: {{ bindings.github.openid }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="binding-actions">
+                  <el-button
+                    v-if="bindings.github"
+                    size="small"
+                    type="danger"
+                    plain
+                    @click="handleUnbindGithub"
+                    :loading="unbindingGithub"
+                  >解除</el-button>
+                  <el-button
+                    v-else
+                    size="small"
+                    type="primary"
+                    @click="handleBindGithub"
+                    :loading="bindingGithub"
+                  >绑定</el-button>
+                </div>
+              </div>
+            </div>
+
+            <el-divider />
+
+            <!-- 邮箱绑定 -->
+            <div class="binding-section">
+              <div class="binding-item">
+                <div class="binding-info">
+                  <div class="binding-platform">
+                    <span class="platform-icon">📧</span>
+                    <div>
+                      <span class="binding-label">邮箱</span>
+                      <span v-if="bindings.email" class="binding-status binding-status--bound">
+                        {{ bindings.email }}
+                        <el-tag v-if="bindings.email_verified" size="small" type="success" effect="light" style="margin-left: 4px;">已验证</el-tag>
+                      </span>
+                      <span v-else class="binding-status binding-status--unbound">未绑定</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="binding-actions">
+                  <el-button
+                    v-if="bindings.email && bindings.has_password"
+                    size="small"
+                    type="warning"
+                    plain
+                    @click="showChangeEmailDialog = true"
+                  >换绑</el-button>
+                  <el-button
+                    v-if="bindings.email && bindings.has_password"
+                    size="small"
+                    type="danger"
+                    plain
+                    @click="showUnbindEmailDialog = true"
+                  >解除</el-button>
+                  <el-button
+                    v-if="!bindings.email"
+                    size="small"
+                    type="primary"
+                    @click="showBindEmailDialog = true"
+                  >绑定</el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </el-card>
+
+      <!-- 修改昵称对话框 -->
+      <el-dialog v-model="showNicknameDialog" title="修改昵称" width="400px" destroy-on-close>
+        <el-form :model="nicknameForm" label-width="80px">
+          <el-form-item label="新昵称">
+            <el-input v-model="nicknameForm.nickname" placeholder="请输入新昵称（2-32字符）" clearable />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="showNicknameDialog = false">取消</el-button>
+          <el-button type="primary" @click="handleUpdateNickname" :loading="savingNickname">保存</el-button>
+        </template>
+      </el-dialog>
+
+      <!-- 绑定邮箱对话框 -->
+      <el-dialog v-model="showBindEmailDialog" title="绑定邮箱" width="400px" destroy-on-close>
+        <el-form :model="bindEmailForm" label-width="80px">
+          <el-form-item label="邮箱">
+            <el-input v-model="bindEmailForm.email" placeholder="请输入邮箱地址" clearable />
+          </el-form-item>
+          <el-form-item label="验证码">
+            <div class="code-input-row">
+              <el-input v-model="bindEmailForm.code" placeholder="请输入验证码" clearable />
+              <el-button
+                @click="handleSendBindCode"
+                :disabled="bindCodeCooldown > 0"
+                :loading="sendingBindCode"
+              >
+                {{ bindCodeCooldown > 0 ? `${bindCodeCooldown}s` : '发送验证码' }}
+              </el-button>
+            </div>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="showBindEmailDialog = false">取消</el-button>
+          <el-button type="primary" @click="handleBindEmail" :loading="bindingEmail">确认绑定</el-button>
+        </template>
+      </el-dialog>
+
+      <!-- 换绑邮箱对话框 -->
+      <el-dialog v-model="showChangeEmailDialog" title="换绑邮箱" width="400px" destroy-on-close>
+        <el-form :model="changeEmailForm" label-width="80px">
+          <el-form-item label="新邮箱">
+            <el-input v-model="changeEmailForm.email" placeholder="请输入新邮箱地址" clearable />
+          </el-form-item>
+          <el-form-item label="验证码">
+            <div class="code-input-row">
+              <el-input v-model="changeEmailForm.code" placeholder="请输入验证码" clearable />
+              <el-button
+                @click="handleSendChangeCode"
+                :disabled="changeCodeCooldown > 0"
+                :loading="sendingChangeCode"
+              >
+                {{ changeCodeCooldown > 0 ? `${changeCodeCooldown}s` : '发送验证码' }}
+              </el-button>
+            </div>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="showChangeEmailDialog = false">取消</el-button>
+          <el-button type="primary" @click="handleChangeEmail" :loading="changingEmail">确认换绑</el-button>
+        </template>
+      </el-dialog>
+
+      <!-- 解除邮箱绑定对话框 -->
+      <el-dialog v-model="showUnbindEmailDialog" title="解除邮箱绑定" width="400px" destroy-on-close>
+        <p style="color: #606266; margin-bottom: 16px;">解除邮箱绑定后，您需要使用其他方式（GitHub）登录。请确认您的 GitHub 已绑定。</p>
+        <el-form :model="unbindEmailForm" label-width="80px">
+          <el-form-item label="密码" required>
+            <el-input
+              v-model="unbindEmailForm.password"
+              type="password"
+              placeholder="请输入当前密码"
+              show-password
+              clearable
+            />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="showUnbindEmailDialog = false">取消</el-button>
+          <el-button type="danger" @click="handleUnbindEmail" :loading="unbindingEmail">确认解除</el-button>
+        </template>
+      </el-dialog>
+
       <!-- 退出登录按钮 -->
       <div class="logout-section">
         <el-button type="danger" @click="handleLogout" size="large" class="logout-btn">
@@ -402,7 +607,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
-import { userApi } from '@/api/user'
+import { userApi, oauthApi } from '@/api/user'
 import { IconDocument, IconMagic, IconClock, IconLogout, IconEdit } from '@/components/icons'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Message, Calendar, ArrowDown } from '@element-plus/icons-vue'
@@ -412,6 +617,12 @@ import { normalizeOpenAiCompatibleBaseUrl } from '@/utils/common'
 
 const router = useRouter()
 const userStore = useUserStore()
+
+const displayName = computed(() => {
+  const u = userStore.user
+  if (!u) return ''
+  return u.nickname || u.username || (u.email ? u.email.split('@')[0] : '')
+})
 
 const changingPassword = ref(false)
 const uploadingAvatar = ref(false)
@@ -427,8 +638,44 @@ const showStatsPanel = ref(false)
 const showLlmPanel = ref(false)
 const showPasswordForm = ref(false)
 const showAboutPanel = ref(false)
+const showBindingsPanel = ref(false)
 const termsDialogVisible = ref(false)
 const privacyDialogVisible = ref(false)
+
+// 账号绑定相关
+const bindingsLoading = ref(false)
+const bindings = ref({
+  email: null,
+  email_verified: false,
+  has_password: false,
+  github: null
+})
+
+// 昵称修改
+const showNicknameDialog = ref(false)
+const nicknameForm = ref({ nickname: '' })
+const savingNickname = ref(false)
+
+// GitHub 绑定
+const bindingGithub = ref(false)
+const unbindingGithub = ref(false)
+
+// 邮箱绑定
+const showBindEmailDialog = ref(false)
+const showChangeEmailDialog = ref(false)
+const showUnbindEmailDialog = ref(false)
+const bindEmailForm = ref({ email: '', code: '' })
+const changeEmailForm = ref({ email: '', code: '' })
+const unbindEmailForm = ref({ password: '' })
+const sendingBindCode = ref(false)
+const sendingChangeCode = ref(false)
+const bindingEmail = ref(false)
+const changingEmail = ref(false)
+const unbindingEmail = ref(false)
+const bindCodeCooldown = ref(0)
+const changeCodeCooldown = ref(0)
+let bindCodeTimer = null
+let changeCodeTimer = null
 
 const llmLoading = ref(false)
 const llmSaving = ref(false)
@@ -578,6 +825,245 @@ async function loadUserData() {
   }
 }
 
+async function loadBindings() {
+  bindingsLoading.value = true
+  try {
+    const data = await userApi.getBindings()
+    bindings.value = data
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '加载绑定信息失败')
+  } finally {
+    bindingsLoading.value = false
+  }
+}
+
+// 昵称修改
+async function handleUpdateNickname() {
+  if (!nicknameForm.value.nickname || nicknameForm.value.nickname.length < 2) {
+    ElMessage.warning('请输入有效的昵称（至少2个字符）')
+    return
+  }
+  savingNickname.value = true
+  try {
+    const result = await userApi.updateNickname(nicknameForm.value.nickname)
+    userStore.user.nickname = result.nickname
+    persistUserToStorage()
+    ElMessage.success('昵称修改成功')
+    showNicknameDialog.value = false
+    nicknameForm.value.nickname = ''
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '修改昵称失败')
+  } finally {
+    savingNickname.value = false
+  }
+}
+
+// GitHub 绑定
+async function handleBindGithub() {
+  bindingGithub.value = true
+  try {
+    const config = await oauthApi.githubConfig()
+    if (!config.enabled) {
+      ElMessage.error('GitHub 登录未配置，请联系管理员')
+      return
+    }
+    const result = await oauthApi.githubAuthorize()
+    // 打开 GitHub 授权页面
+    const authWindow = window.open(result.authorize_url, '_blank', 'width=600,height=700')
+
+    // 监听 postMessage
+    function handleMessage(event) {
+      if (event.data && event.data.type === 'oauth-bind-result') {
+        window.removeEventListener('message', handleMessage)
+        if (event.data.success) {
+          ElMessage.success('GitHub 绑定成功')
+        } else {
+          ElMessage.error(event.data.error || '绑定失败')
+        }
+        // 重新加载绑定状态
+        loadBindings()
+        loadUserData()
+        bindingGithub.value = false
+      }
+    }
+    window.addEventListener('message', handleMessage)
+
+    // 兜底：如果窗口关闭了但没收到 message，也刷新一下
+    const checkInterval = setInterval(() => {
+      try {
+        if (authWindow.closed) {
+          clearInterval(checkInterval)
+          setTimeout(() => {
+            window.removeEventListener('message', handleMessage)
+            loadBindings()
+            loadUserData()
+            bindingGithub.value = false
+          }, 500)
+        }
+      } catch (e) {
+        // ignore
+      }
+    }, 1000)
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '获取授权链接失败')
+    bindingGithub.value = false
+  }
+}
+
+async function handleUnbindGithub() {
+  try {
+    await ElMessageBox.confirm('确定要解除 GitHub 绑定吗？', '提示', {
+      confirmButtonText: '解除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
+  unbindingGithub.value = true
+  try {
+    await userApi.unbindGithub()
+    await loadBindings()
+    ElMessage.success('GitHub 已解除绑定')
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '解除绑定失败')
+  } finally {
+    unbindingGithub.value = false
+  }
+}
+
+// 邮箱绑定 - 发送验证码
+async function handleSendBindCode() {
+  if (!bindEmailForm.value.email) {
+    ElMessage.warning('请输入邮箱地址')
+    return
+  }
+  sendingBindCode.value = true
+  try {
+    await oauthApi.sendBindCode({ email: bindEmailForm.value.email, action: 'bind' })
+    ElMessage.success('验证码已发送')
+    // 开始倒计时
+    bindCodeCooldown.value = 60
+    if (bindCodeTimer) clearInterval(bindCodeTimer)
+    bindCodeTimer = setInterval(() => {
+      bindCodeCooldown.value--
+      if (bindCodeCooldown.value <= 0) {
+        clearInterval(bindCodeTimer)
+        bindCodeTimer = null
+      }
+    }, 1000)
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '发送验证码失败')
+  } finally {
+    sendingBindCode.value = false
+  }
+}
+
+async function handleBindEmail() {
+  if (!bindEmailForm.value.email || !bindEmailForm.value.code) {
+    ElMessage.warning('请输入邮箱和验证码')
+    return
+  }
+  bindingEmail.value = true
+  try {
+    const result = await oauthApi.bindEmail({
+      email: bindEmailForm.value.email,
+      code: bindEmailForm.value.code,
+      action: 'bind'
+    })
+    await loadBindings()
+    await loadUserData()
+    ElMessage.success('邮箱绑定成功')
+    showBindEmailDialog.value = false
+    bindEmailForm.value = { email: '', code: '' }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '绑定邮箱失败')
+  } finally {
+    bindingEmail.value = false
+  }
+}
+
+// 邮箱换绑 - 发送验证码
+async function handleSendChangeCode() {
+  if (!changeEmailForm.value.email) {
+    ElMessage.warning('请输入新邮箱地址')
+    return
+  }
+  sendingChangeCode.value = true
+  try {
+    await oauthApi.sendBindCode({ email: changeEmailForm.value.email, action: 'change' })
+    ElMessage.success('验证码已发送')
+    // 开始倒计时
+    changeCodeCooldown.value = 60
+    if (changeCodeTimer) clearInterval(changeCodeTimer)
+    changeCodeTimer = setInterval(() => {
+      changeCodeCooldown.value--
+      if (changeCodeCooldown.value <= 0) {
+        clearInterval(changeCodeTimer)
+        changeCodeTimer = null
+      }
+    }, 1000)
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '发送验证码失败')
+  } finally {
+    sendingChangeCode.value = false
+  }
+}
+
+async function handleChangeEmail() {
+  if (!changeEmailForm.value.email || !changeEmailForm.value.code) {
+    ElMessage.warning('请输入新邮箱和验证码')
+    return
+  }
+  changingEmail.value = true
+  try {
+    await oauthApi.bindEmail({
+      email: changeEmailForm.value.email,
+      code: changeEmailForm.value.code,
+      action: 'change'
+    })
+    await loadBindings()
+    await loadUserData()
+    ElMessage.success('邮箱换绑成功')
+    showChangeEmailDialog.value = false
+    changeEmailForm.value = { email: '', code: '' }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '换绑邮箱失败')
+  } finally {
+    changingEmail.value = false
+  }
+}
+
+// 解除邮箱绑定
+async function handleUnbindEmail() {
+  if (!unbindEmailForm.value.password) {
+    ElMessage.warning('请输入当前密码')
+    return
+  }
+  try {
+    await ElMessageBox.confirm('确定要解除邮箱绑定吗？解除后您需要使用 GitHub 登录。', '警告', {
+      confirmButtonText: '解除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
+  unbindingEmail.value = true
+  try {
+    await userApi.unbindEmail(unbindEmailForm.value.password)
+    await loadBindings()
+    await loadUserData()
+    ElMessage.success('邮箱已解除绑定')
+    showUnbindEmailDialog.value = false
+    unbindEmailForm.value.password = ''
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '解除绑定失败')
+  } finally {
+    unbindingEmail.value = false
+  }
+}
+
 async function loadStats() {
   statsLoading.value = true
   statsError.value = ''
@@ -656,7 +1142,7 @@ async function saveLlmSettings() {
 }
 
 async function reloadAll() {
-  await Promise.all([loadUserData(), loadStats(), loadLlmSettings()])
+  await Promise.all([loadUserData(), loadStats(), loadLlmSettings(), loadBindings()])
 }
 
 onMounted(async () => {
@@ -955,7 +1441,8 @@ function formatDays(days) {
 .stats-card :deep(.el-card__body),
 .llm-card :deep(.el-card__body),
 .about-card :deep(.el-card__body),
-.password-card :deep(.el-card__body) {
+.password-card :deep(.el-card__body),
+.bindings-card :deep(.el-card__body) {
   padding-top: 0;
   padding-bottom: 0;
 }
@@ -1112,6 +1599,94 @@ function formatDays(days) {
 .stat-label-inner {
   border-bottom: 1px dashed #c0c4cc;
   cursor: help;
+}
+
+/* 账号绑定样式 */
+.bindings-card {
+  margin-bottom: 24px;
+  border-radius: 12px;
+}
+
+.binding-section {
+  padding: 8px 0;
+}
+
+.binding-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.binding-info {
+  flex: 1;
+}
+
+.binding-platform {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.platform-icon {
+  font-size: 24px;
+}
+
+.platform-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e4e7ed;
+}
+
+.binding-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.binding-label {
+  font-weight: 500;
+  color: #303133;
+  margin-right: 8px;
+}
+
+.binding-value {
+  color: #606266;
+}
+
+.binding-sub {
+  display: block;
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
+
+.binding-status {
+  font-size: 14px;
+}
+
+.binding-status--bound {
+  color: #67c23a;
+}
+
+.binding-status--unbound {
+  color: #909399;
+}
+
+.binding-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.code-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.code-input-row .el-input {
+  flex: 1;
 }
 
 /* 密码表单样式 */

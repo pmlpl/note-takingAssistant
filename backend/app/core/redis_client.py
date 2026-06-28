@@ -337,7 +337,7 @@ async def cache_recent_note_async(user_id: int, note_data: dict) -> None:
 
 
 async def get_recent_notes_async(user_id: int, limit: int = 20) -> list:
-    return (await _run_in_pool(redis_get_recent_notes, user_id, limit)) or []
+    return (await _run_in_pool(get_recent_notes, user_id, limit)) or []
 
 
 async def batch_cache_recent_notes_async(user_id: int, notes_data: list) -> None:

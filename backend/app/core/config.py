@@ -48,6 +48,18 @@ class Settings(BaseSettings):
     LLM_HTTP_READ_TIMEOUT_SECONDS: float = 1200.0
     LLM_HTTP_TRUST_ENV: bool = False
 
+    # ── GitHub OAuth ──────────────────────────
+    GITHUB_CLIENT_ID: Optional[str] = None
+    GITHUB_CLIENT_SECRET: Optional[str] = None
+    GITHUB_REDIRECT_URI: Optional[str] = None
+
+    # ── SMTP 邮件 ──────────────────────────
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 465
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM_NAME: str = "智能笔记助手"
+
     # ── 其他 ──────────────────────────
     # 本机调试时设为 true 可开启 uvicorn reload；Docker 中默认为 false（关闭 reload）
     DEBUG: bool = True

@@ -25,22 +25,22 @@ router = APIRouter()
 
 
 # ====== 输入校验工具 ======
-_USERNAME_RE = re.compile(r"^[a-zA-Z0-9_][a-zA-Z0-9_\-]{2,31}$")
+_NICKNAME_RE = re.compile(r"^[a-zA-Z0-9_\u4e00-\u9fa5][a-zA-Z0-9_\-\u4e00-\u9fa5]{1,31}$")
 
 
-def _validate_username(username: str) -> None:
-    """用户名：3-32 字符，只允许字母/数字/下划线/短横线，字母数字开头。"""
-    if not username or len(username) < 3 or len(username) > 32:
-        raise HTTPException(status_code=400, detail="用户名长度必须在 3-32 之间")
-    if not _USERNAME_RE.match(username):
+def _validate_nickname(nickname: str | None) -> None:
+    if not nickname:
+        return
+    if len(nickname) < 2 or len(nickname) > 32:
+        raise HTTPException(status_code=400, detail="昵称长度必须在 2-32 之间")
+    if not _NICKNAME_RE.match(nickname):
         raise HTTPException(
             status_code=400,
-            detail="用户名只能包含字母、数字、下划线、短横线，且必须以字母或数字开头",
+            detail="昵称只能包含字母、数字、中文、下划线、短横线",
         )
 
 
 def _validate_password(password: str) -> None:
-    """密码：至少 8 位，同时包含字母与数字。"""
     if not password or len(password) < 8:
         raise HTTPException(status_code=400, detail="密码至少需要 8 个字符")
     if len(password) > 128:
@@ -49,10 +49,9 @@ def _validate_password(password: str) -> None:
         raise HTTPException(status_code=400, detail="密码必须同时包含字母和数字")
 
 
-def _validate_email(email: str | None) -> None:
+def _validate_email(email: str) -> None:
     if not email:
-        return
-    # 简单 RFC 5322 子集
+        raise HTTPException(status_code=400, detail="邮箱不能为空")
     email_re = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
     if not email_re.match(email):
         raise HTTPException(status_code=400, detail="邮箱格式不正确")
@@ -65,20 +64,17 @@ async def register(
     _: None = Depends(rate_limit_anon("register")),
 ):
     """用户注册接口"""
-    _validate_username(user.username)
-    _validate_password(user.password)
     _validate_email(user.email)
+    _validate_password(user.password)
+    _validate_nickname(user.nickname)
 
-    db_user = await crud_user.get_user_by_username(db, username=user.username)
-    if db_user:
-        raise HTTPException(status_code=400, detail="用户名已存在")
+    db_user_by_email = await crud_user.get_user_by_email(db, email=user.email)
+    if db_user_by_email:
+        raise HTTPException(status_code=400, detail="该邮箱已被注册")
 
-    if user.email:
-        db_user_by_email = await crud_user.get_user_by_email(db, email=user.email)
-        if db_user_by_email:
-            raise HTTPException(status_code=400, detail="该邮箱已被注册")
+    nickname = user.nickname or user.email.split("@")[0]
 
-    return await crud_user.create_user(db=db, username=user.username, email=user.email, password=user.password)
+    return await crud_user.create_user(db=db, email=user.email, password=user.password, nickname=nickname)
 
 
 @router.post("/login", summary="用户登录", response_model=TokenWithUser)
@@ -88,29 +84,33 @@ async def login(
     _: None = Depends(rate_limit_anon("login")),
 ):
     """用户登录接口"""
-    db_user = await crud_user.authenticate_user(db, username=user.username, password=user.password)
+    db_user = await crud_user.authenticate_user(db, email=user.email, password=user.password)
     if not db_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误",
+            detail="邮箱或密码错误",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     current_tgen = getattr(db_user, "token_gen", 0) or 0
     access_token = create_access_token(
-        data={"sub": db_user.username},
+        data={"sub": db_user.email},
         expires_delta=access_token_expires,
         token_gen=current_tgen,
     )
 
+    display_nickname = db_user.nickname or db_user.username or db_user.email.split("@")[0]
+
     return {
-        "access_token": access_token, 
+        "access_token": access_token,
         "token_type": "bearer",
         "user": {
             "id": db_user.id,
+            "nickname": display_nickname,
             "username": db_user.username,
             "email": db_user.email,
+            "email_verified": bool(db_user.email_verified),
             "avatar_url": db_user.avatar_url,
             "created_at": db_user.created_at
         }
@@ -161,14 +161,18 @@ async def get_current_user_info(
     _: None = Depends(rate_limit_user("notes")),
 ):
     """获取当前用户信息（需要JWT认证）"""
-    db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
+
+    display_nickname = db_user.nickname or db_user.username or db_user.email.split("@")[0]
+
     return {
         "id": db_user.id,
+        "nickname": display_nickname,
         "username": db_user.username,
         "email": db_user.email,
+        "email_verified": bool(db_user.email_verified),
         "avatar_url": db_user.avatar_url,
         "created_at": db_user.created_at
     }
@@ -185,7 +189,7 @@ async def get_llm_settings(
     current_user: dict = Depends(get_current_user),
     _: None = Depends(rate_limit_user("notes")),
 ):
-    db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
     last4: str | None = None
@@ -227,7 +231,7 @@ async def put_llm_settings(
     current_user: dict = Depends(get_current_user),
     _: None = Depends(rate_limit_user("notes")),
 ):
-    db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -290,7 +294,7 @@ async def change_password(
 
     _validate_password(req.newPassword)
 
-    db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
 
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -298,20 +302,16 @@ async def change_password(
     if not verify_password(req.currentPassword, db_user.hashed_password):
         raise HTTPException(status_code=400, detail="当前密码不正确")
 
-    # 更新密码哈希
     db_user.hashed_password = get_password_hash(req.newPassword)
-    # 递增令牌代数：所有旧 token 的 tgen 都小于新值
     db_user.token_gen = (getattr(db_user, "token_gen", 0) or 0) + 1
     await db.commit()
     await db.refresh(db_user)
 
-    # 将新的最小有效 tgen 同步到 Redis，让所有已签发的旧 token 在认证期立即失效
-    # TTL 设置为 2 倍的 token 有效期，兜底极端情况下还在 token 有效期内的请求
     ttl = int(settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60 * 2)
     try:
         if redis_client.client:
             redis_client.client.setex(
-                f"tgen_min:{db_user.username}", ttl, str(db_user.token_gen)
+                f"tgen_min:{db_user.email}", ttl, str(db_user.token_gen)
             )
     except Exception as e:
         logger.info(f"⚠️ 同步 tgen_min 失败（不阻断改密成功）: {e}")
@@ -336,8 +336,7 @@ async def upload_avatar(
     if not ok:
         raise HTTPException(status_code=400, detail=err)
 
-    # 获取当前用户信息
-    db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -386,8 +385,7 @@ async def get_user_stats(
     from app.crud import ai_usage as crud_ai_usage
     from datetime import datetime, timedelta
     
-    # 获取用户
-    db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
     
@@ -414,3 +412,126 @@ async def get_user_stats(
         "ai_usage": ai_usage,
         "days_active": days_active
     }
+
+
+# ====== 账号绑定 ======
+
+class NicknameUpdate(BaseModel):
+    nickname: str
+
+
+@router.put("/me/nickname", summary="修改昵称")
+async def update_nickname(
+    body: NicknameUpdate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(rate_limit_user("notes")),
+):
+    """修改用户昵称"""
+    _validate_nickname(body.nickname)
+
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
+    if not db_user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    db_user.nickname = body.nickname
+    await db.commit()
+    await db.refresh(db_user)
+
+    display_nickname = db_user.nickname or db_user.username or db_user.email.split("@")[0]
+    return {"nickname": display_nickname}
+
+
+@router.get("/me/bindings", summary="获取账号绑定状态")
+async def get_bindings(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(rate_limit_user("notes")),
+):
+    """获取当前用户的账号绑定状态（GitHub、邮箱）"""
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
+    if not db_user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # 获取所有 OAuth 绑定
+    oauth_accounts = await crud_user.get_user_oauth_accounts(db, user_id=db_user.id)
+
+    github_binding = None
+    for acc in oauth_accounts:
+        if acc.provider == "github":
+            github_binding = {
+                "provider": "github",
+                "openid": acc.openid,
+                "provider_username": acc.provider_username,
+                "avatar_url": acc.avatar_url,
+                "bound_at": acc.created_at.isoformat() if acc.created_at else None,
+            }
+
+    return {
+        "email": db_user.email,
+        "email_verified": bool(db_user.email_verified),
+        "has_password": bool(db_user.hashed_password),
+        "github": github_binding,
+    }
+
+
+class UnbindEmailRequest(BaseModel):
+    password: str
+
+
+@router.delete("/me/bindings/email", summary="解除邮箱绑定")
+async def unbind_email(
+    body: UnbindEmailRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(rate_limit_user("notes")),
+):
+    """解除邮箱绑定（需要验证密码，且必须已有 GitHub 绑定或其他登录方式）"""
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
+    if not db_user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    if not verify_password(body.password, db_user.hashed_password):
+        raise HTTPException(status_code=400, detail="密码不正确")
+
+    # 检查是否有其他登录方式
+    oauth_accounts = await crud_user.get_user_oauth_accounts(db, user_id=db_user.id)
+    if not oauth_accounts:
+        raise HTTPException(status_code=400, detail="没有其他登录方式，无法解除唯一绑定")
+
+    # 解绑邮箱：清除邮箱相关字段（保留其他 OAuth 绑定）
+    db_user.email = None
+    db_user.email_verified = False
+    db_user.hashed_password = None
+    await db.commit()
+
+    return {"message": "邮箱已解除绑定"}
+
+
+@router.delete("/me/bindings/github", summary="解除 GitHub 绑定")
+async def unbind_github(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = Depends(rate_limit_user("notes")),
+):
+    """解除 GitHub 绑定（需要保留其他登录方式）"""
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
+    if not db_user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # 检查是否有邮箱或其他登录方式
+    oauth_accounts = await crud_user.get_user_oauth_accounts(db, user_id=db_user.id)
+    github_bound = any(acc.provider == "github" for acc in oauth_accounts)
+
+    if not github_bound:
+        raise HTTPException(status_code=400, detail="未绑定 GitHub")
+
+    # 必须保留至少一种登录方式
+    remaining_oauth = [acc for acc in oauth_accounts if acc.provider != "github"]
+    if not db_user.email and not db_user.hashed_password and not remaining_oauth:
+        raise HTTPException(status_code=400, detail="没有其他登录方式，无法解除唯一绑定")
+
+    await crud_user.delete_oauth_account(db, user_id=db_user.id, provider="github")
+    await db.commit()
+
+    return {"message": "GitHub 已解除绑定"}

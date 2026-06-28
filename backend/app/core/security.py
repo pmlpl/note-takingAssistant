@@ -79,7 +79,7 @@ def get_token_exp_seconds(token: str) -> Optional[int]:
 _TGEN_MIN_PREFIX = "tgen_min:"
 
 
-def _check_tgen_valid(username: str, token_tgen: int, redis_client_ref) -> bool:
+def _check_tgen_valid(email: str, token_tgen: int, redis_client_ref) -> bool:
     """
     对比用户当前最小有效 tgen 与 token 中携带的 tgen；
     若 Redis 中的 tgen_min > token_tgen，说明此 token 在改密前签发，应拒绝。
@@ -88,13 +88,12 @@ def _check_tgen_valid(username: str, token_tgen: int, redis_client_ref) -> bool:
     if not redis_client_ref or not redis_client_ref.client:
         return True
     try:
-        raw = redis_client_ref.client.get(f"{_TGEN_MIN_PREFIX}{username}")
+        raw = redis_client_ref.client.get(f"{_TGEN_MIN_PREFIX}{email}")
         if raw is None:
             return True
         min_tgen = int(raw)
         return token_tgen >= min_tgen
     except Exception:
-        # 解析失败不阻断正常请求
         return True
 
 
@@ -106,7 +105,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # 第一步：检查 token 是否被主动撤销（Redis 黑名单）
     if is_token_blacklisted(token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -114,22 +112,20 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 第二步：解码验证 JWT，并做 tgen 代数校验（改密后旧 token 作废）
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        email: str = payload.get("sub")
+        if email is None:
             raise credentials_exception
         token_tgen = payload.get("tgen", 0) or 0
-        # 引入 redis_client 用于 tgen 最小值查询
         from app.core.redis_client import redis_client as _redis_client_local
-        if not _check_tgen_valid(username, token_tgen, _redis_client_local):
+        if not _check_tgen_valid(email, token_tgen, _redis_client_local):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="密码已变更，请重新登录",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return {"username": username}
+        return {"email": email}
     except JWTError as e:
         raise credentials_exception
 

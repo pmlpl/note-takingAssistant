@@ -1,4 +1,4 @@
-﻿<template>
+<template>
     <div class="manual-page">
       <div class="manual-split" :class="{ 'manual-split--collapsed': tocCollapsed }">
         <aside class="manual-toc" aria-label="目录">
@@ -104,6 +104,7 @@
                     <li><strong>笔记</strong>：新建与编辑（富文本或 Markdown）、搜索与管理「我的笔记」、查看历史笔记、从 Word / 文本等导入内容。</li>
                     <li><strong>首页工作台</strong>：左侧管理笔记与导入，中间预览正文，右侧与 AI 对话并可关联某篇笔记作为上下文。</li>
                     <li><strong>AI</strong>：按主题生成笔记草稿、对选定内容做总结分析、多语言翻译；可在个人中心配置<strong>自带模型接口</strong>（可选）。</li>
+                    <li><strong>知识图谱</strong>：可视化展示笔记与概念之间的关联，支持节点拖拽、点击查看详情。</li>
                     <li><strong>思维导图</strong>：在独立页面查看或整理导图相关内容（见顶部导航）。</li>
                   </ul>
 
@@ -115,6 +116,7 @@
                     <li><strong>AI 笔记生成</strong>：<code>/ai/generate</code></li>
                     <li><strong>AI 笔记总结</strong>：<code>/ai/summarize</code></li>
                     <li><strong>翻译笔记</strong>：<code>/ai/translate</code></li>
+                    <li><strong>知识图谱</strong>：<code>/kg</code></li>
                     <li><strong>思维导图</strong>：<code>/mindmap</code></li>
                     <li><strong>个人中心</strong>：<code>/user</code></li>
                   </ul>
@@ -177,7 +179,7 @@
 
                 <h3 class="manual-h3">我们收集哪些信息</h3>
                 <ul class="manual-list">
-                  <li><strong>账号信息</strong>：注册与登录所需的用户名、电子邮箱等（以注册页字段为准）。</li>
+                  <li><strong>账号信息</strong>：注册与登录所需的昵称、电子邮箱等（以注册页字段为准）；若您使用第三方登录（如 GitHub），我们会保存第三方账号的标识、用户名与头像用于登录与展示。</li>
                   <li><strong>笔记与内容</strong>：您主动创建、编辑或导入的笔记正文、标题与标签等。</li>
                   <li><strong>使用过程数据</strong>：为保障服务与安全，服务端可能记录必要的日志（例如操作时间、功能调用次数统计等），用于排查故障与改进体验。</li>
                   <li><strong>可选：自带模型配置</strong>：若您在个人中心填写推理服务的 API 基址、模型名称与密钥，我们将在您确认保存后接收并<strong>加密存储</strong>密钥类信息，用于按您的指示调用第三方兼容接口。</li>
@@ -213,21 +215,40 @@
                 <h3 class="manual-h3">注册</h3>
                 <ol class="manual-list">
                   <li>在欢迎页点击<strong>免费注册</strong>（或进入 <code>/register</code>）。</li>
-                  <li>按页面提示填写必填项并完成注册。</li>
-                  <li>注册成功后使用用户名与密码登录。</li>
+                  <li>按页面提示填写邮箱、密码、昵称完成注册。密码至少 8 位，须同时包含字母和数字。</li>
+                  <li>注册成功后使用邮箱与密码登录。</li>
+                </ol>
+
+                <h3 class="manual-h3">登录方式</h3>
+                <p class="manual-p">本产品支持三种登录方式，您可任选其一：</p>
+                <ol class="manual-list">
+                  <li><strong>邮箱密码登录</strong>：输入注册时的邮箱和密码。</li>
+                  <li><strong>邮箱验证码登录</strong>：输入邮箱，点击「获取验证码」，输入收到的 6 位验证码即可登录。未注册的邮箱将自动创建账号。</li>
+                  <li><strong>GitHub 登录</strong>：点击「GitHub 登录」按钮，跳转到 GitHub 授权页面，授权后自动登录。首次使用 GitHub 登录会自动创建账号。</li>
                 </ol>
 
                 <h3 class="manual-h3">登录与退出</h3>
                 <ol class="manual-list">
-                  <li>在欢迎页点击<strong>立即登录</strong>（或进入 <code>/login</code>），输入用户名与密码。</li>
+                  <li>在欢迎页点击<strong>立即登录</strong>（或进入 <code>/login</code>），选择登录方式并完成登录。</li>
                   <li>登录成功后一般会进入<strong>首页</strong>；若先前访问过需登录的页面，登录后可能会回到该页面。</li>
-                  <li>退出：点击右上角<strong>用户名</strong>，在下拉菜单中选择<strong>退出登录</strong>。</li>
+                  <li>退出：进入<strong>个人中心</strong>，点击底部「退出登录」按钮。</li>
                 </ol>
 
                 <h3 class="manual-h3">个人中心 · 个人信息</h3>
                 <p class="manual-p">
-                  打开顶部导航<strong>个人中心</strong>（<code>/user</code>）。在<strong>个人信息</strong>卡片中点击<strong>展开</strong>，可查看用户名、邮箱、注册时间；点击头像区域可按提示<strong>更换头像</strong>（支持的格式与大小以页面提示为准）。
+                  打开顶部导航<strong>个人中心</strong>（<code>/user</code>）。在<strong>个人信息</strong>卡片中点击<strong>展开</strong>，可查看昵称、邮箱、注册时间；点击头像区域可按提示<strong>更换头像</strong>（支持的格式与大小以页面提示为准）。
                 </p>
+
+                <h3 class="manual-h3">个人中心 · 账号绑定</h3>
+                <p class="manual-p">
+                  在<strong>账号绑定</strong>卡片中展开，可管理您的登录方式：
+                </p>
+                <ul class="manual-list">
+                  <li><strong>修改昵称</strong>：点击昵称右侧的「修改」按钮，输入新昵称（2-32 个字符，支持字母、数字、中文、下划线、短横线）。</li>
+                  <li><strong>GitHub 绑定</strong>：未绑定时点击「绑定」按钮，在弹出的 GitHub 授权页面完成授权即可绑定。绑定后可使用 GitHub 快捷登录。已绑定可点击「解除」解绑。</li>
+                  <li><strong>邮箱换绑</strong>：点击「换绑」按钮，输入新邮箱和验证码完成换绑。</li>
+                  <li><strong>邮箱解绑</strong>：需要验证密码，且必须已有 GitHub 绑定作为备用登录方式。</li>
+                </ul>
 
                 <h3 class="manual-h3">个人中心 · 数据统计</h3>
                 <p class="manual-p">
@@ -236,7 +257,7 @@
 
                 <h3 class="manual-h3">修改密码</h3>
                 <p class="manual-p">
-                  在个人中心找到<strong>安全设置</strong>卡片，展开后填写<strong>当前密码</strong>、<strong>新密码</strong>（至少 6 位）与<strong>确认密码</strong>，保存即可。
+                  在个人中心找到<strong>安全设置</strong>卡片，展开后填写<strong>当前密码</strong>、<strong>新密码</strong>（至少 8 位，须同时包含字母和数字）与<strong>确认密码</strong>，保存即可。修改密码后所有历史登录会话将失效。
                 </p>
               </section>
 
@@ -545,18 +566,46 @@ const FEATURE_ITEMS = [
     sections: []
   },
   {
+    id: 'manual-feature-kg',
+    title: '知识图谱',
+    routeHint: '/kg',
+    paragraphs: [
+      '知识图谱以可视化方式展示笔记与概念之间的关联网络。蓝色节点代表笔记，橙色节点代表概念，连线表示二者之间的关联强度。'
+    ],
+    sections: [
+      {
+        title: '主要功能',
+        items: [
+          '可拖拽节点：点击并拖动任意节点可调整位置，连接的边会实时更新。',
+          '力导向布局：节点之间存在引力和斥力，会自动调整到较为均衡的位置。',
+          '点击查看详情：点击笔记节点可在右侧面板查看相关概念及相似度；点击概念节点可查看关联的笔记。',
+          '颜色区分：蓝色为笔记节点，橙色为概念节点，便于快速识别。'
+        ]
+      },
+      {
+        title: '使用建议',
+        items: [
+          '笔记数量较多时，图谱可能较密集，可通过拖拽节点来调整布局。',
+          '相似概念和笔记会自动聚集在一起，便于发现知识之间的关联。',
+          '点击节点后右侧面板会展示详细信息，可点击跳转到对应笔记。'
+        ]
+      }
+    ]
+  },
+  {
     id: 'manual-feature-user',
     title: '个人中心',
     routeHint: '/user',
     paragraphs: [
-      '管理头像、邮箱展示、注册时间与密码安全；查看笔记与 AI 使用概况；可选配置自带模型（详见本手册「AI 与自带模型」）。'
+      '管理头像、昵称、邮箱展示、注册时间与密码安全；查看笔记与 AI 使用概况；管理账号绑定（GitHub、邮箱）；可选配置自带模型（详见本手册「AI 与自带模型」）。'
     ],
     sections: [
       {
         title: '常用区块',
         items: [
-          '个人信息：展开后更换头像、查看基本资料。',
+          '个人信息：展开后更换头像、查看昵称、邮箱、注册时间等基本资料。',
           '数据统计：展开后查看笔记数、AI 使用次数、活跃天数等。',
+          '账号绑定：修改昵称、绑定/解绑 GitHub、换绑/解绑邮箱。',
           '安全设置：修改登录密码。',
           'AI 模型（自带密钥）：填写或更新自带推理接口（可选）。'
         ]

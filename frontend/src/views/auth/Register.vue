@@ -10,15 +10,16 @@
         </div>
 
         <el-form :model="form" ref="formRef" label-width="80px">
-          <el-form-item label="用户名" prop="username" :rules="[
-            { required: true, message: '请输入用户名' },
-            { min: 3, max: 32, message: '用户名长度为3-32个字符' },
-            { pattern: /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/, message: '用户名只能包含字母、数字、下划线、短横线，且必须以字母或数字开头' }
+          <el-form-item label="邮箱" prop="email" :rules="[
+            { required: true, message: '请输入邮箱' },
+            { type: 'email', message: '请输入正确的邮箱格式' }
           ]">
-            <el-input v-model="form.username" placeholder="请输入用户名（3-32位，字母数字开头）" />
+            <el-input v-model="form.email" placeholder="请输入邮箱地址" />
           </el-form-item>
-          <el-form-item label="邮箱" prop="email" :rules="[{ required: true, message: '请输入邮箱' }, { type: 'email', message: '请输入正确的邮箱格式' }]">
-            <el-input v-model="form.email" placeholder="请输入邮箱" />
+          <el-form-item label="昵称" prop="nickname" :rules="[
+            { min: 2, max: 32, message: '昵称长度为2-32个字符' }
+          ]">
+            <el-input v-model="form.nickname" placeholder="请输入昵称（可选，默认邮箱前缀）" />
           </el-form-item>
           <el-form-item label="密码" prop="password" :rules="[
             { required: true, message: '请输入密码' },
@@ -74,8 +75,8 @@ const formRef = ref(null)
 const loading = ref(false)
 
 const form = ref({
-  username: '',
   email: '',
+  nickname: '',
   password: '',
   confirmPassword: ''
 })
@@ -88,8 +89,8 @@ async function handleRegister() {
   loading.value = true
   try {
     await userApi.register({
-      username: form.value.username,
       email: form.value.email,
+      nickname: form.value.nickname,
       password: form.value.password
     })
     ElMessage.success('注册成功！请登录')
@@ -97,9 +98,7 @@ async function handleRegister() {
   } catch (error) {
     if (error.response?.status === 400) {
       const detail = error.response.data?.detail
-      if (detail && detail.includes('用户名')) {
-        ElMessage.error('用户名已存在，请更换用户名')
-      } else if (detail && detail.includes('邮箱')) {
+      if (detail && detail.includes('邮箱')) {
         ElMessage.error('该邮箱已被注册')
       } else {
         ElMessage.error(detail || '注册失败，请检查输入信息')

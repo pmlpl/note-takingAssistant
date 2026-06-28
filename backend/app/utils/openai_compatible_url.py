@@ -11,6 +11,8 @@ import ipaddress
 import socket
 from urllib.parse import urlparse, urlunparse
 
+from app.core.config import settings
+
 # SDK appends paths like /chat/completions; base must end at .../v1, not .../v1/models.
 _BAD_BASE_SUFFIXES = ("/models", "/chat/completions")
 
@@ -100,15 +102,21 @@ def assert_safe_llm_url(url: str | None) -> str | None:
 
     # 显式拦截云元数据服务与 Docker 内部服务
     if host in _METADATA_HOSTS or host in _INTERNAL_HOSTNAMES:
-        raise UnsafeLlmUrlError(
-            "LLM API 地址指向内网/云元数据服务被拒绝，请填写公网可访问的推理服务地址。"
-        )
+        if settings.DEBUG:
+            pass
+        else:
+            raise UnsafeLlmUrlError(
+                "LLM API 地址指向内网/云元数据服务被拒绝，请填写公网可访问的推理服务地址。"
+            )
 
     # IPv6 字面量如 [::1] 被 urlparse.hostname 解析为 `::1`，这里同样拦截
     if _is_private_or_link_local_ip(host):
-        raise UnsafeLlmUrlError(
-            "LLM API 地址指向私有/环回/链路本地 IP 被拒绝，请填写公网 IP 或域名。"
-        )
+        if settings.DEBUG:
+            pass
+        else:
+            raise UnsafeLlmUrlError(
+                "LLM API 地址指向私有/环回/链路本地 IP 被拒绝，请填写公网 IP 或域名。"
+            )
 
     # 端口白名单校验
     port = parsed.port
@@ -121,9 +129,12 @@ def assert_safe_llm_url(url: str | None) -> str | None:
 
     # DNS 反向解析兜底：防止用户填的是一个内网可解析域名
     if _host_resolves_to_internal(host):
-        raise UnsafeLlmUrlError(
-            "LLM API 域名解析到内网 IP 被拒绝，请填写公网可访问的推理服务地址。"
-        )
+        if settings.DEBUG:
+            pass
+        else:
+            raise UnsafeLlmUrlError(
+                "LLM API 域名解析到内网 IP 被拒绝，请填写公网可访问的推理服务地址。"
+            )
 
     return url
 

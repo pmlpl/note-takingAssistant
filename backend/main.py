@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from app.api.v1 import user, note, ai, public
+from app.api.v1 import user, note, ai, public, kg, oauth
 from app.core.database import engine, Base, AsyncSessionLocal
-from app.core.startup_migrations import ensure_user_llm_columns
+from app.core.startup_migrations import ensure_user_llm_columns, ensure_user_oauth_columns
 from app.core.config import settings
 from app.core.logger import app_logger as logger
 import os
@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     async with AsyncSessionLocal() as session:
         await ensure_user_llm_columns(session)
+        await ensure_user_oauth_columns(session)
         await session.commit()
     yield
     # 关闭时执行清理操作
@@ -71,8 +72,10 @@ os.makedirs(uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 # 注册路由
 app.include_router(user.router, prefix="/api/v1/user", tags=["用户管理"])
+app.include_router(oauth.router, prefix="/api/v1/oauth", tags=["OAuth登录"])
 app.include_router(note.router, prefix="/api/v1/note", tags=["笔记管理"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI智能模块"])
+app.include_router(kg.router, prefix="/api/v1/kg", tags=["知识图谱"])
 app.include_router(public.router, prefix="/api/v1/public", tags=["公开接口"])
 
 # 测试接口

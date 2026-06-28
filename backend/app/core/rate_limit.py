@@ -20,15 +20,12 @@ from app.core.redis_client import (
 
 # 命名限流策略：key_prefix -> (max_requests, window_seconds)
 LIMIT_POLICIES: Dict[str, tuple[int, int]] = {
-    # 注册：同一 IP 每小时最多 10 次（防止刷号）
     "register": (10, 3600),
-    # 登录：同一 IP 每分钟最多 5 次（防止暴力破解）
     "login": (5, 60),
-    # AI 接口：每用户每分钟 60 次（避免刷算力）
+    "email_code": (3, 300),
+    "email_verify": (10, 300),
     "ai": (60, 60),
-    # 笔记/个人接口：每用户每分钟 120 次
     "notes": (120, 60),
-    # 通用公开接口：每 IP 每分钟 60 次
     "public": (60, 60),
 }
 
@@ -88,11 +85,11 @@ def rate_limit_anon(policy_name: str) -> Callable[[Request], None]:
 
 
 def rate_limit_user(policy_name: str) -> Callable[[Request, dict], None]:
-    """已登录接口的限流依赖 —— 优先按用户名，退化时回退 IP。"""
+    """已登录接口的限流依赖 —— 优先按邮箱，退化时回退 IP。"""
     from app.core.security import get_current_user
 
     def _dep(request: Request, current_user: dict = Depends(get_current_user)) -> None:
-        identifier = current_user.get("username") or _client_ip(request)
+        identifier = current_user.get("email") or _client_ip(request)
         check_and_bump(policy_name, identifier)
 
     return _dep

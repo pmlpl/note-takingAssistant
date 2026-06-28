@@ -1,7 +1,10 @@
 <div align="center">
 
-![智能笔记助手](https://img.shields.io/badge/AI%20智能笔记助手-v1.0.0-8b5cf6?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-1.0.0-10b981?style=for-the-badge)
+<img src="docs/logo.svg" width="120" height="120" alt="智能笔记助手 Logo">
+
+# 智能笔记助手
+
+![Version](https://img.shields.io/badge/Version-1.1.0-10b981?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)
 
 </div>
@@ -27,16 +30,19 @@
 - **AI 能力**：基于 **OpenAI 兼容协议**，可对接 LM Studio 本地推理或云端大模型
 - **BYOK 支持**：用户可在个人中心配置自带模型与 API Key
 
-**v1.0.0 功能总览**
+**v1.1.0 功能总览**
 
 | 模块 | 能力 |
 |------|------|
 | 📝 **笔记管理** | 创建 / 编辑 / 搜索 / 收藏 / 富文本 & Markdown |
 | 🤖 **AI 辅助** | 生成笔记 / 总结 / 翻译 / 多轮对话（流式输出） |
-| 🧠 **思维导图** | 笔记结构可视化 |
+| 🧠 **知识图谱** | 笔记与概念关联可视化，力导向布局，节点拖拽 |
+| 🗺️ **思维导图** | 笔记结构可视化 |
 | 📊 **数据统计** | 个人笔记统计 + 平台注册趋势图 |
 | 🔐 **安全体系** | JWT 认证 / 密码复杂度校验 / 速率限制 / SSRF 防护 / BYOK 密钥加密 |
 | 🐳 **一键部署** | Docker Compose 全套拉起，HTTPS 自动续期 |
+| 🔗 **多种登录方式** | 邮箱密码 / 邮箱验证码 / GitHub OAuth |
+| 👤 **账号管理** | 昵称修改 / 邮箱换绑 / GitHub 绑定解绑 |
 
 ---
 
@@ -50,7 +56,10 @@
 | **AI 笔记生成** | 按主题、关键词、字数生成；可参考已有笔记做扩展 |
 | **AI 流式翻译** | HTML→Markdown 预处理，逐段流式返回，首字等待时间短 |
 | **AI 对话助手** | 首页多轮对话面板，支持上下文与快捷指令 |
+| **知识图谱** | 笔记与概念关联可视化，力导向布局，节点拖拽交互 |
 | **本地/云端推理自由切换** | 既可走服务端默认 LM Studio，也可用户自带模型 Key |
+| **多种登录方式** | 邮箱密码 / 邮箱验证码 / GitHub OAuth 一键登录 |
+| **账号绑定管理** | 昵称修改、邮箱换绑、GitHub 绑定/解绑，多方式灵活管理 |
 
 ### 工程与安全
 
@@ -262,9 +271,12 @@ https://momo.makeup
 
 | 模块 | 接口 |
 |------|------|
-| 👤 用户 | `POST /api/v1/user/register` · `POST /api/v1/user/login` · `GET /api/v1/user/me` |
+| 👤 用户 | `POST /api/v1/user/register` · `POST /api/v1/user/login` · `POST /api/v1/user/logout` · `GET /api/v1/user/me` |
 | 📝 笔记 | `POST /api/v1/note/` · `GET /api/v1/note/` · `GET /api/v1/note/{id}` · `PUT /api/v1/note/{id}` · `DELETE /api/v1/note/{id}` |
 | 🤖 AI | `POST /api/v1/ai/generate-note` · `POST /api/v1/ai/summarize-note` · `POST /api/v1/ai/translate-note-stream` · `POST /api/v1/ai/chat-stream` |
+| 🔐 OAuth | `GET /api/v1/oauth/github/authorize` · `GET /api/v1/oauth/github/callback` |
+| 📧 邮箱验证码 | `POST /api/v1/auth/send-code` · `POST /api/v1/auth/login-by-code` |
+| 🔗 账号绑定 | `GET /api/v1/user/me/bindings` · `PUT /api/v1/user/me/nickname` · `DELETE /api/v1/user/me/bindings/github` · `DELETE /api/v1/user/me/bindings/email` |
 | 🌐 公开统计 | `GET /api/v1/public/stats` · `GET /api/v1/public/daily-registrations` |
 
 ---
@@ -278,9 +290,11 @@ https://momo.makeup
 | `/notes`、`/notes/edit/:id` | 笔记列表 / 编辑 | 是 |
 | `/history` | 历史笔记 | 是 |
 | `/ai/generate`、`/ai/summarize`、`/ai/translate` | AI 创作工具 | 是 |
+| `/kg` | 知识图谱 | 是 |
 | `/mindmap` | 思维导图 | 是 |
-| `/user` | 个人中心（BYOK 配置） | 是 |
+| `/user` | 个人中心（账号绑定、BYOK 配置） | 是 |
 | `/manual` | 使用手册 | 否 |
+| `/oauth-callback` | OAuth 回调页（静默跳转） | 否 |
 
 ---
 
@@ -376,6 +390,6 @@ docker compose down                   # 停止并移除容器（保留数据）
 
 <br>
 
-**v1.0.0** · 最后更新：2026-06-20
+**v1.1.0** · 最后更新：2026-06-28
 
 </div>

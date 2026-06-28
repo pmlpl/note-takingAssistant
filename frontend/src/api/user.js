@@ -41,5 +41,49 @@ export const userApi = {
 
   putLLMSettings(data) {
     return api.put('/v1/user/me/llm-settings', data)
+  },
+
+  // 账号绑定相关
+  getBindings() {
+    return api.get('/v1/user/me/bindings')
+  },
+
+  updateNickname(nickname) {
+    return api.put('/v1/user/me/nickname', { nickname })
+  },
+
+  unbindEmail(password) {
+    return api.delete('/v1/user/me/bindings/email', { data: { password } })
+  },
+
+  unbindGithub() {
+    return api.delete('/v1/user/me/bindings/github')
+  }
+}
+
+export const oauthApi = {
+  githubConfig() {
+    return api.get('/v1/oauth/github/config')
+  },
+
+  githubAuthorize() {
+    return api.post('/v1/oauth/github/authorize')
+  },
+
+  sendEmailCode(data) {
+    return api.post('/v1/oauth/email/send-code', data)
+  },
+
+  verifyEmailCode(data) {
+    return api.post('/v1/oauth/email/verify', data)
+  },
+
+  // 账号绑定相关
+  sendBindCode(data) {
+    return api.post('/v1/oauth/email/bind-code', data)
+  },
+
+  bindEmail(data) {
+    return api.post('/v1/oauth/email/bind', data)
   }
 }

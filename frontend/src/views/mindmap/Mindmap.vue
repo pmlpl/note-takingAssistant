@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onActivated, onUnmounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { IconMindmap } from '@/components/icons'
 import {
@@ -649,6 +649,12 @@ async function loadInitialMindmapSource() {
 onMounted(async () => {
   await nextTick()
   setupPreviewResizeObserver()
+  await loadInitialMindmapSource()
+})
+
+// keep-alive 缓存后再次进入时，重新检查是否有从首页跳转带来的新导图
+onActivated(async () => {
+  await nextTick()
   await loadInitialMindmapSource()
 })
 

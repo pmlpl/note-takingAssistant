@@ -141,7 +141,6 @@ onActivated(async () => {
 async function loadNote(id) {
   try {
     const note = await noteApi.getNote(id)
-    console.log('加载的笔记数据:', note)
     
     // 直接使用后端返回的原始内容，不做任何转换
     // 富文本编辑器会自己处理 HTML/Markdown 格式

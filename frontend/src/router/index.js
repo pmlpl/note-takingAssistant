@@ -69,6 +69,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/knowledge-graph',
+    name: 'KnowledgeGraph',
+    component: () => import('@/views/kg/KnowledgeGraph.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/manual',
     name: 'UserManual',
     component: () => import('@/views/help/UserManual.vue'),
@@ -79,6 +85,12 @@ const routes = [
     name: 'UserCenter',
     component: () => import('@/views/user/UserCenter.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/oauth-callback',
+    name: 'OAuthCallback',
+    component: () => import('@/views/auth/OAuthCallback.vue'),
+    meta: { transition: 'fade' }
   }
 ]
 

@@ -5,7 +5,7 @@ from datetime import datetime
 
 # Pydantic模型 - 用于请求/响应
 class UserBase(BaseModel):
-    username: str
+    nickname: Optional[str] = None
     email: Optional[str] = None
     avatar_url: Optional[str] = None
 
@@ -15,14 +15,16 @@ class UserCreate(UserBase):
 
 
 class UserLogin(BaseModel):
-    username: str
+    email: str
     password: str
 
 
 class UserResponse(UserBase):
     id: int
+    username: Optional[str] = None
+    email_verified: bool = False
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -66,7 +68,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 # SQLAlchemy数据库模型
-from sqlalchemy import Column, Integer, String, DateTime, Text, text
+from sqlalchemy import Column, Integer, String, DateTime, Text, text, Boolean, ForeignKey
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -75,13 +77,27 @@ class UserDB(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True, nullable=False)
-    email = Column(String(100), unique=True, index=True, nullable=True)
+    username = Column(String(50), unique=True, index=True, nullable=True)
+    nickname = Column(String(50), nullable=True)
+    email = Column(String(255), unique=True, index=True, nullable=True)
+    email_verified = Column(Boolean, nullable=False, server_default=text('0'), default=False)
     hashed_password = Column(String(255), nullable=False)
-    avatar_url = Column(Text, nullable=True)  # 头像URL
+    avatar_url = Column(Text, nullable=True)
     llm_base_url = Column(Text, nullable=True)
     llm_model = Column(String(512), nullable=True)
     llm_api_key_encrypted = Column(Text, nullable=True)
-    # 令牌代数：改密后自增 1，任何 token 中携带的 tgen 若小于此值即失效
     token_gen = Column(Integer, nullable=False, server_default=text('0'), default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class OAuthAccountDB(Base):
+    __tablename__ = "oauth_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider = Column(String(20), nullable=False, index=True)
+    openid = Column(String(128), nullable=False, index=True)
+    provider_username = Column(String(128), nullable=True)
+    access_token = Column(Text, nullable=True)
+    avatar_url = Column(String(512), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -64,7 +64,7 @@ async def upload_image(
 
 async def _get_db_user(db: AsyncSession, current_user: dict):
     """获取当前登录的数据库用户（复用代码）"""
-    db_user = await crud_user.get_user_by_username(db, username=current_user["username"])
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
     return db_user

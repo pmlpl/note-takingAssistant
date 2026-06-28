@@ -1,4 +1,4 @@
-﻿<template>
+<template>
     <div class="note-translate-page">
       <header class="page-header">
         <el-button link class="back-btn" @click="goBack">
@@ -205,6 +205,7 @@ function translateUserScope() {
   const u = userStore.user
   if (!u) return null
   if (u.id != null && u.id !== '') return `u${u.id}`
+  if (u.email) return `email_${u.email}`
   if (u.username) return `name_${u.username}`
   return null
 }
@@ -306,7 +307,7 @@ onActivated(() => {
 })
 
 watch(
-  () => [userStore.user?.id, userStore.user?.username, userStore.authSessionEpoch],
+  () => [userStore.user?.id, userStore.user?.email, userStore.authSessionEpoch],
   () => {
     void ensureTranslateSessionForCurrentUser()
   }

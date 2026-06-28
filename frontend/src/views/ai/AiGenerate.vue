@@ -225,7 +225,7 @@ import { IconMagic, IconPlus, IconEdit, IconUpload, IconDocument } from '@/compo
 import { ElMessage } from 'element-plus'
 import {IconNotebook} from "@/components/icons/index.js";
 import { Loading } from '@element-plus/icons-vue'
-import { sanitizeHtml } from '@/utils/htmlSanitize'
+import { sanitizeHtml, renderMarkdownToSafeHtml } from '@/utils/htmlSanitize'
 
 defineOptions({
   name: 'AiGenerate'
@@ -245,10 +245,10 @@ const form = ref({
 
 const loading = ref(false)
 const saving = ref(false)
-const noteContent = ref('')  // 富文本内容（HTML）
-const sanitizedNoteHtml = computed(() => sanitizeHtml(noteContent.value))
-const rawMarkdown = ref('')  // 原始 Markdown 内容
-const displayMode = ref('rich')  // 显示模式：'rich' 富文本, 'markdown' 原始Markdown
+const rawMarkdown = ref('')
+const noteContent = computed(() => rawMarkdown.value ? renderMarkdownToSafeHtml(rawMarkdown.value) : '')
+const sanitizedNoteHtml = computed(() => rawMarkdown.value ? sanitizeHtml(noteContent.value) : '')
+const displayMode = ref('rich')
 
 const STREAM_MS = Number(import.meta.env.VITE_AI_REQUEST_TIMEOUT_MS) || 600_000
 let generateAbortController = null
@@ -269,7 +269,6 @@ function resetGeneratePageForNewUser() {
   }
   loading.value = false
   saving.value = false
-  noteContent.value = ''
   rawMarkdown.value = ''
   displayMode.value = 'rich'
   fileList.value = []
@@ -366,7 +365,6 @@ async function generateNote() {
 
   const runId = ++generateRunId
   loading.value = true
-  noteContent.value = ''
   rawMarkdown.value = ''
 
   generateAbortController?.abort()
@@ -394,7 +392,6 @@ async function generateNote() {
       onChunk: (acc) => {
         if (runId !== generateRunId) return
         rawMarkdown.value = acc
-        noteContent.value = convertMarkdownToHtml(acc)
       }
     })
 
@@ -420,7 +417,6 @@ async function generateNote() {
       } else {
         ElMessage.error(typeof msg === 'string' ? msg : '生成失败，请重试')
       }
-      noteContent.value = ''
       rawMarkdown.value = ''
     }
   } finally {
@@ -564,50 +560,6 @@ ${htmlContent}
 </body>
 </html>
   `.trim()
-}
-
-// 简单的 Markdown 转 HTML 函数
-function convertMarkdownToHtml(markdown) {
-  let html = markdown
-  
-  // 转换标题
-  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>')
-  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>')
-  html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>')
-  
-  // 转换粗体
-  html = html.replace(/\*\*(.+?)\*\*/gim, '<strong>$1</strong>')
-  
-  // 转换斜体
-  html = html.replace(/\*(.+?)\*/gim, '<em>$1</em>')
-  
-  // 转换代码块
-  html = html.replace(/```([\s\S]*?)```/gim, '<pre><code>$1</code></pre>')
-  
-  // 转换行内代码
-  html = html.replace(/`([^`]+)`/gim, '<code>$1</code>')
-  
-  // 转换无序列表
-  html = html.replace(/^\s*[-*+]\s+(.*)$/gim, '<li>$1</li>')
-  html = html.replace(/(<li>.*<\/li>)/gis, '<ul>$1</ul>')
-  
-  // 转换有序列表
-  html = html.replace(/^\s*\d+\.\s+(.*)$/gim, '<li>$1</li>')
-  
-  // 转换段落（简单的换行）
-  html = html.replace(/\n\n/gim, '</p><p>')
-  html = '<p>' + html + '</p>'
-  
-  // 清理空段落
-  html = html.replace(/<p>\s*<\/p>/gim, '')
-  html = html.replace(/<p>\s*(<h[1-3]>)/gim, '$1')
-  html = html.replace(/(<\/h[1-3]>)\s*<\/p>/gim, '$1')
-  html = html.replace(/<p>\s*(<ul>)/gim, '$1')
-  html = html.replace(/(<\/ul>)\s*<\/p>/gim, '$1')
-  html = html.replace(/<p>\s*(<pre>)/gim, '$1')
-  html = html.replace(/(<\/pre>)\s*<\/p>/gim, '$1')
-  
-  return html
 }
 </script>
 
