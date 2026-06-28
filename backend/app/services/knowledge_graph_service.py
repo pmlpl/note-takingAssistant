@@ -19,10 +19,11 @@ from app.services.llm_runtime import openai_client_and_model_for_user
 from app.core.logger import app_logger as logger
 
 
-SIMILARITY_THRESHOLD = 0.3
+SIMILARITY_THRESHOLD = 0.35
 MAX_RELATIONS_PER_NOTE = 5
 MAX_CONCEPTS_PER_NOTE = 8
-MIN_CONCEPT_FREQ = 1
+MIN_CONCEPT_NOTE_FREQ = 2
+TITLE_WEIGHT = 3.0
 
 
 def _clean_html(text: str) -> str:
@@ -33,14 +34,14 @@ def _clean_html(text: str) -> str:
     return text
 
 
-def _extract_keywords(text: str, top_n: int = 20) -> Dict[str, float]:
+def _tokenize(text: str) -> List[str]:
     if not text:
-        return {}
+        return []
     text = _clean_html(text)
     text = re.sub(r'[^\w\u4e00-\u9fa5]', ' ', text.lower())
     words = [w for w in text.split() if len(w) >= 2]
     if not words:
-        return {}
+        return []
     stop_words = {
         'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
         'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
@@ -75,16 +76,43 @@ def _extract_keywords(text: str, top_n: int = 20) -> Dict[str, float]:
         '一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
         '第', '章', '节', '点', '个', '项', '类', '种', '条',
     }
-    words = [w for w in words if w not in stop_words]
-    counter = Counter(words)
-    total = len(words)
-    if total == 0:
-        return {}
-    keywords = {}
-    for word, count in counter.most_common(top_n):
-        tf = count / total
-        keywords[word] = tf
-    return keywords
+    return [w for w in words if w not in stop_words]
+
+
+def _compute_tfidf(notes: List[NoteDB]) -> Tuple[Dict[int, Dict[str, float]], Dict[str, float]]:
+    doc_count = len(notes)
+    if doc_count == 0:
+        return {}, {}
+
+    word_doc_freq = defaultdict(int)
+    note_word_counts = {}
+
+    for note in notes:
+        title_words = _tokenize(note.title or "")
+        content_words = _tokenize(note.content or "")
+        weighted_words = title_words * int(TITLE_WEIGHT) + content_words
+        counter = Counter(weighted_words)
+        note_word_counts[note.id] = counter
+        for word in set(weighted_words):
+            word_doc_freq[word] += 1
+
+    idf = {}
+    for word, df in word_doc_freq.items():
+        idf[word] = math.log((doc_count + 1) / (df + 1)) + 1
+
+    tfidf_vectors = {}
+    for note_id, counter in note_word_counts.items():
+        total = sum(counter.values())
+        if total == 0:
+            tfidf_vectors[note_id] = {}
+            continue
+        tfidf = {}
+        for word, count in counter.items():
+            tf = count / total
+            tfidf[word] = tf * idf.get(word, 1.0)
+        tfidf_vectors[note_id] = tfidf
+
+    return tfidf_vectors, idf
 
 
 def _cosine_similarity(vec_a: Dict[str, float], vec_b: Dict[str, float]) -> float:
@@ -148,14 +176,17 @@ async def _extract_concepts_with_llm(note: NoteDB, db_user: UserDB) -> List[Tupl
         return concepts[:MAX_CONCEPTS_PER_NOTE]
     except Exception as e:
         logger.info(f"LLM 概念提取失败，降级使用关键词提取: {e}")
-        title_keywords = _extract_keywords(note.title or "", top_n=10)
-        content_keywords = _extract_keywords(note.content or "", top_n=20)
-        merged = {}
-        for word, tf in content_keywords.items():
-            merged[word] = tf
-        for word, tf in title_keywords.items():
-            merged[word] = merged.get(word, 0) + tf * 3
-        sorted_keywords = sorted(merged.items(), key=lambda x: x[1], reverse=True)
+        title_words = _tokenize(note.title or "")
+        content_words = _tokenize(note.content or "")
+        weighted_words = title_words * int(TITLE_WEIGHT) + content_words
+        counter = Counter(weighted_words)
+        total = len(weighted_words)
+        if total == 0:
+            return []
+        keywords = {}
+        for word, count in counter.most_common(MAX_CONCEPTS_PER_NOTE * 2):
+            keywords[word] = count / total
+        sorted_keywords = sorted(keywords.items(), key=lambda x: x[1], reverse=True)
         return [(word, min(weight, 1.0)) for word, weight in sorted_keywords[:MAX_CONCEPTS_PER_NOTE]]
 
 
@@ -167,24 +198,16 @@ async def build_knowledge_graph(db: AsyncSession, user_id: int, db_user: UserDB)
     if not notes:
         return [], [], {"note_count": 0, "concept_count": 0, "edge_count": 0}
 
-    note_keywords = {}
-    for note in notes:
-        title_keywords = _extract_keywords(note.title or "", top_n=10)
-        content_keywords = _extract_keywords(note.content or "", top_n=30)
-        merged = {}
-        for word, tf in content_keywords.items():
-            merged[word] = tf
-        for word, tf in title_keywords.items():
-            merged[word] = merged.get(word, 0) + tf * 3
-        note_keywords[note.id] = merged
+    tfidf_vectors, idf = _compute_tfidf(notes)
 
     edges = []
+    note_ids = [n.id for n in notes]
     for i, note_a in enumerate(notes):
         similarities = []
         for j, note_b in enumerate(notes):
             if i >= j:
                 continue
-            sim = _cosine_similarity(note_keywords[note_a.id], note_keywords[note_b.id])
+            sim = _cosine_similarity(tfidf_vectors.get(note_a.id, {}), tfidf_vectors.get(note_b.id, {}))
             if sim >= SIMILARITY_THRESHOLD:
                 similarities.append((note_b.id, sim))
         similarities.sort(key=lambda x: x[1], reverse=True)
@@ -201,7 +224,18 @@ async def build_knowledge_graph(db: AsyncSession, user_id: int, db_user: UserDB)
 
     for note in notes:
         concepts = await _extract_concepts_with_llm(note, db_user)
-        for concept_name, weight in concepts:
+        note_tfidf = tfidf_vectors.get(note.id, {})
+        if not concepts and note_tfidf:
+            sorted_tfidf = sorted(note_tfidf.items(), key=lambda x: x[1], reverse=True)
+            top_concepts = [(w, min(v, 1.0)) for w, v in sorted_tfidf[:MAX_CONCEPTS_PER_NOTE]]
+        else:
+            enhanced = []
+            for name, weight in concepts:
+                name_lower = name.lower()
+                extra_weight = note_tfidf.get(name_lower, 0) * 0.5
+                enhanced.append((name, min(weight + extra_weight, 1.0)))
+            top_concepts = enhanced
+        for concept_name, weight in top_concepts:
             all_concepts[concept_name]["weight"] += weight
             all_concepts[concept_name]["note_ids"].append(note.id)
             concept_note_edges.append({
@@ -213,7 +247,7 @@ async def build_knowledge_graph(db: AsyncSession, user_id: int, db_user: UserDB)
     frequent_concepts = {
         name: data
         for name, data in all_concepts.items()
-        if len(data["note_ids"]) >= MIN_CONCEPT_FREQ
+        if len(data["note_ids"]) >= MIN_CONCEPT_NOTE_FREQ
     }
 
     nodes = []
