@@ -82,8 +82,6 @@ def _extract_keywords(text: str, top_n: int = 20) -> Dict[str, float]:
         return {}
     keywords = {}
     for word, count in counter.most_common(top_n):
-        if count < 2:
-            continue
         tf = count / total
         keywords[word] = tf
     return keywords
@@ -150,8 +148,15 @@ async def _extract_concepts_with_llm(note: NoteDB, db_user: UserDB) -> List[Tupl
         return concepts[:MAX_CONCEPTS_PER_NOTE]
     except Exception as e:
         logger.info(f"LLM 概念提取失败，降级使用关键词提取: {e}")
-        keywords = _extract_keywords(f"{note.title} {note.content}", top_n=MAX_CONCEPTS_PER_NOTE)
-        return [(word, weight) for word, weight in keywords.items()][:MAX_CONCEPTS_PER_NOTE]
+        title_keywords = _extract_keywords(note.title or "", top_n=10)
+        content_keywords = _extract_keywords(note.content or "", top_n=20)
+        merged = {}
+        for word, tf in content_keywords.items():
+            merged[word] = tf
+        for word, tf in title_keywords.items():
+            merged[word] = merged.get(word, 0) + tf * 3
+        sorted_keywords = sorted(merged.items(), key=lambda x: x[1], reverse=True)
+        return [(word, min(weight, 1.0)) for word, weight in sorted_keywords[:MAX_CONCEPTS_PER_NOTE]]
 
 
 async def build_knowledge_graph(db: AsyncSession, user_id: int, db_user: UserDB) -> Tuple[List[KGNode], List[KGEdge], Dict]:
@@ -164,8 +169,14 @@ async def build_knowledge_graph(db: AsyncSession, user_id: int, db_user: UserDB)
 
     note_keywords = {}
     for note in notes:
-        text = f"{note.title} {note.content}"
-        note_keywords[note.id] = _extract_keywords(text, top_n=30)
+        title_keywords = _extract_keywords(note.title or "", top_n=10)
+        content_keywords = _extract_keywords(note.content or "", top_n=30)
+        merged = {}
+        for word, tf in content_keywords.items():
+            merged[word] = tf
+        for word, tf in title_keywords.items():
+            merged[word] = merged.get(word, 0) + tf * 3
+        note_keywords[note.id] = merged
 
     edges = []
     for i, note_a in enumerate(notes):
