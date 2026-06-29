@@ -1,0 +1,27 @@
+name: Desktop CI
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'Desktop-note/**'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'Desktop-note/**'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Desktop-note
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore dependencies
+        run: dotnet restore SmartNote.sln
+      - name: Build
+        run: dotnet build SmartNote.sln --configuration Release --no-restore

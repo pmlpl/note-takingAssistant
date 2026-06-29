@@ -2,10 +2,9 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# 安装系统依赖（mysql-connector-python 需要）
+# aiomysql 使用纯 Python MySQL 协议，无需系统级 MySQL 客户端库
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    default-libmysqlclient-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 先复制依赖文件，利用 Docker 缓存层

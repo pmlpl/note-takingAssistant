@@ -1,48 +1,30 @@
 <template>
-  <section
+  <article
     ref="root"
-    class="feature-row"
-    :class="[{ 'is-visible': visible, 'feature-row--reverse': feature.reverse }]"
+    class="feature-card"
+    :class="{ 'is-visible': visible }"
   >
-    <div class="feature-inner">
-      <div class="feature-media">
-        <div v-if="visible && !imageReady && !imageError" class="media-placeholder" />
-        <img
-          v-if="visible"
-          ref="imgRef"
-          :src="feature.image"
-          :alt="feature.title"
-          class="feature-img"
-          :class="{ 'feature-img--ready': imageReady }"
-          decoding="async"
-          @load="markImageReady"
-          @error="onImageError"
-        />
-        <p v-if="imageError" class="media-error">图片加载失败，请刷新重试</p>
-      </div>
-      <div class="feature-copy">
-        <span class="feature-tag">{{ feature.subtitle }}</span>
-        <h3>{{ feature.title }}</h3>
-        <p>{{ feature.description }}</p>
-        <el-button
-          v-if="feature.external"
-          type="primary"
-          class="feature-cta"
-          @click="openExternal(feature.external)"
-        >
-          {{ feature.cta }}
-        </el-button>
-        <el-button
-          v-else
-          type="primary"
-          class="feature-cta"
-          @click="$emit('navigate', feature.route)"
-        >
-          {{ feature.cta }}
-        </el-button>
-      </div>
+    <div class="feature-card__media">
+      <div v-if="visible && !imageReady && !imageError" class="media-placeholder" />
+      <img
+        v-if="visible"
+        ref="imgRef"
+        :src="feature.image"
+        :alt="feature.title"
+        class="feature-card__img"
+        :class="{ 'feature-card__img--ready': imageReady }"
+        decoding="async"
+        @load="markImageReady"
+        @error="onImageError"
+      />
+      <p v-if="imageError" class="media-error">图片加载失败，请刷新重试</p>
     </div>
-  </section>
+    <div class="feature-card__body">
+      <div class="feature-card__tag">{{ feature.subtitle }}</div>
+      <h3 class="feature-card__title">{{ feature.title }}</h3>
+      <p class="feature-card__desc">{{ feature.description }}</p>
+      </div>
+  </article>
 </template>
 
 <script setup>
@@ -55,7 +37,7 @@ const props = defineProps({
 
 defineEmits(['navigate'])
 
-const { root, visible } = useLazyReveal({ rootMargin: '0px 0px -8% 0px', threshold: 0.08 })
+const { root, visible } = useLazyReveal({ rootMargin: '0px 0px -5% 0px', threshold: 0.08 })
 const imgRef = ref(null)
 const imageReady = ref(false)
 const imageError = ref(false)
@@ -91,55 +73,40 @@ function openExternal(url) {
 </script>
 
 <style scoped>
-.feature-row {
-  width: 100%;
-  padding: 8px clamp(20px, 4vw, 48px) 36px;
-  margin: 0;
+.feature-card {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.7);
+  border: 2.5px solid var(--color-pencil);
+  border-radius: var(--radius-wobbly-md);
+  box-shadow: var(--shadow-hard-sm);
+  overflow: hidden;
   opacity: 0;
-  transform: translateY(36px);
-  transition: opacity 0.7s ease, transform 0.7s ease;
+  transform: translateY(28px);
+  transition: opacity 0.6s ease, transform 0.6s ease, box-shadow 0.3s ease;
+  cursor: default;
 }
 
-.feature-row.is-visible {
+.feature-card:hover {
+  box-shadow: var(--shadow-hard);
+  transform: translateY(-4px);
+}
+
+.feature-card.is-visible {
   opacity: 1;
   transform: translateY(0);
 }
 
-/* 区块之间的短虚线（非通栏黑线） */
-.feature-row + .feature-row::before {
-  content: '';
-  display: block;
-  width: min(260px, 36vw);
-  margin: 0 auto 32px;
-  border-top: 2px dashed rgba(45, 45, 45, 0.38);
+.feature-card.is-visible:hover {
+  transform: translateY(-4px);
 }
 
-.feature-inner {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: clamp(24px, 4vw, 48px);
-  align-items: center;
-}
-
-.feature-row--reverse .feature-media {
-  order: 2;
-}
-
-.feature-row--reverse .feature-copy {
-  order: 1;
-}
-
-.feature-media {
+/* ── 图片区 ── */
+.feature-card__media {
   position: relative;
-  border: 3px solid var(--color-pencil);
-  border-radius: var(--radius-wobbly-md);
-  box-shadow: var(--shadow-hard);
   overflow: hidden;
-  background: #fff;
-  min-height: 240px;
+  min-height: 180px;
+  background: #f0ebe3;
 }
 
 .media-placeholder {
@@ -153,25 +120,27 @@ function openExternal(url) {
 }
 
 @keyframes shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 
-.feature-img {
+.feature-card__img {
   display: block;
   width: 100%;
   height: auto;
+  min-height: 180px;
+  object-fit: cover;
   vertical-align: middle;
   opacity: 0;
-  transition: opacity 0.45s ease;
+  transition: opacity 0.45s ease, transform 0.5s ease;
 }
 
-.feature-img--ready {
+.feature-card__img--ready {
   opacity: 1;
+}
+
+.feature-card:hover .feature-card__img--ready {
+  transform: scale(1.03);
 }
 
 .media-error {
@@ -188,64 +157,50 @@ function openExternal(url) {
   background: #faf9f6;
 }
 
-.feature-copy {
+/* ── 文案区 ── */
+.feature-card__body {
+  padding: 20px clamp(20px, 3vw, 28px) 24px;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 8px 0;
-  background: transparent;
 }
 
-.feature-copy h3 {
-  font-family: var(--font-heading);
-  font-size: clamp(24px, 3vw, 32px);
-  margin: 8px 0 16px;
-}
-
-.feature-tag {
+.feature-card__tag {
   display: inline-block;
-  font-size: 13px;
-  padding: 4px 12px;
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 12px;
   border: 2px solid var(--color-pencil);
   border-radius: var(--radius-wobbly-sm);
   background: var(--color-yellow);
-  width: fit-content;
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
 }
 
-.feature-copy p {
-  font-size: clamp(15px, 1.6vw, 17px);
-  line-height: 1.75;
-  color: #444;
-  margin: 0 0 24px;
-  max-width: 52ch;
+.feature-card__title {
+  font-family: var(--font-heading);
+  font-size: clamp(20px, 2.5vw, 26px);
+  margin: 0 0 12px;
+  line-height: 1.25;
 }
 
-.feature-cta {
-  font-size: 16px !important;
-  width: fit-content;
+.feature-card__desc {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #555;
+  margin: 0 0 20px;
+  flex: 1;
+}
+
+.feature-card__cta {
+  align-self: flex-start;
+  font-size: 14px !important;
 }
 
 @media (max-width: 768px) {
-  .feature-inner {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
-
-  .feature-media {
-    min-height: 200px;
-  }
-
-  .feature-row--reverse .feature-media,
-  .feature-row--reverse .feature-copy {
-    order: unset;
-  }
-
-  .feature-copy {
-    padding: 0 4px 8px;
-  }
-
-  .feature-copy p {
-    max-width: none;
+  .feature-card__media {
+    min-height: 160px;
   }
 }
 </style>

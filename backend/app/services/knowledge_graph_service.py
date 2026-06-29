@@ -24,6 +24,7 @@ MAX_RELATIONS_PER_NOTE = 5
 MAX_CONCEPTS_PER_NOTE = 8
 MIN_CONCEPT_NOTE_FREQ = 2
 TITLE_WEIGHT = 3.0
+MAX_NOTES_FOR_GRAPH = 100
 
 
 def _clean_html(text: str) -> str:
@@ -192,7 +193,7 @@ async def _extract_concepts_with_llm(note: NoteDB, db_user: UserDB) -> List[Tupl
 
 async def build_knowledge_graph(db: AsyncSession, user_id: int, db_user: UserDB) -> Tuple[List[KGNode], List[KGEdge], Dict]:
     result = await db.execute(
-        select(NoteDB).where(NoteDB.user_id == user_id).order_by(NoteDB.updated_at.desc())
+        select(NoteDB).where(NoteDB.user_id == user_id).order_by(NoteDB.updated_at.desc()).limit(MAX_NOTES_FOR_GRAPH)
     )
     notes = result.scalars().all()
     if not notes:

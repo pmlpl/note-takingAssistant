@@ -8,7 +8,7 @@
             <AppLogo :size="28" />
             <span class="brand-name">智能笔记助手</span>
           </button>
-          <p class="brand-tagline">AI 驱动的个人笔记与学习助手 · 毕业设计作品</p>
+          <p class="brand-tagline">AI 驱动的个人笔记与学习助手<br />基于 Vue 3 + FastAPI 全栈构建</p>
           <a
             class="brand-github"
             :href="GITHUB_REPO_URL"
@@ -17,7 +17,8 @@
             aria-label="GitHub 开源仓库"
             title="GitHub"
           >
-            <IconGitHub :size="26" color="currentColor" />
+            <IconGitHub :size="24" color="currentColor" />
+            <span>Star on GitHub</span>
           </a>
         </div>
 
@@ -58,7 +59,7 @@
       </div>
 
       <div class="site-footer__bottom">
-        <p class="copyright">© {{ year }} 智能笔记助手 · 毕业设计作品</p>
+        <p class="copyright">© {{ year }} 智能笔记助手 · All rights reserved</p>
         <p class="credit">Made with Vue 3 + FastAPI</p>
       </div>
     </div>
@@ -100,7 +101,7 @@ function onAnchor(anchor) {
 .site-footer {
   --footer-bg: #1e1e1e;
   --footer-text: #f5f0e6;
-  --footer-muted: rgba(245, 240, 230, 0.65);
+  --footer-muted: rgba(245, 240, 230, 0.6);
   --footer-accent: #c45c26;
   width: 100%;
   margin-top: 0;
@@ -109,9 +110,14 @@ function onAnchor(anchor) {
 }
 
 .site-footer__accent {
-  height: 6px;
+  height: 4px;
   width: 100%;
-  background: var(--footer-accent);
+  background: linear-gradient(
+    90deg,
+    var(--footer-accent) 0%,
+    var(--color-accent) 50%,
+    var(--footer-accent) 100%
+  );
 }
 
 .site-footer__inner {
@@ -123,7 +129,7 @@ function onAnchor(anchor) {
   display: grid;
   grid-template-columns: 1.4fr repeat(3, 1fr);
   gap: 32px 24px;
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto 36px;
 }
 
@@ -143,17 +149,17 @@ function onAnchor(anchor) {
   color: inherit;
   font-family: var(--font-heading);
   font-size: 20px;
+  transition: opacity 0.2s;
 }
 
-.brand-lockup:hover .brand-name {
-  text-decoration: underline;
-  text-underline-offset: 4px;
+.brand-lockup:hover {
+  opacity: 0.8;
 }
 
 .brand-tagline {
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--footer-muted);
   max-width: 280px;
 }
@@ -161,20 +167,21 @@ function onAnchor(anchor) {
 .brand-github {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
+  gap: 8px;
   color: var(--footer-text);
   text-decoration: none;
-  border: 2px solid rgba(245, 240, 230, 0.25);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border: 2px solid rgba(245, 240, 230, 0.2);
   border-radius: var(--radius-wobbly-sm);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
   transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
 .brand-github:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
   border-color: var(--footer-accent);
   transform: translateY(-2px);
 }
@@ -208,20 +215,19 @@ function onAnchor(anchor) {
   cursor: pointer;
   font-family: inherit;
   line-height: 1.4;
+  transition: color 0.2s;
 }
 
 .col-links a:hover,
 .col-link-btn:hover {
   color: var(--footer-text);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .site-footer__bottom {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
   padding-top: 24px;
-  border-top: 1px solid rgba(245, 240, 230, 0.15);
+  border-top: 1px solid rgba(245, 240, 230, 0.12);
   display: flex;
   flex-wrap: wrap;
   align-items: center;

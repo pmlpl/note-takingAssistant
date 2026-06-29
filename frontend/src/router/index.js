@@ -69,16 +69,20 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/knowledge-graph',
+    path: '/kg',
     name: 'KnowledgeGraph',
     component: () => import('@/views/kg/KnowledgeGraph.vue'),
     meta: { requiresAuth: true }
   },
   {
+    path: '/knowledge-graph',
+    redirect: '/kg'
+  },
+  {
     path: '/manual',
     name: 'UserManual',
     component: () => import('@/views/help/UserManual.vue'),
-    meta: { requiresAuth: true, transition: 'fade' }
+    meta: { requiresAuth: false, transition: 'fade' }
   },
   {
     path: '/user',

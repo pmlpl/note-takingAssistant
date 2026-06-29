@@ -1,12 +1,26 @@
 <template>
   <div class="rich-text-shell">
-    <div ref="editorRef" class="rich-text-editor"></div>
+    <Toolbar
+      class="rich-text-toolbar"
+      :editor="editorRef"
+      :defaultConfig="toolbarConfig"
+      mode="default"
+    />
+    <Editor
+      class="rich-text-editor"
+      v-model="valueHtml"
+      :defaultConfig="editorConfig"
+      mode="default"
+      @onCreated="handleCreated"
+      @onChange="handleChange"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import WangEditor from 'wangeditor'
+import { ref, shallowRef, onBeforeUnmount, watch } from 'vue'
+import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
+import '@wangeditor/editor/dist/css/style.css'
 
 const props = defineProps({
   modelValue: {
@@ -17,45 +31,52 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-const editorRef = ref(null)
-let editor = null
+const editorRef = shallowRef()
+const valueHtml = ref(props.modelValue)
 
-onMounted(() => {
-  editor = new WangEditor(editorRef.value)
+const toolbarConfig = {}
 
-  editor.config.uploadImgShowBase64 = true
-  editor.config.onchange = (html) => {
-    emit('update:modelValue', html)
+const editorConfig = {
+  placeholder: '请输入内容...',
+  MENU_CONF: {
+    uploadImage: {
+      base64LimitSize: 10 * 1024 * 1024
+    }
   }
+}
 
-  editor.create()
+const handleCreated = (editor) => {
+  editorRef.value = editor
+}
 
-  if (props.modelValue) {
-    editor.txt.html(props.modelValue)
+const handleChange = (editor) => {
+  emit('update:modelValue', editor.getHtml())
+}
+
+watch(() => props.modelValue, (newVal) => {
+  if (editorRef.value && newVal !== editorRef.value.getHtml()) {
+    valueHtml.value = newVal
   }
 })
 
-watch(() => props.modelValue, (newVal) => {
-  if (editor && newVal !== editor.txt.html()) {
-    editor.txt.html(newVal)
-  }
+onBeforeUnmount(() => {
+  const editor = editorRef.value
+  if (editor == null) return
+  editor.destroy()
 })
 
 defineExpose({
-  getContent: () => editor?.txt.html(),
-  setContent: (content) => editor?.txt.html(content)
+  getContent: () => editorRef.value?.getHtml() || '',
+  setContent: (content) => {
+    if (editorRef.value) {
+      editorRef.value.setHtml(content)
+    }
+  }
 })
 </script>
 
 <style scoped>
-/* Flex 子项默认 min-width:auto，会被 Word 宽表格撑开导致整页横向滚动 */
 .rich-text-shell {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-}
-
-.rich-text-editor {
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -65,20 +86,18 @@ defineExpose({
   box-sizing: border-box;
 }
 
-.rich-text-editor :deep(.w-e-toolbar) {
+.rich-text-toolbar {
   border-bottom: 1px solid #e4e7ed;
   flex-wrap: wrap;
 }
 
-.rich-text-editor :deep(.w-e-text-container) {
-  height: min(120vh, 800px) !important;
-  overflow: hidden !important;
-}
-
-.rich-text-editor :deep(.w-e-scroll) {
-  height: 100% !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
+.rich-text-editor {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: min(120vh, 800px);
+  overflow: hidden;
+  overflow-y: auto;
 }
 
 .rich-text-editor :deep(.w-e-text) {
