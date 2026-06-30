@@ -1,4 +1,8 @@
-"""Lightweight DDL for deployments without Alembic (idempotent)."""
+"""Lightweight DDL for deployments without Alembic (idempotent).
+
+If Alembic has been applied (alembic_version table exists), all DDL is skipped
+since Alembic is the source of truth for schema management.
+"""
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,8 +12,23 @@ from app.models.kg import KGConceptDB, KGRelationDB, KGStatusDB  # noqa: F401
 from app.models.user import UserDB, OAuthAccountDB  # noqa: F401
 
 
+async def _alembic_applied(conn) -> bool:
+    """Return True if alembic_version table exists, meaning Alembic has taken over."""
+    if engine.dialect.name != "mysql":
+        return False
+    r = await conn.scalar(
+        text(
+            "SELECT COUNT(*) FROM information_schema.tables "
+            "WHERE table_schema=DATABASE() AND table_name='alembic_version'"
+        )
+    )
+    return (r or 0) > 0
+
+
 async def ensure_user_llm_columns(db: AsyncSession) -> None:
     """Add BYOK / LLM override columns + token_gen to users if missing（仅 MySQL）。"""
+    if await _alembic_applied(db):
+        return
     if engine.dialect.name != "mysql":
         return
     pairs = [
@@ -37,6 +56,8 @@ async def ensure_user_llm_columns(db: AsyncSession) -> None:
 
 async def ensure_user_oauth_columns(db: AsyncSession) -> None:
     """Add nickname, email_verified columns and oauth_accounts table if missing（仅 MySQL）。"""
+    if await _alembic_applied(db):
+        return
     if engine.dialect.name != "mysql":
         return
 

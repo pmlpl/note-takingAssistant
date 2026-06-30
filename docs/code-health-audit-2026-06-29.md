@@ -2,18 +2,40 @@
 
 > 审查日期：2026-06-29  
 > 项目版本：v1.1.0  
-> 审查范围：`note-takingAssistant/`（Web 全栈）+ `Desktop-note/`（桌面客户端）
+> 审查范围：`note-takingAssistant/`（Web 全栈）+ `Desktop-note/`（桌面客户端）  
+> **执行状态**：第 1 轮已由 Trae 完成 10/13 项（77%），第 2 轮待完成 3 项
 
 ---
 
-## 目录
+## 执行进度追踪
 
-1. [项目现状概览](#1-项目现状概览)
-2. [P1 — 建议优先处理（4 项）](#2-p1--建议优先处理)
-3. [P2 — 建议改善（5 项）](#3-p2--建议改善)
-4. [P3 — 改进空间（5 项）](#4-p3--改进空间)
-5. [按文件列出的修改清单](#5-按文件列出的修改清单)
-6. [修改顺序建议](#6-修改顺序建议)
+| 批次 | 编号 | 问题 | 状态 | 验证结果 |
+|------|------|------|------|----------|
+| 1 | 2.3 | 死依赖清理 | ✅ 完成 | `mysql-connector-python` + `requests` 已删除，Dockerfile 已简化 |
+| 1 | 3.5 | Nginx HTTP gzip | ✅ 完成 | `nginx.http.conf` 已添加 gzip 块 |
+| 1 | 3.1 | 路由名称统一 | ✅ 完成 | `/kg` 为主路由，`/knowledge-graph` 重定向 |
+| 1 | 3.2 | /manual 权限修复 | ✅ 完成 | `requiresAuth: false` |
+| 1 | 3.3 | KG 数量限制 | ✅ 完成 | `MAX_NOTES_FOR_GRAPH = 100` + `.limit()` |
+| 1 | 3.4 | 桌面端 CI | ✅ 完成 | `.github/workflows/desktop-ci.yml` 已创建 |
+| 1 | 4.2 | 测试覆盖率 | ✅ 完成 | `pytest-cov` 已添加，CI 已改为 `--cov=app` |
+| 2 | 2.4 | wangeditor v4→v5 | ✅ 完成 | `RichText.vue` 已重写为 v5 API，构建通过 |
+| - | 2.1 | 删除冗余迁移脚本 | ✅ 完成 | `migrate_add_token_gen.py` + `add_user_llm_settings.py` 已删除 |
+| - | 4.3 | inspect_db.py 整理 | ✅ 完成 | 已移入 `backend/scripts/` |
+| 2 | **2.1** | **引入 Alembic** | ❌ 未做 | 无 `alembic/`、无 `alembic.ini` |
+| 3 | **2.2** | **UserCenter 拆分** | ❌ 未做 | 仍为 1806 行 |
+| 3 | **4.4** | **ai_service.py 清理** | ❌ 未做 | 兼容层文件仍在 |
+
+### 额外发现
+
+- `npm install` 后显示 **8 个漏洞（3 moderate, 4 high, 1 critical）**，应及时排查修复
+- 后端 `pytest` 8 个测试因本地 MySQL 未启动而跳过，非代码问题
+
+---
+
+## 👇 以下为待完成项目（请继续执行）
+
+---
+
 
 ---
 
@@ -538,5 +560,294 @@ jobs:
 
 ---
 
+## ═══════════════════════════════════════════
+## 以下为第 2 轮待执行任务（Trae 请继续）
+## ═══════════════════════════════════════════
+
+---
+
+## 任务 A：引入 Alembic 迁移管理（来源 2.1）
+
+### 背景
+
+项目中存在 `startup_migrations.py` 做启动时自动 DDL，但它没有版本追踪，无法回滚。已有 2 个冗余脚本已删除。现在需要正式引入 Alembic。
+
+### 执行步骤
+
+**步骤 1：安装 alembic**
+
+在 `backend/requirements.txt` 末尾添加一行：
+```
+alembic>=1.13.0
+```
+
+**步骤 2：初始化 Alembic**
+
+```bash
+cd backend
+pip install alembic
+alembic init alembic
+```
+
+**步骤 3：配置 alembic.ini**
+
+编辑 `backend/alembic.ini`，找到 `sqlalchemy.url` 行，替换为：
+```ini
+sqlalchemy.url = mysql+aiomysql://root:root@127.0.0.1:3306/note_db
+```
+（开发环境默认值即可，生产通过环境变量覆盖）
+
+**步骤 4：配置 alembic/env.py**
+
+编辑 `backend/alembic/env.py`，需要让它能 import 项目的 SQLAlchemy `Base`。在文件顶部附近添加：
+
+```python
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from app.core.config import settings
+from app.core.database import Base
+from app.models.user import UserDB, OAuthAccountDB
+from app.models.note import NoteDB
+from app.models.ai_usage import AIUsageLog
+from app.models.kg import KGConceptDB, KGRelationDB, KGStatusDB
+
+target_metadata = Base.metadata
+```
+
+并把 `target_metadata = None` 改为上面的 `target_metadata = Base.metadata`。
+
+同时修改 `run_migrations_online` 中的 `connectable` 创建逻辑，使其使用异步引擎（因为项目是 async SQLAlchemy）。关键是替换 `connectable = engine_from_config(...)` 为：
+
+```python
+from sqlalchemy.ext.asyncio import create_async_engine
+connectable = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,
+)
+```
+
+并添加 `do_run_migrations` 的 async 版本：
+
+```python
+def do_run_migrations(connection):
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        compare_type=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+async def run_async_migrations():
+    connectable = create_async_engine(settings.DATABASE_URL)
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+    await connectable.dispose()
+
+# 替换 run_migrations_online 函数体为：
+asyncio.run(run_async_migrations())
+```
+
+`asyncio` 需要在文件顶部 import。
+
+**步骤 5：生成初始 migration**
+
+```bash
+cd backend
+alembic revision --autogenerate -m "initial"
+alembic upgrade head
+```
+
+**步骤 6：简化 startup_migrations.py**
+
+保留 `startup_migrations.py`，但将其职责缩减为：**仅在 Alembic 尚未运行时做 light idempotent 检测**。具体做法：
+
+- 先检查 `alembic_version` 表是否存在
+- 若存在 → 跳过所有 DDL（Alembic 已接管）
+- 若不存在 → 执行现有 idempotent DDL（向后兼容老部署）
+
+添加检测逻辑：
+
+```python
+async def _alembic_applied(conn):
+    """Return True if alembic_version table exists, meaning Alembic has taken over."""
+    r = await conn.scalar(
+        text("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='alembic_version'")
+    )
+    return (r or 0) > 0
+
+# 在 ensure_user_llm_columns 和 ensure_user_oauth_columns 开头各加：
+# if await _alembic_applied(db): return
+```
+
+### 影响文件
+
+| 文件 | 操作 |
+|------|------|
+| `backend/requirements.txt` | 添加 `alembic>=1.13.0` |
+| `backend/alembic/` | 新增目录（`alembic init` 自动生成） |
+| `backend/alembic.ini` | 新增（修改 sqlalchemy.url） |
+| `backend/alembic/env.py` | 修改配置异步引擎 + target_metadata |
+| `backend/app/core/startup_migrations.py` | 添加 Alembic 检测，跳过已接管表 |
+
+### 验证方法
+
+```bash
+cd backend
+alembic current        # 应显示当前 revision
+alembic upgrade head   # 应无错误
+pytest -q              # 测试仍通过
+```
+
+---
+
+## 任务 B：拆分 UserCenter.vue（来源 2.2）
+
+### 背景
+
+`frontend/src/views/user/UserCenter.vue` 有 **1806 行**，包含了 6 张卡片、5 个对话框。需要拆分为独立子组件。
+
+### 拆分策略
+
+当前 UserCenter.vue 模板结构：
+```
+个人信息卡片（头像 + 昵称 + 邮箱）
+统计数据卡片（笔记数 + AI次数 + 活跃天数）
+AI/BYOK 设置卡片
+关于与本机卡片
+安全设置卡片（修改密码）
+账号绑定卡片（昵称 + GitHub + 邮箱）
+退出登录按钮
+5 个对话框（改昵称 / 绑定邮箱 / 换绑邮箱 / 解除邮箱 / 法律文档）
+```
+
+拆分为 7 个子组件 + 1 个主容器：
+
+| 新文件 | 内容 | 预计行数 |
+|--------|------|----------|
+| `UserProfileCard.vue` | 头像上传 + 昵称 + 邮箱 + 注册日期 | ~180 |
+| `UserStatsCard.vue` | 笔记数量/AI次数/活跃天数 三个统计项 | ~120 |
+| `UserLlmSettings.vue` | API基址/模型/密钥 表单 + 保存 | ~200 |
+| `UserAboutCard.vue` | 应用信息 + UA + 法律文档链接 | ~140 |
+| `UserPasswordForm.vue` | 密码修改表单 + 强度指示器 | ~180 |
+| `UserBindingsPanel.vue` | 昵称修改 + GitHub绑定 + 邮箱绑定 | ~350 |
+| `UserLegalDialogs.vue` | 用户协议 + 隐私政策对话框 | ~80 |
+| `UserCenter.vue` | 容器：布局 + 数据加载 + 事件协调 | ~200 |
+
+### 拆分规则
+
+1. 每个子组件用 `<script setup>` + `defineProps` + `defineEmits`
+2. 主容器 `UserCenter.vue` 负责：`onMounted` 数据加载、共享状态管理、子组件事件处理
+3. 子组件通过 props 接收数据，通过 emits 通知父组件刷新
+4. 共享的样式（卡片折叠动画等）提取到 `src/assets/styles/user-center-shared.css`
+5. 共享的工具函数（`formatDate`, `formatDays`, `buildAvatarUrl` 等）保留在主容器或提取到 `src/composables/useUserCenter.js`
+
+### 影响文件
+
+| 文件 | 操作 |
+|------|------|
+| `frontend/src/views/user/UserCenter.vue` | 重写（1806→~200行） |
+| `frontend/src/views/user/UserProfileCard.vue` | 新增 |
+| `frontend/src/views/user/UserStatsCard.vue` | 新增 |
+| `frontend/src/views/user/UserLlmSettings.vue` | 新增 |
+| `frontend/src/views/user/UserAboutCard.vue` | 新增 |
+| `frontend/src/views/user/UserPasswordForm.vue` | 新增 |
+| `frontend/src/views/user/UserBindingsPanel.vue` | 新增 |
+| `frontend/src/views/user/UserLegalDialogs.vue` | 新增 |
+
+### 验证方法
+
+```bash
+cd frontend
+npm run build     # 构建无报错
+npm run test      # 29 tests 继续通过
+```
+
+启动 dev server 后手动检查：
+- 个人信息展示正常
+- 头像上传正常
+- AI 设置保存正常
+- 密码修改正常
+- GitHub/邮箱绑定正常
+- 折叠面板动画正常
+
+---
+
+## 任务 C：清理 ai_service.py 兼容层（来源 4.4）
+
+### 背景
+
+`backend/app/services/ai_service.py`（39 行）明确标注为"兼容层"，全部委托给 `note_generator.py`、`note_analyzer.py`、`chat_service.py`。需要确认无调用方后删除或标记 deprecated。
+
+### 步骤
+
+**步骤 1：确认调用方**
+
+```bash
+cd backend
+grep -rn "ai_service\|ai_generate_note\|ai_summarize_note\|ai_chat" app/ --include="*.py" | grep -v "ai_service.py" | grep -v __pycache__
+```
+
+如果 `app/api/` 中已全部改用新模块（`generate_note_stream`, `analyze_note`, `chat_with_ai`），则可以安全删除。
+
+**步骤 2a：若安全 → 删除**
+
+删除 `backend/app/services/ai_service.py`，同时修改 `backend/app/services/__init__.py`，移除对 `ai_service` 的 re-export。
+
+**步骤 2b：若仍有旧调用 → 标记 deprecated**
+
+在 `ai_service.py` 的每个函数上方添加 Python `DeprecationWarning`：
+
+```python
+import warnings
+
+def ai_generate_note(**kwargs):
+    warnings.warn("ai_generate_note is deprecated, use generate_note_stream from note_generator", DeprecationWarning, stacklevel=2)
+    ...
+```
+
+### 影响文件
+
+| 文件 | 操作 |
+|------|------|
+| `backend/app/services/ai_service.py` | 删除或标记 deprecated |
+| `backend/app/services/__init__.py` | 可能需移除旧 import（若删除） |
+
+---
+
+## 额外：修复 npm 安全漏洞
+
+### 背景
+
+`npm install` 后报告 8 个漏洞。应及时排查。
+
+### 步骤
+
+```bash
+cd frontend
+npm audit                           # 查看详情
+npm audit fix                       # 尝试自动修复（非破坏性）
+```
+
+如果 `npm audit fix --force` 是唯一选项，请先列出破坏性变更再决定是否执行。
+
+---
+
+## 执行汇总
+
+| 任务 | 来源 | 优先级 | 预计工作量 |
+|------|------|--------|-----------|
+| A | 2.1 迁移碎片化 | P1 | ~30 分钟 |
+| B | 2.2 大组件拆分 | P1 | ~2 小时 |
+| C | 4.4 兼容层清理 | P3 | ~10 分钟 |
+| D | npm 漏洞 | 额外发现 | ~15 分钟 |
+
+**建议执行顺序**：C → D → A → B（先简单后复杂）
+
+---
+
 > **审查人：** Claude (Opus 4.8)  
-> **下一步：** 以上方案交给 Trae 执行。建议按批次顺序实施，每批完成后验证功能正常再进行下一批。
+> **第 1 轮完成：** 2026-06-29（10/13 项，77%）  
+> **第 2 轮待执行：** 以上 A/B/C/D 四项
