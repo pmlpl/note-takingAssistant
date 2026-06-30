@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 465
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
-    SMTP_FROM_NAME: str = "智能笔记助手"
+    SMTP_FROM_NAME: str = "NoteMind"
 
     # ── 其他 ──────────────────────────
     # 本机调试时设为 true 可开启 uvicorn reload；Docker 中默认为 false（关闭 reload）

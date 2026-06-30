@@ -4,7 +4,7 @@
       <el-card class="login-card">
         <div class="login-header">
           <AppLogo :size="52" />
-          <h2>智能笔记助手</h2>
+          <h2>NoteMind</h2>
           <p class="login-subtitle">登录您的账号</p>
         </div>
 

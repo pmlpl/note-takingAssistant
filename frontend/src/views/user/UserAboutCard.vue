@@ -95,7 +95,7 @@ function resolveAppDisplayName() {
   if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim()
   const dn = appPkg.displayName
   if (typeof dn === 'string' && dn.trim()) return dn.trim()
-  return '智能笔记助手'
+  return 'NoteMind'
 }
 
 const aboutDevice = computed(() => ({

@@ -8,7 +8,7 @@
       <div class="nav-inner">
         <div class="nav-brand" @click="scrollToTop">
           <AppLogo :size="32" />
-          <span>智能笔记助手</span>
+          <span>NoteMind</span>
         </div>
         <nav class="nav-links">
           <a
@@ -52,7 +52,7 @@
           <span class="wavy">学习搭档</span>
         </h1>
         <p class="hero-lead">
-          智能笔记助手帮你写笔记、做总结、画导图，支持接入本地 LM Studio，数据完全自主可控。
+          NoteMind帮你写笔记、做总结、画导图。Web版需自带云端API Key；桌面版可直连本机LM Studio，AI完全本地运行。
         </p>
         <div class="hero-actions">
           <el-button type="primary" size="large" @click="navigate('/register')">

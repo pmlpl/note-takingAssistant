@@ -5,7 +5,7 @@
         <!-- Tape strip decoration -->
         <div class="register-header">
           <AppLogo :size="52" />
-          <h2>智能笔记助手</h2>
+          <h2>NoteMind</h2>
           <p class="register-subtitle">创建新账号</p>
         </div>
 

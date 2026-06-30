@@ -6,7 +6,7 @@
         <div class="site-footer__brand">
           <button type="button" class="brand-lockup" @click="onBrandClick">
             <AppLogo :size="28" />
-            <span class="brand-name">智能笔记助手</span>
+            <span class="brand-name">NoteMind</span>
           </button>
           <p class="brand-tagline">AI 驱动的个人笔记与学习助手<br />基于 Vue 3 + FastAPI 全栈构建</p>
           <a
@@ -59,7 +59,7 @@
       </div>
 
       <div class="site-footer__bottom">
-        <p class="copyright">© {{ year }} 智能笔记助手 · All rights reserved</p>
+        <p class="copyright">© {{ year }} NoteMind · All rights reserved</p>
         <p class="credit">Made with Vue 3 + FastAPI</p>
       </div>
     </div>

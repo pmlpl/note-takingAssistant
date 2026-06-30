@@ -2,8 +2,8 @@ const pptxgen = require("pptxgenjs");
 
 const pres = new pptxgen();
 pres.layout = "LAYOUT_16x9";
-pres.author = "AI 智能笔记助手";
-pres.title = "基于大语言模型的智能笔记助手系统";
+pres.author = "NoteMind";
+pres.title = "基于大语言模型的NoteMind 系统";
 
 const C = {
   primary: "1E2761",
@@ -38,7 +38,7 @@ s1.addShape(pres.shapes.RECTANGLE, {
   h: 5.625,
   fill: { color: C.accent },
 });
-s1.addText("基于大语言模型的\n智能笔记助手系统", {
+s1.addText("基于大语言模型的\nNoteMind 系统", {
   x: 0.8,
   y: 1.0,
   w: 8.5,

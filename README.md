@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/logo.svg" width="120" height="120" alt="智能笔记助手 Logo">
+<img src="docs/logo.svg" width="120" height="120" alt="NoteMind Logo">
 
-# 智能笔记助手
+# NoteMind
 
 ![Version](https://img.shields.io/badge/Version-1.1.0-10b981?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)
@@ -27,8 +27,10 @@
 
 - **前端**：Vue 3 + Element Plus，流畅的交互体验
 - **后端**：FastAPI + 异步 MySQL/Redis，高并发稳
-- **AI 能力**：基于 **OpenAI 兼容协议**，可对接 LM Studio 本地推理或云端大模型
-- **BYOK 支持**：用户可在个人中心配置自带模型与 API Key
+- **AI 能力**：基于 **OpenAI 兼容协议**，支持云端大模型
+- **BYOK（自带密钥）**：Web 版需用户自行配置云端 API Key；桌面版可直连本机 LM Studio
+- **密钥安全**：用户 API Key 使用 Fernet 对称加密存储，仅返回后四位掩码用于确认
+- **桌面版优势**：桌面客户端可直接连接本机 LM Studio，AI 完全本地运行，无需云端依赖
 
 **v1.1.0 功能总览**
 
@@ -57,7 +59,7 @@
 | **AI 流式翻译** | HTML→Markdown 预处理，逐段流式返回，首字等待时间短 |
 | **AI 对话助手** | 首页多轮对话面板，支持上下文与快捷指令 |
 | **知识图谱** | 笔记与概念关联可视化，力导向布局，节点拖拽交互 |
-| **本地/云端推理自由切换** | 既可走服务端默认 LM Studio，也可用户自带模型 Key |
+| **AI 推理方式** | Web 版：用户自带云端 API Key；桌面版：直连本机 LM Studio 或云端 API |
 | **多种登录方式** | 邮箱密码 / 邮箱验证码 / GitHub OAuth 一键登录 |
 | **账号绑定管理** | 昵称修改、邮箱换绑、GitHub 绑定/解绑，多方式灵活管理 |
 
@@ -69,7 +71,7 @@
 | **速率限制** | 匿名接口 60 次/分；AI 生成限流；防暴力注册/登录 |
 | **SSRF 防护** | LLM 自定义 URL 校验协议/IP/端口，拦截内网请求 |
 | **密码安全** | bcrypt 哈希 + 前端 8 位含字母数字强度校验 |
-| **BYOK 加密** | 用户自带 API Key 使用 Fernet 对称加密存库 |
+| **BYOK 加密** | 用户 API Key 使用 Fernet 对称加密存库，前端展示仅返回后四位掩码 |
 | **文件上传安全** | 魔数校验 + 扩展名白名单 + 随机文件名重命名 |
 | **日志体系** | 结构化 JSON 日志，便于排障与审计 |
 

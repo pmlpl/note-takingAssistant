@@ -41,13 +41,13 @@ def send_verification_code_email(to_email: str, code: str) -> bool:
     html = f"""
     <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-            <h2 style="color: white; margin: 0;">智能笔记助手</h2>
+            <h2 style="color: white; margin: 0;">NoteMind</h2>
             <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0;">邮箱验证码</p>
         </div>
         <div style="background: #ffffff; padding: 40px 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
             <p style="color: #333; font-size: 16px; margin: 0 0 20px 0;">您好，</p>
             <p style="color: #555; font-size: 15px; line-height: 1.6; margin: 0 0 30px 0;">
-                您正在使用邮箱验证码登录/注册智能笔记助手。<br>
+                您正在使用邮箱验证码登录/注册NoteMind。<br>
                 验证码有效期为 5 分钟，请勿泄露给他人。
             </p>
             <div style="background: #f7f8fc; padding: 25px; border-radius: 8px; text-align: center;">
@@ -58,8 +58,8 @@ def send_verification_code_email(to_email: str, code: str) -> bool:
             </p>
         </div>
         <div style="text-align: center; color: #aaa; font-size: 12px; margin-top: 20px;">
-            © 2026 智能笔记助手
+            © 2026 NoteMind
         </div>
     </div>
     """
-    return send_email(to_email, "智能笔记助手 - 邮箱验证码", html)
+    return send_email(to_email, "NoteMind - 邮箱验证码", html)

@@ -89,7 +89,7 @@
                 <header class="manual-block manual-intro-block">
                   <h1>使用手册</h1>
                   <p class="manual-lead">
-                    欢迎使用<strong>智能笔记助手</strong>。您可以用它整理笔记、写作与复习，并在写作过程中使用 AI
+                    欢迎使用<strong>NoteMind</strong>。您可以用它整理笔记、写作与复习，并在写作过程中使用 AI
                     生成、总结与翻译等能力。本页面向<strong>日常使用者</strong>说明产品是什么、怎么用以及相关约定。
                   </p>
                   <el-alert type="info" show-icon :closable="false" class="manual-tip">
@@ -107,6 +107,20 @@
                     <li><strong>知识图谱</strong>：可视化展示笔记与概念之间的关联，支持节点拖拽、点击查看详情。</li>
                     <li><strong>思维导图</strong>：在独立页面查看或整理导图相关内容（见顶部导航）。</li>
                   </ul>
+
+                  <h3 class="manual-h3">Web 版与桌面版的区别</h3>
+                  <ul class="manual-list">
+                    <li><strong>Web 版</strong>：服务器不提供默认 LLM，AI 功能需由用户在个人中心配置<strong>自带云端 API Key</strong>（如 OpenAI、DeepSeek 等）。您的密钥使用加密存储，前端仅展示后四位掩码用于确认。</li>
+                    <li><strong>桌面版</strong>：Windows 原生客户端，可<strong>直接连接本机 LM Studio</strong>，AI 功能完全本地运行，无需服务器转发，数据更安全、隐私更有保障。</li>
+                    <li>如果您希望使用本地模型进行 AI 推理，推荐使用<strong>桌面版</strong>；如果习惯云端服务，可在 Web 版配置自己的 API Key。</li>
+                  </ul>
+
+                  <el-alert type="info" show-icon :closable="false" class="manual-tip">
+                    <template #title>
+                      <span>密钥安全提示</span>
+                    </template>
+                    您填写的 API Key 将在服务端使用 Fernet 对称加密存储，我们不会明文记录或泄露您的密钥。前端展示时仅返回后四位掩码，方便您确认已保存的密钥。请妥善保管您的密钥，不要在公共场合分享。
+                  </el-alert>
 
                   <h3 class="manual-h3">从哪里进入各功能</h3>
                   <ul class="manual-list manual-list--compact">
@@ -265,25 +279,27 @@
               <section v-else-if="activeSectionId === 'manual-ai-byok'" class="manual-block">
                 <h2>AI 与自带模型</h2>
                 <p class="manual-p">
-                  当您希望使用自己申请的兼容接口（而非站点默认线路）时，可在<strong>个人中心 → AI 模型（自带密钥）</strong>中配置。展开该区域后按表单填写并保存。
+                  本应用<strong>Web 版服务器不提供默认 LLM</strong>，AI 功能需由用户在<strong>个人中心 → AI 模型（自带密钥）</strong>中配置自己的云端 API Key。展开该区域后按表单填写并保存。
                 </p>
 
-                <h3 class="manual-h3">何时需要配置</h3>
+                <h3 class="manual-h3">配置说明</h3>
                 <ul class="manual-list">
-                  <li>页面提示 AI 不可用或您希望固定使用某一自建 / 第三方兼容服务时，可在征得服务条款允许的前提下填写自带接口。</li>
-                  <li>若不填写或留空部分字段，通常表示继续使用站点为您准备的默认推理配置（以实际表现为准）。</li>
+                  <li>Web 版用户需自行申请云端大模型 API Key（如 OpenAI、DeepSeek、智谱等），并在个人中心配置后方可使用 AI 功能。</li>
+                  <li>桌面版用户可直接连接本机 LM Studio，无需云端依赖；也可配置云端 API Key 作为备选。</li>
                 </ul>
 
                 <h3 class="manual-h3">填写说明</h3>
                 <ul class="manual-list">
                   <li><strong>API 基址</strong>：须为您所用服务的 <strong>OpenAI 兼容根路径</strong>，一般以 <code>/v1</code> 结尾，例如 <code>https://示例域名/api/v1</code>。<strong>不要</strong>把浏览器里常见的 <code>…/v1/models</code> 整条地址当作基址填入。</li>
                   <li><strong>模型标识</strong>：须与推理软件或服务列表里显示的<strong>模型名称</strong>完全一致。</li>
-                  <li><strong>API 密钥</strong>：仅在您信任本站点存储的前提下填写。密钥在服务端以加密方式保存；若站点安全策略发生重大变更，您可能需要重新保存一次密钥。</li>
-                  <li>修改已保存的密钥：按界面提示开启<strong>修改 API Key</strong>后再保存；留空并保存可能表示清除已保存的个人密钥。</li>
+                  <li><strong>API 密钥</strong>：您的密钥在服务端使用 <strong>Fernet 对称加密</strong>存储，我们不会明文记录或泄露。前端展示时仅返回后四位掩码，方便您确认已保存的密钥。修改已保存的密钥时，按界面提示开启<strong>修改 API Key</strong>后再保存；留空并保存将清除已保存的个人密钥。</li>
                 </ul>
 
-                <el-alert type="warning" show-icon :closable="false" class="manual-tip">
-                  请勿在公共场合泄露密钥；不要使用他人账号或来路不明的接口。
+                <el-alert type="info" show-icon :closable="false" class="manual-tip">
+                  <template #title>
+                    <span>安全承诺</span>
+                  </template>
+                  您的 API Key 经加密后存储于数据库，仅在调用 AI 接口时解密使用。我们不会以明文形式记录、展示或传输您的密钥。请妥善保管密钥，避免在公共设备上保存。
                 </el-alert>
               </section>
 

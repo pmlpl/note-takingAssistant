@@ -1,6 +1,6 @@
-# AI 个人智能笔记助手 - 后端（v1.1.0）
+# NoteMind - 后端（v1.1.0）
 
-基于 FastAPI + MySQL + Redis + **LM Studio**（OpenAI 兼容本地 API）的智能笔记助手后端服务。
+基于 FastAPI + MySQL + Redis + **LM Studio**（OpenAI 兼容本地 API）的NoteMind 后端服务。
 
 ## 技术栈
 

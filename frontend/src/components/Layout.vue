@@ -4,7 +4,7 @@
     <el-header class="header">
       <div class="logo">
         <AppLogo :size="36" />
-        <span class="title">智能笔记助手</span>
+        <span class="title">NoteMind</span>
       </div>
 
       <el-menu :default-active="activeMenu" mode="horizontal" class="nav-menu">

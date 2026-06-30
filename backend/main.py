@@ -46,8 +46,8 @@ async def lifespan(app: FastAPI):
 
 # 初始化FastAPI
 app = FastAPI(
-    title="AI个人智能笔记助手API",
-    description="基于 FastAPI 的 AI 笔记助手后端；AI 能力通过 OpenAI 兼容协议连接 LM Studio（或其它本地推理服务）。",
+    title="NoteMind AI Note Assistant API",
+    description="基于 FastAPI 的 NoteMind AI 笔记助手后端；AI 能力通过 OpenAI 兼容协议连接 LM Studio（或其它本地推理服务）。",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -81,7 +81,7 @@ app.include_router(public.router, prefix="/api/v1/public", tags=["公开接口"]
 # 测试接口
 @app.get("/", tags=["测试"])
 def home():
-    return {"message": "AI个人智能笔记助手后端运行成功！"}
+    return {"message": "NoteMind AI Note Assistant backend running successfully!"}
 
 # 启动服务器（是否 auto-reload 由配置项控制，生产环境必须关闭）
 if __name__ == "__main__":
