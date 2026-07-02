@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
+    base: './',
     plugins: [
       vue(),
       Components({
@@ -46,7 +47,7 @@ export default defineConfig(({ mode }) => {
       include: ['src/**/*.test.js']
     },
     build: {
-      chunkSizeWarningLimit: 1600,
+      chunkSizeWarningLimit: 800,
       minify: 'terser',
       terserOptions: {
         compress: {

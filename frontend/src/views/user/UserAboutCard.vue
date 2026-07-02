@@ -23,7 +23,6 @@
           <el-descriptions-item label="应用名称">{{ aboutDevice.appName }}</el-descriptions-item>
           <el-descriptions-item label="版本号">{{ aboutDevice.appVersion }}</el-descriptions-item>
           <el-descriptions-item label="运行模式">{{ aboutDevice.mode }}</el-descriptions-item>
-          <el-descriptions-item label="API 基址（开发）">{{ aboutDevice.apiBase }}</el-descriptions-item>
           <el-descriptions-item label="时区">{{ aboutDevice.tz }}</el-descriptions-item>
           <el-descriptions-item label="界面语言">{{ aboutDevice.lang }}</el-descriptions-item>
           <el-descriptions-item label="屏幕分辨率">{{ aboutDevice.screen }}</el-descriptions-item>
@@ -102,7 +101,6 @@ const aboutDevice = computed(() => ({
   appName: resolveAppDisplayName(),
   appVersion: appPkg.version || '-',
   mode: import.meta.env.MODE,
-  apiBase: import.meta.env.VITE_API_BASE_URL || '（未设置，开发环境通常走 Vite 代理 /api）',
   ua: typeof navigator !== 'undefined' ? navigator.userAgent : '-',
   lang: typeof navigator !== 'undefined' ? navigator.language : '-',
   tz: formatAboutTimeZone(),

@@ -53,14 +53,28 @@ app = FastAPI(
 )
 
 # 跨域配置（必加，否则Vue前端无法访问）
-# 安全：不允许同时设置 "*" 和 allow_credentials=True（浏览器会拒绝）；
-# 若配置为通配符，则自动改为 allow_credentials=False，并只放行该来源。
-_cors_origin = settings.FRONTEND_URL.strip() if isinstance(settings.FRONTEND_URL, str) else "*"
-_is_wildcard = _cors_origin == "*"
+# 支持多个 origin：FRONTEND_URL + CORS_ORIGINS（逗号分隔）+ 桌面端 app://localhost
+def _get_cors_origins():
+    origins = set()
+    frontend = settings.FRONTEND_URL.strip() if isinstance(settings.FRONTEND_URL, str) else ""
+    if frontend:
+        origins.add(frontend)
+    extra = settings.CORS_ORIGINS.strip() if isinstance(settings.CORS_ORIGINS, str) else ""
+    if extra:
+        for o in extra.split(","):
+            o = o.strip()
+            if o:
+                origins.add(o)
+    # 桌面端默认 origin
+    origins.add("app://localhost")
+    return list(origins)
+
+_cors_origins = _get_cors_origins()
+_is_wildcard = "*" in _cors_origins
 app.add_middleware(
     CORSMiddleware,  # type:ignore
-    allow_origins=[_cors_origin],
-    allow_credentials=(not _is_wildcard),  # 通配符时禁用凭证，防止越权
+    allow_origins=_cors_origins,
+    allow_credentials=(not _is_wildcard),
     allow_methods=["*"],
     allow_headers=["*"],
     max_age=600,  # Preflight 缓存 10 分钟，减少 OPTIONS 请求

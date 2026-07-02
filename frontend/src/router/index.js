@@ -106,26 +106,21 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   try {
     const userStore = useUserStore()
-    
-    // 如果访问根路径，根据登录状态决定跳转
+
     if (to.path === '/') {
       if (userStore.isLoggedIn) {
-        // 已登录，跳转到首页
         next('/home')
       } else {
-        // 未登录，显示欢迎页
         next()
       }
       return
     }
-    
-    // 如果已登录但访问登录/注册页，跳转到首页
+
     if (userStore.isLoggedIn && (to.path === '/login' || to.path === '/register')) {
       next('/home')
       return
     }
-    
-    // 未登录访问需认证页面 → 欢迎页（非登录页）
+
     if (to.meta.requiresAuth && !userStore.isLoggedIn) {
       next('/')
       return

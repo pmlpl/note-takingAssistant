@@ -91,8 +91,8 @@ def parse_file(file_path: str, filename: str) -> Optional[str]:
     Returns:
         str: 解析后的内容，失败返回None
     """
-    # 获取文件扩展名（转为小写）
-    ext = os.path.splitext(filename)[1].lower()
+    safe_filename = os.path.basename(filename)
+    ext = os.path.splitext(safe_filename)[1].lower()
     
     # 根据扩展名选择解析器
     if ext == '.txt':
@@ -108,7 +108,7 @@ def parse_file(file_path: str, filename: str) -> Optional[str]:
 
 def extract_title_from_filename(filename: str) -> str:
     """
-    从文件名中提取标题（去掉扩展名）
+    从文件名中提取标题（去掉扩展名），已做路径清洗
     
     Args:
         filename: 原始文件名
@@ -116,10 +116,9 @@ def extract_title_from_filename(filename: str) -> str:
     Returns:
         str: 提取的标题
     """
-    # 去掉扩展名
-    title = os.path.splitext(filename)[0]
+    safe_name = os.path.basename(filename)
+    title = os.path.splitext(safe_name)[0]
     
-    # 如果标题为空，使用默认标题
     if not title.strip():
         title = "未命名笔记"
     

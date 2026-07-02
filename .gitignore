@@ -63,6 +63,8 @@ backend/dist/
 dist/
 dist-ssr/
 .vite/
+desktop/release/
+desktop/dist/
 
 # Deployment artifacts
 note-app.tar.gz

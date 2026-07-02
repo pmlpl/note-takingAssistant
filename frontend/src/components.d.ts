@@ -42,7 +42,6 @@ declare module 'vue' {
     ElRadioGroup: typeof import('element-plus/es')['ElRadioGroup']
     ElRow: typeof import('element-plus/es')['ElRow']
     ElSelect: typeof import('element-plus/es')['ElSelect']
-    ElSkeleton: typeof import('element-plus/es')['ElSkeleton']
     ElSlider: typeof import('element-plus/es')['ElSlider']
     ElSwitch: typeof import('element-plus/es')['ElSwitch']
     ElTabPane: typeof import('element-plus/es')['ElTabPane']
@@ -74,9 +73,7 @@ declare module 'vue' {
     RichText: typeof import('./components/RichText.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
-    SiteFooter: typeof import('./components/SiteFooter.vue')['default']
     WelcomeFeatureRow: typeof import('./components/welcome/WelcomeFeatureRow.vue')['default']
-    WelcomeStatsBlock: typeof import('./components/welcome/WelcomeStatsBlock.vue')['default']
   }
   export interface ComponentCustomProperties {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']

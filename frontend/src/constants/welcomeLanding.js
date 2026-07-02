@@ -1,115 +1,65 @@
-/** 欢迎页功能展示区 — 网格卡片布局 */
-export const WELCOME_FEATURES = [
-  {
-    id: 'ai-generate',
-    title: 'AI 智能生成',
-    subtitle: '主题 + 关键词，一键成稿',
-    description:
-      '支持参考笔记与图片，输出 Markdown / Word / 纯文本。流式生成让你实时看到 AI 如何组织段落与结构，适合课程笔记、读书摘要与项目文档。',
-    image: '/welcome/welcome-feature-ai.png',
-    icon: 'wand',
-    cta: '登录后体验生成',
-    route: '/login',
-  },
-  {
-    id: 'summarize-translate',
-    title: '总结 · 翻译',
-    subtitle: '读懂长文，跨语言整理',
-    description:
-      '基于选定笔记或上传内容智能总结核心要点；翻译模块将富文本转为 Markdown 后流式输出，便于复习与双语对照。',
-    image: '/welcome/welcome-feature-summary.png',
-    icon: 'translate',
-    cta: '立即开始',
-    route: '/register',
-  },
-  {
-    id: 'mindmap',
-    title: '思维导图',
-    subtitle: '把笔记变成知识网络',
-    description:
-      '从首页助手或导图页将 Mermaid 源码可视化，梳理章节关系与概念层级，适合考前复盘与项目拆解。',
-    image: '/welcome/welcome-feature-mindmap.png',
-    icon: 'mindmap',
-    cta: '查看开源仓库',
-    external: 'https://github.com/pmlpl/note-takingAssistant',
-  },
-  {
-    id: 'notes',
-    title: '笔记管理',
-    subtitle: '富文本 · 标签 · 搜索',
-    description:
-      'WangEditor 与 Markdown 双模式；「我的笔记」与历史笔记分区；导入 Word / TXT，配合 Redis 缓存最近浏览，学习路径更连贯。',
-    image: '/welcome/welcome-feature-notes.png',
-    icon: 'notebook',
-    cta: '免费注册',
-    route: '/register',
-  },
-]
+/**
+ * NoteMind Welcome 页面常量配置
+ * 100% 按照 notemind-welcome-design 设计稿
+ */
 
+// GitHub 仓库地址
 export const GITHUB_REPO_URL = 'https://github.com/pmlpl/note-takingAssistant'
 
-export const GITHUB_ISSUES_URL = `${GITHUB_REPO_URL}/issues`
+// Hero 区域技术栈标签 (按照设计稿顺序)
+export const TECH_CHIPS = ['Vue 3', 'FastAPI', 'PostgreSQL', 'Redis', 'Docker', 'LM Studio']
 
-/** 使用步骤引导 */
+// 四大核心功能 (按照设计稿)
+export const WELCOME_FEATURES = [
+  {
+    icon: 'sparkles',
+    title: 'AI 智能生成',
+    subtitle: 'Smart Content Creation',
+    description: '基于 GPT-4 驱动，智能生成课堂笔记、学习摘要和知识卡片。只需输入关键词，AI 自动为你构建结构清晰、内容详实的笔记。',
+    image: '/welcome/welcome-feature-ai.png',
+    cta: 'Try Now',
+  },
+  {
+    icon: 'languages',
+    title: '总结 · 翻译',
+    subtitle: 'Summarize & Translate',
+    description: '一键总结长篇笔记的核心要点，支持中英双语互译。快速提取关键信息，让你的学习资料更加精炼、高效。',
+    image: '/welcome/welcome-feature-summary.png',
+    cta: 'Try Now',
+  },
+  {
+    icon: 'gitBranch',
+    title: '思维导图',
+    subtitle: 'Mind Mapping',
+    description: '自动将笔记转化为可视化的思维导图，清晰呈现知识脉络与逻辑关系。支持拖拽编辑、自由调整布局。',
+    image: '/welcome/welcome-feature-mindmap.png',
+    cta: 'Try Now',
+  },
+  {
+    icon: 'notebookPen',
+    title: '笔记管理',
+    subtitle: 'Note Management',
+    description: '强大的笔记管理工具，支持标签分类、全文搜索、Markdown 编辑。你的每一份知识都能被有序保存和快速检索。',
+    image: '/welcome/welcome-feature-notes.png',
+    cta: 'Try Now',
+  },
+]
+
+// 使用步骤 (按照设计稿)
 export const HOW_IT_WORKS = [
-  {
-    step: 1,
-    title: '注册账号',
-    description: '只需邮箱和密码，30 秒完成注册即可使用全部功能',
-  },
-  {
-    step: 2,
-    title: '创建笔记',
-    description: '使用富文本或 Markdown 编辑器，轻松记录学习内容',
-  },
-  {
-    step: 3,
-    title: 'AI 助力',
-    description: '让 AI 帮你总结、翻译、生成新笔记，大幅提升效率',
-  },
-  {
-    step: 4,
-    title: '知识可视化',
-    description: '一键将笔记转为思维导图，构建清晰的知识网络',
-  },
+  { step: 1, title: '注册账号', description: '填写基本信息，快速创建你的 NoteMind 账号。' },
+  { step: 2, title: '创建笔记', description: '新建一个笔记本，输入课堂内容或上传学习资料。' },
+  { step: 3, title: 'AI 处理', description: '一键调用 AI，自动生成摘要、翻译或思维导图。' },
+  { step: 4, title: '高效学习', description: '随时回顾笔记，用导图梳理知识，持续提升效率。' },
 ]
 
-/** 技术栈亮点 */
-export const TECH_HIGHLIGHTS = [
-  { label: 'Vue 3', desc: '前端框架' },
-  { label: 'FastAPI', desc: '后端服务' },
-  { label: 'PostgreSQL', desc: '数据存储' },
-  { label: 'Redis', desc: '缓存加速' },
-  { label: 'Docker', desc: '容器部署' },
-  { label: 'LM Studio', desc: '本地 LLM' },
+// 统计数据 (按照设计稿 - 使用计数器动画，从 0 滚动到目标值)
+export const STATS_DATA = [
+  { label: 'Active Users', targetValue: 10000, suffix: '+', decimals: 0, color: 'blue' },
+  { label: 'Notes Created', targetValue: 50000, suffix: '+', decimals: 0, color: 'green' },
+  { label: 'Uptime', targetValue: 99.9, suffix: '%', decimals: 1, color: 'accent' },
+  { label: 'Core Features', targetValue: 4, suffix: '', decimals: 0, color: 'yellow' },
 ]
 
-/** 标准页脚导航分组 */
-export const FOOTER_NAV_GROUPS = [
-  {
-    id: 'product',
-    title: '产品',
-    links: [
-      { label: '核心功能', anchor: '#features' },
-      { label: '使用步骤', anchor: '#how-it-works' },
-      { label: '平台数据', anchor: '#stats' },
-    ],
-  },
-  {
-    id: 'resources',
-    title: '资源',
-    links: [
-      { label: '使用手册', route: '/manual' },
-      { label: '开源仓库', external: GITHUB_REPO_URL },
-      { label: '问题反馈', external: GITHUB_ISSUES_URL },
-    ],
-  },
-  {
-    id: 'account',
-    title: '账户',
-    links: [
-      { label: '登录', route: '/login' },
-      { label: '免费注册', route: '/register' },
-    ],
-  },
-]
+// 旧常量保留（兼容其他地方使用）
+export const TECH_HIGHLIGHTS = TECH_CHIPS.map((chip) => ({ label: chip }))

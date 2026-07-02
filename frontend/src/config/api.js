@@ -3,3 +3,5 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localho
 
 export const UPLOAD_IMAGE_URL = `${API_BASE_URL}/api/v1/note/upload-image`
 export const IMAGE_BASE_URL = API_BASE_URL
+
+export const MAX_IMPORT_SIZE = 20 * 1024 * 1024

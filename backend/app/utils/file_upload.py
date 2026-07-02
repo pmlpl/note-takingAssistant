@@ -21,17 +21,19 @@ _SAFE_IMAGE_TYPES: dict[str, list[bytes]] = {
     ".webp": [b"RIFF"],  # WEBP 文件以 "RIFF" 开头，第 8-11 字节为 "WEBP"
 }
 
-# 图片文件大小上限 5MB
-IMAGE_MAX_BYTES = 5 * 1024 * 1024
-
 
 def _normalize_extension(filename: str) -> str:
-    """统一取小写扩展名，含前导点号。"""
-    ext = os.path.splitext(filename or "")[1].lower()
+    """统一取小写扩展名，含前导点号。已做路径清洗。"""
+    safe_name = os.path.basename(filename or "")
+    ext = os.path.splitext(safe_name)[1].lower()
     return ext
 
 
-def validate_image_bytes(file_bytes: bytes, filename: str) -> Tuple[bool, str, str]:
+def validate_image_bytes(
+    file_bytes: bytes,
+    filename: str,
+    max_bytes: int = 5 * 1024 * 1024,
+) -> Tuple[bool, str, str]:
     """校验图片文件。
 
     返回: (是否安全, 标准化扩展名, 错误信息)
@@ -48,8 +50,8 @@ def validate_image_bytes(file_bytes: bytes, filename: str) -> Tuple[bool, str, s
     # 2. 文件大小
     if len(file_bytes) == 0:
         return False, ext, "上传的文件为空"
-    if len(file_bytes) > IMAGE_MAX_BYTES:
-        return False, ext, f"文件超过上限 {IMAGE_MAX_BYTES // 1024 // 1024}MB"
+    if len(file_bytes) > max_bytes:
+        return False, ext, f"文件超过上限 {max_bytes // 1024 // 1024}MB"
 
     # 3. 魔数校验：读取文件前 16 字节，与对应扩展名的签名做对比
     head = file_bytes[:16]

@@ -100,7 +100,6 @@ def assert_safe_llm_url(url: str | None) -> str | None:
 
     host = parsed.hostname.lower()
 
-    # 显式拦截云元数据服务与 Docker 内部服务
     if host in _METADATA_HOSTS or host in _INTERNAL_HOSTNAMES:
         if settings.DEBUG:
             pass
@@ -109,7 +108,6 @@ def assert_safe_llm_url(url: str | None) -> str | None:
                 "LLM API 地址指向内网/云元数据服务被拒绝，请填写公网可访问的推理服务地址。"
             )
 
-    # IPv6 字面量如 [::1] 被 urlparse.hostname 解析为 `::1`，这里同样拦截
     if _is_private_or_link_local_ip(host):
         if settings.DEBUG:
             pass
@@ -118,7 +116,6 @@ def assert_safe_llm_url(url: str | None) -> str | None:
                 "LLM API 地址指向私有/环回/链路本地 IP 被拒绝，请填写公网 IP 或域名。"
             )
 
-    # 端口白名单校验
     port = parsed.port
     if port is None:
         port = 443 if parsed.scheme.lower() == "https" else 80
@@ -127,7 +124,6 @@ def assert_safe_llm_url(url: str | None) -> str | None:
             f"LLM API 端口 {port} 不在允许列表内（允许：{sorted(_ALLOWED_PORTS)}）。"
         )
 
-    # DNS 反向解析兜底：防止用户填的是一个内网可解析域名
     if _host_resolves_to_internal(host):
         if settings.DEBUG:
             pass

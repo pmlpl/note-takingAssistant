@@ -6,6 +6,12 @@ import '@/assets/style.css'
 import router from './router'
 import App from './App.vue'
 
+if (typeof window !== 'undefined' && !window.dragEvent) {
+  window.dragEvent = function (event) {
+    return event || window.event
+  }
+}
+
 const app = createApp(App)
 const pinia = createPinia()
 

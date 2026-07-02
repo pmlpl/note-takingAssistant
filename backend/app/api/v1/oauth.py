@@ -282,9 +282,50 @@ class VerifyCodeRequest(BaseModel):
 EMAIL_CODE_PREFIX = "email_code:"
 EMAIL_CODE_TTL = 300
 
+_dev_email_codes = {}
+
 
 def _generate_code() -> str:
     return "".join(random.choices(string.digits, k=6))
+
+
+def _save_email_code(email: str, code: str) -> None:
+    from app.core.redis_client import redis_client
+
+    try:
+        if redis_client.client:
+            redis_client.client.setex(f"{EMAIL_CODE_PREFIX}{email}", EMAIL_CODE_TTL, code)
+            return
+    except Exception as e:
+        logger.warning(f"Redis 存储验证码失败，降级到内存存储: {e}")
+
+    _dev_email_codes[email] = code
+
+
+def _get_email_code(email: str) -> str | None:
+    from app.core.redis_client import redis_client
+
+    try:
+        if redis_client.client:
+            stored = redis_client.client.get(f"{EMAIL_CODE_PREFIX}{email}")
+            if stored:
+                return stored.decode("utf-8") if isinstance(stored, bytes) else stored
+    except Exception as e:
+        logger.warning(f"Redis 读取验证码失败，降级到内存读取: {e}")
+
+    return _dev_email_codes.get(email)
+
+
+def _delete_email_code(email: str) -> None:
+    from app.core.redis_client import redis_client
+
+    try:
+        if redis_client.client:
+            redis_client.client.delete(f"{EMAIL_CODE_PREFIX}{email}")
+    except Exception:
+        pass
+
+    _dev_email_codes.pop(email, None)
 
 
 @router.post("/email/send-code", summary="发送邮箱验证码")
@@ -292,27 +333,25 @@ async def send_email_code(
     req: SendCodeRequest,
     _: None = Depends(rate_limit_anon("email_code")),
 ):
-    from app.core.redis_client import redis_client
-
     email = req.email.strip().lower()
 
     if not email:
         raise HTTPException(status_code=400, detail="邮箱不能为空")
 
-    if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        raise HTTPException(status_code=503, detail="邮件服务暂不可用")
-
     code = _generate_code()
 
-    ok = send_verification_code_email(email, code)
-    if not ok:
-        raise HTTPException(status_code=500, detail="验证码发送失败，请稍后重试")
+    has_smtp = bool(settings.SMTP_HOST and settings.SMTP_USER and settings.SMTP_PASSWORD)
 
-    try:
-        if redis_client.client:
-            redis_client.client.setex(f"{EMAIL_CODE_PREFIX}{email}", EMAIL_CODE_TTL, code)
-    except Exception as e:
-        logger.warning(f"Redis 存储验证码失败: {e}")
+    if has_smtp:
+        ok = send_verification_code_email(email, code)
+        if not ok:
+            raise HTTPException(status_code=500, detail="验证码发送失败，请稍后重试")
+    else:
+        if not settings.DEBUG:
+            raise HTTPException(status_code=503, detail="邮件服务暂不可用")
+        logger.info(f"[DEV MODE] 邮箱验证码: email={email}, code={code} (有效期 {EMAIL_CODE_TTL} 秒)")
+
+    _save_email_code(email, code)
 
     return {"message": "验证码已发送，请注意查收", "expires_in": EMAIL_CODE_TTL}
 
@@ -323,22 +362,13 @@ async def verify_email_code(
     db: AsyncSession = Depends(get_async_db),
     _: None = Depends(rate_limit_anon("email_verify")),
 ):
-    from app.core.redis_client import redis_client
-
     email = req.email.strip().lower()
     code = req.code.strip()
 
     if not email or not code:
         raise HTTPException(status_code=400, detail="邮箱和验证码不能为空")
 
-    stored_code = None
-    try:
-        if redis_client.client:
-            stored_code = redis_client.client.get(f"{EMAIL_CODE_PREFIX}{email}")
-            if stored_code:
-                stored_code = stored_code.decode("utf-8") if isinstance(stored_code, bytes) else stored_code
-    except Exception as e:
-        logger.warning(f"Redis 读取验证码失败: {e}")
+    stored_code = _get_email_code(email)
 
     if not stored_code:
         raise HTTPException(status_code=400, detail="验证码已过期或不存在")
@@ -346,11 +376,7 @@ async def verify_email_code(
     if stored_code != code:
         raise HTTPException(status_code=400, detail="验证码错误")
 
-    try:
-        if redis_client.client:
-            redis_client.client.delete(f"{EMAIL_CODE_PREFIX}{email}")
-    except Exception:
-        pass
+    _delete_email_code(email)
 
     db_user = await crud_user.get_user_by_email(db, email=email)
 
@@ -408,6 +434,47 @@ class BindEmailRequest(BaseModel):
 BIND_CODE_PREFIX = "bind_code:"
 BIND_CODE_TTL = 600  # 10分钟
 
+_dev_bind_codes = {}
+
+
+def _save_bind_code(key: str, code: str) -> None:
+    from app.core.redis_client import redis_client
+
+    try:
+        if redis_client.client:
+            redis_client.client.setex(key, BIND_CODE_TTL, code)
+            return
+    except Exception as e:
+        logger.warning(f"Redis 存储绑定验证码失败，降级到内存存储: {e}")
+
+    _dev_bind_codes[key] = code
+
+
+def _get_bind_code(key: str) -> str | None:
+    from app.core.redis_client import redis_client
+
+    try:
+        if redis_client.client:
+            stored = redis_client.client.get(key)
+            if stored:
+                return stored.decode("utf-8") if isinstance(stored, bytes) else stored
+    except Exception as e:
+        logger.warning(f"Redis 读取绑定验证码失败，降级到内存读取: {e}")
+
+    return _dev_bind_codes.get(key)
+
+
+def _delete_bind_code(key: str) -> None:
+    from app.core.redis_client import redis_client
+
+    try:
+        if redis_client.client:
+            redis_client.client.delete(key)
+    except Exception:
+        pass
+
+    _dev_bind_codes.pop(key, None)
+
 
 @router.post("/email/bind-code", summary="发送邮箱绑定/换绑验证码")
 async def send_bind_code(
@@ -417,8 +484,6 @@ async def send_bind_code(
     _: None = Depends(rate_limit_anon("email_code")),
 ):
     """已登录用户绑定新邮箱或换绑邮箱时发送验证码"""
-    from app.core.redis_client import redis_client
-
     email = req.email.strip().lower()
     action = req.action  # "bind" 或 "change"
 
@@ -428,9 +493,6 @@ async def send_bind_code(
     if action not in ("bind", "change"):
         raise HTTPException(status_code=400, detail="无效的操作类型")
 
-    if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        raise HTTPException(status_code=503, detail="邮件服务暂不可用")
-
     # 检查邮箱是否已被其他用户使用
     existing_user = await crud_user.get_user_by_email(db, email=email)
     if existing_user:
@@ -439,15 +501,18 @@ async def send_bind_code(
     code = _generate_code()
     key = f"{BIND_CODE_PREFIX}{action}:{email}"
 
-    ok = send_verification_code_email(email, code)
-    if not ok:
-        raise HTTPException(status_code=500, detail="验证码发送失败，请稍后重试")
+    has_smtp = bool(settings.SMTP_HOST and settings.SMTP_USER and settings.SMTP_PASSWORD)
 
-    try:
-        if redis_client.client:
-            redis_client.client.setex(key, BIND_CODE_TTL, code)
-    except Exception as e:
-        logger.warning(f"Redis 存储绑定验证码失败: {e}")
+    if has_smtp:
+        ok = send_verification_code_email(email, code)
+        if not ok:
+            raise HTTPException(status_code=500, detail="验证码发送失败，请稍后重试")
+    else:
+        if not settings.DEBUG:
+            raise HTTPException(status_code=503, detail="邮件服务暂不可用")
+        logger.info(f"[DEV MODE] 邮箱绑定验证码: email={email}, action={action}, code={code} (有效期 {BIND_CODE_TTL} 秒)")
+
+    _save_bind_code(key, code)
 
     return {"message": "验证码已发送，请注意查收", "expires_in": BIND_CODE_TTL}
 
@@ -460,8 +525,6 @@ async def bind_email(
     _: None = Depends(rate_limit_anon("email_verify")),
 ):
     """已登录用户验证邮箱验证码，完成绑定或换绑"""
-    from app.core.redis_client import redis_client
-
     email = req.email.strip().lower()
     code = req.code.strip()
     action = req.action  # "bind" 或 "change"
@@ -473,14 +536,7 @@ async def bind_email(
         raise HTTPException(status_code=400, detail="无效的操作类型")
 
     key = f"{BIND_CODE_PREFIX}{action}:{email}"
-    stored_code = None
-    try:
-        if redis_client.client:
-            stored_code = redis_client.client.get(key)
-            if stored_code:
-                stored_code = stored_code.decode("utf-8") if isinstance(stored_code, bytes) else stored_code
-    except Exception as e:
-        logger.warning(f"Redis 读取绑定验证码失败: {e}")
+    stored_code = _get_bind_code(key)
 
     if not stored_code:
         raise HTTPException(status_code=400, detail="验证码已过期或不存在")
@@ -489,11 +545,7 @@ async def bind_email(
         raise HTTPException(status_code=400, detail="验证码错误")
 
     # 删除验证码
-    try:
-        if redis_client.client:
-            redis_client.client.delete(key)
-    except Exception:
-        pass
+    _delete_bind_code(key)
 
     db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
     if not db_user:

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
     API_BASE_URL: str = "http://localhost:8000"
     FRONTEND_URL: str = "http://localhost:8081"   # Docker 前端默认端口
+    CORS_ORIGINS: str = ""   # 额外允许的 CORS origin，逗号分隔，如 "app://localhost,http://localhost:5173"
 
     # ── 数据库配置 ──────────────────────────
     DB_HOST: str = "127.0.0.1"
@@ -59,6 +60,10 @@ class Settings(BaseSettings):
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     SMTP_FROM_NAME: str = "NoteMind"
+
+    # ── 文件上传 ──────────────────────────
+    MAX_IMPORT_BYTES: int = 20 * 1024 * 1024  # 笔记导入文件大小上限 20MB
+    IMAGE_MAX_BYTES: int = 5 * 1024 * 1024    # 图片上传大小上限 5MB
 
     # ── 其他 ──────────────────────────
     # 本机调试时设为 true 可开启 uvicorn reload；Docker 中默认为 false（关闭 reload）

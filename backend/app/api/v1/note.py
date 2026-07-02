@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
@@ -6,6 +6,7 @@ import os
 import re
 import tempfile
 import uuid
+import hashlib
 from datetime import datetime
 from app.core.database import get_async_db
 from app.models.note import NoteCreate, NoteUpdate, NoteResponse, NoteDB
@@ -40,22 +41,52 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/upload-image", summary="上传图片")
 async def upload_image(
     file: UploadFile = File(...),
+    x_content_md5: Optional[str] = Header(None, alias="X-Content-MD5"),
     _: None = _notes_rate_limit,
 ):
     """上传笔记正文配图（做魔数 + 扩展名双重校验）。"""
     from app.utils.file_upload import validate_image_bytes, safe_image_filename
 
-    file_content = await file.read()
-    ok, ext, err = validate_image_bytes(file_content, file.filename or "")
+    if file.size is not None and file.size > settings.IMAGE_MAX_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"图片超过上限 {settings.IMAGE_MAX_BYTES // 1024 // 1024}MB",
+        )
+
+    CHUNK_SIZE = 1024 * 1024
+    file_bytes = bytearray()
+    md5 = hashlib.md5()
+    while True:
+        chunk = await file.read(CHUNK_SIZE)
+        if not chunk:
+            break
+        file_bytes.extend(chunk)
+        md5.update(chunk)
+        if len(file_bytes) > settings.IMAGE_MAX_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"图片超过上限 {settings.IMAGE_MAX_BYTES // 1024 // 1024}MB",
+            )
+
+    if x_content_md5:
+        computed_md5 = md5.hexdigest()
+        if computed_md5.lower() != x_content_md5.lower():
+            raise HTTPException(
+                status_code=400,
+                detail=f"文件MD5校验失败，期望 {x_content_md5}，实际 {computed_md5}",
+            )
+
+    ok, ext, err = validate_image_bytes(
+        bytes(file_bytes), file.filename or "", max_bytes=settings.IMAGE_MAX_BYTES
+    )
     if not ok:
         raise HTTPException(status_code=400, detail=err)
 
-    # 安全化文件名 + 保存
     safe_name = safe_image_filename(file.filename or f"image{ext}", ext)
     file_path = os.path.join(UPLOAD_DIR, safe_name)
     try:
         with open(file_path, "wb") as f:
-            f.write(file_content)
+            f.write(bytes(file_bytes))
     except OSError as e:
         raise HTTPException(status_code=500, detail=f"图片保存失败: {e}")
 
@@ -298,6 +329,7 @@ async def delete_note(
 async def import_note(
     file: UploadFile = File(...),
     overwrite: Optional[bool] = Form(False),
+    x_content_md5: Optional[str] = Header(None, alias="X-Content-MD5"),
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user),
     _: None = _notes_rate_limit,
@@ -307,41 +339,70 @@ async def import_note(
     user_id = db_user.id
 
     allowed_extensions = ['.txt', '.md', '.docx']
-    file_ext = os.path.splitext(file.filename)[1].lower()
+    file_ext = os.path.splitext(os.path.basename(file.filename or ""))[1].lower()
     if file_ext not in allowed_extensions:
         raise HTTPException(
             status_code=400,
             detail=f"不支持的文件格式: {file_ext}，仅支持 {', '.join(allowed_extensions)}",
         )
 
+    if file.size is not None and file.size > settings.MAX_IMPORT_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"文件超过上限 {settings.MAX_IMPORT_BYTES // 1024 // 1024}MB",
+        )
+
+    tmp_path = None
     try:
+        md5 = hashlib.md5()
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-            raw = await file.read()
-            tmp_file.write(raw)
             tmp_path = tmp_file.name
+            total = 0
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > settings.MAX_IMPORT_BYTES:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"文件超过上限 {settings.MAX_IMPORT_BYTES // 1024 // 1024}MB",
+                    )
+                md5.update(chunk)
+                tmp_file.write(chunk)
 
-        try:
-            parsed = parse_file(tmp_path, file.filename)
-            if not parsed:
-                raise HTTPException(status_code=400, detail="文件解析失败，请检查文件格式是否正确")
+        if x_content_md5:
+            computed_md5 = md5.hexdigest()
+            if computed_md5.lower() != x_content_md5.lower():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"文件MD5校验失败，期望 {x_content_md5}，实际 {computed_md5}",
+                )
 
-            title = extract_title_from_filename(file.filename)
-            dup = await crud_note.get_note_by_title(db=db, user_id=user_id, title=title)
-            if dup:
-                if not overwrite:
-                    raise HTTPException(status_code=409, detail=f"笔记 '{title}' 已存在，请选择是否覆盖")
-                await crud_note.delete_note(db=db, note_id=dup.id, user_id=user_id)
-                await remove_recent_note_by_id_async(user_id, dup.id)
+        parsed = parse_file(tmp_path, file.filename)
+        if not parsed:
+            raise HTTPException(status_code=400, detail="文件解析失败，请检查文件格式是否正确")
 
-            db_note = await crud_note.create_note(db=db, user_id=user_id, title=title, content=parsed, tags=f"导入,{file_ext}")
-            note_data = _note_to_recent_dict(db_note)
-            note_data["content"] = _text_preview(parsed)
-            await cache_recent_note_async(user_id, note_data)
-            return db_note
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+        title = extract_title_from_filename(file.filename)
+        dup = await crud_note.get_note_by_title(db=db, user_id=user_id, title=title)
+        if dup:
+            if not overwrite:
+                raise HTTPException(status_code=409, detail=f"笔记 '{title}' 已存在，请选择是否覆盖")
+            await crud_note.delete_note(db=db, note_id=dup.id, user_id=user_id)
+            await remove_recent_note_by_id_async(user_id, dup.id)
+
+        db_note = await crud_note.create_note(db=db, user_id=user_id, title=title, content=parsed, tags=f"导入,{file_ext}")
+        note_data = _note_to_recent_dict(db_note)
+        note_data["content"] = _text_preview(parsed)
+        await cache_recent_note_async(user_id, note_data)
+        return db_note
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导入笔记失败: {str(e)}")
+    finally:
+        if tmp_path is not None and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass

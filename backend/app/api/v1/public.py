@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_db
 from app.core.rate_limit import rate_limit_anon
 from app.models.user import UserDB
+from app.models.note import NoteDB
+from app.models.ai_usage import AIUsageLog
 from app.utils.stats_series import build_daily_series
 
 router = APIRouter()
@@ -24,9 +26,21 @@ async def welcome_stats(
     db: AsyncSession = Depends(get_async_db),
     _: None = Depends(rate_limit_anon("public")),
 ):
-    """注册用户总量与近 30 日每日新增注册。"""
+    """注册用户总量、笔记总量、AI 调用总次数及近 30 日每日新增注册。"""
+    # 注册用户总量
     user_count_result = await db.execute(select(func.count(UserDB.id)))
     user_count = int(user_count_result.scalar() or 0)
+
+    # 笔记总量
+    note_count_result = await db.execute(select(func.count(NoteDB.id)))
+    note_count = int(note_count_result.scalar() or 0)
+
+    # AI 调用总次数（如果有 ai_usage_logs 表）
+    try:
+        ai_count_result = await db.execute(select(func.count(AIUsageLog.id)))
+        ai_count = int(ai_count_result.scalar() or 0)
+    except Exception:
+        ai_count = 0
 
     today = _today_utc()
     start_date = today - timedelta(days=STATS_DAYS - 1)
@@ -43,5 +57,7 @@ async def welcome_stats(
 
     return {
         "user_count": user_count,
+        "note_count": note_count,
+        "ai_count": ai_count,
         "daily_users": daily_users,
     }
