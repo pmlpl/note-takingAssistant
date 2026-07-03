@@ -204,7 +204,7 @@ export async function translateNoteStream({ content, targetLang, onChunk, signal
 
   const base = getApiBaseUrl().replace(/\/$/, '')
   await streamPlainTextPost({
-    url: `${base}/v1/ai/translate-note/stream`,
+    url: `${base}/v1/ai/translate-note-stream`,
     body: { content, target_lang: targetLang },
     onChunk,
     signal,
@@ -238,7 +238,7 @@ export async function generateNoteStream({
 
   const base = getApiBaseUrl().replace(/\/$/, '')
   await streamPlainTextPost({
-    url: `${base}/v1/ai/generate-note/stream`,
+    url: `${base}/v1/ai/generate-note-stream`,
     body: { topic, keywords, word_count: wordCount, images, reference_notes: referenceNotes },
     onChunk,
     signal,
@@ -264,7 +264,7 @@ export async function chatStream({ message, history, onChunk, signal }) {
 
   const base = getApiBaseUrl().replace(/\/$/, '')
   await streamPlainTextPost({
-    url: `${base}/v1/ai/chat/stream`,
+    url: `${base}/v1/ai/chat-stream`,
     body: { message, history },
     onChunk,
     signal,

@@ -52,7 +52,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   store: {
     get: async (key, defaultValue) => {
-      if (!['local_llm_settings', 'desktop_api_base_url'].includes(key)) {
+      if (!['local_llm_settings', 'desktop_api_base_url', 'close_behavior'].includes(key)) {
         console.warn(`[preload] store.get blocked: key "${key}" not allowed`)
         return defaultValue
       }
@@ -60,7 +60,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return result.success ? result.data : defaultValue
     },
     set: async (key, value) => {
-      if (!['local_llm_settings', 'desktop_api_base_url'].includes(key)) {
+      if (!['local_llm_settings', 'desktop_api_base_url', 'close_behavior'].includes(key)) {
         console.warn(`[preload] store.set blocked: key "${key}" not allowed`)
         return
       }
@@ -68,7 +68,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return result.success
     },
     delete: async (key) => {
-      if (!['local_llm_settings', 'desktop_api_base_url'].includes(key)) {
+      if (!['local_llm_settings', 'desktop_api_base_url', 'close_behavior'].includes(key)) {
         console.warn(`[preload] store.delete blocked: key "${key}" not allowed`)
         return
       }

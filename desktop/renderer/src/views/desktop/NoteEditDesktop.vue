@@ -294,8 +294,9 @@ async function loadNote(id) {
       form.value.content = note.content || ''
       currentNoteId.value = id
       isEdit.value = true
-      // 已有笔记默认进入预览模式
-      viewMode.value = 'preview'
+      // 根据路由参数决定进入预览还是编辑模式
+      const urlMode = route.query.mode
+      viewMode.value = urlMode === 'edit' ? 'edit' : 'preview'
     }
   } catch (err) {
     console.error('加载笔记失败:', err)
@@ -372,9 +373,10 @@ function createNewNote() {
 async function selectNote(note) {
   // 直接加载笔记内容
   await loadNote(note.id)
-  // 更新URL，保持路由同步
+  // 更新URL，保持路由同步，保留当前模式
   if (route.params.id !== String(note.id)) {
-    router.replace(`/notes/edit/${note.id}`)
+    const modeParam = viewMode.value === 'edit' ? '?mode=edit' : ''
+    router.replace(`/notes/edit/${note.id}${modeParam}`)
   }
 }
 

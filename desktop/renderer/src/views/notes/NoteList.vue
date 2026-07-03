@@ -158,7 +158,7 @@ function viewNote(note) {
 }
 
 function editNote(note) {
-  router.push(`/notes/edit/${note.id}`)
+  router.push(`/notes/edit/${note.id}?mode=edit`)
 }
 
 async function deleteNote(note) {

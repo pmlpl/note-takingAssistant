@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '@/api'
+import { useUserStore } from '@/store'
 
 /**
  * POST JSON，按 UTF-8 读取响应体流并累积文本；适用于后端 `StreamingResponse(text/plain)`。
@@ -20,12 +21,23 @@ export async function streamPlainTextPost({
 }) {
   const baseUrl = getApiBaseUrl()
   const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`
+
+  const requestHeaders = {
+    'Content-Type': 'application/json',
+    ...headers
+  }
+  try {
+    const userStore = useUserStore()
+    if (userStore.token) {
+      requestHeaders.Authorization = `Bearer ${userStore.token}`
+    }
+  } catch {
+    /* ignore */
+  }
+
   const res = await fetch(fullUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers
-    },
+    headers: requestHeaders,
     body: JSON.stringify(body),
     signal
   })

@@ -87,14 +87,33 @@ if (!gotTheLock) {
       linux: 'icon.png'
     }
     const iconFile = platforms[process.platform] || 'icon.png'
-    const iconPath = path.join(__dirname, '..', 'build', iconFile)
-    if (fs.existsSync(iconPath)) {
-      return iconPath
+
+    const pathsToTry = [
+      path.join(__dirname, '..', 'build', iconFile),
+      path.join(process.resourcesPath, 'build', iconFile),
+      path.join(app.getAppPath(), 'build', iconFile),
+      path.join(__dirname, 'build', iconFile)
+    ]
+
+    for (const iconPath of pathsToTry) {
+      if (fs.existsSync(iconPath)) {
+        return iconPath
+      }
     }
-    const pngPath = path.join(__dirname, '..', 'build', 'icon.png')
-    if (fs.existsSync(pngPath)) {
-      return pngPath
+
+    const pngPaths = [
+      path.join(__dirname, '..', 'build', 'icon.png'),
+      path.join(process.resourcesPath, 'build', 'icon.png'),
+      path.join(app.getAppPath(), 'build', 'icon.png'),
+      path.join(__dirname, 'build', 'icon.png')
+    ]
+
+    for (const pngPath of pngPaths) {
+      if (fs.existsSync(pngPath)) {
+        return pngPath
+      }
     }
+
     return null
   }
 
@@ -212,12 +231,59 @@ if (!gotTheLock) {
 
     if (isDev) {
       mainWindow.webContents.openDevTools()
+    } else {
+      mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (
+          (input.control && input.shift && input.key?.toUpperCase() === 'I') ||
+          (input.key === 'F12') ||
+          (input.control && input.key?.toUpperCase() === 'J') ||
+          (input.control && input.shift && input.key?.toUpperCase() === 'C')
+        ) {
+          event.preventDefault()
+        }
+      })
+      mainWindow.webContents.on('context-menu', (e, params) => {
+        const menu = Menu.buildFromTemplate([
+          { role: 'cut', label: '剪切' },
+          { role: 'copy', label: '复制' },
+          { role: 'paste', label: '粘贴' },
+          { type: 'separator' },
+          { role: 'selectAll', label: '全选' }
+        ])
+        menu.popup({ window: mainWindow })
+      })
     }
 
     mainWindow.on('close', (e) => {
       if (!isQuitting) {
+        const closeBehavior = store.get('close_behavior', 'quit')
+
+        if (closeBehavior === 'quit') {
+          isQuitting = true
+          app.quit()
+          return
+        }
+
+        if (closeBehavior === 'minimize') {
+          e.preventDefault()
+          mainWindow.hide()
+          return
+        }
+
         e.preventDefault()
-        mainWindow.hide()
+        dialog.showMessageBox(mainWindow, {
+          type: 'question',
+          title: '退出确认',
+          message: '确定要退出 NoteMind 吗？',
+          buttons: ['退出', '最小化到托盘']
+        }).then((result) => {
+          if (result.response === 0) {
+            isQuitting = true
+            app.quit()
+          } else {
+            mainWindow.hide()
+          }
+        })
       }
     })
 
@@ -360,20 +426,6 @@ if (!gotTheLock) {
       {
         label: '视图',
         submenu: [
-          {
-            label: '重新加载',
-            accelerator: 'CmdOrCtrl+R',
-            click: (item, focusedWindow) => {
-              if (focusedWindow) focusedWindow.reload()
-            }
-          },
-          {
-            label: '切换开发者工具',
-            accelerator: process.platform === 'darwin' ? 'Alt+Command+I' : 'Ctrl+Shift+I',
-            click: (item, focusedWindow) => {
-              if (focusedWindow) focusedWindow.webContents.toggleDevTools()
-            }
-          },
           { type: 'separator' },
           { role: 'resetzoom', label: '重置缩放' },
           { role: 'zoomin', label: '放大' },

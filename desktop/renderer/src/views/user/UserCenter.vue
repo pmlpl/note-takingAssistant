@@ -30,6 +30,26 @@
       @save="onLlmSaved"
     />
 
+    <div class="settings-card">
+      <div class="card-header">
+        <span class="card-title">窗口设置</span>
+      </div>
+      <div class="card-content">
+        <div class="setting-item">
+          <label class="setting-label">点击关闭按钮时</label>
+          <el-select
+            v-model="closeBehavior"
+            class="setting-select"
+            @change="saveCloseBehavior"
+          >
+            <el-option label="直接退出" value="quit" />
+            <el-option label="最小化到托盘" value="minimize" />
+            <el-option label="询问我" value="ask" />
+          </el-select>
+        </div>
+      </div>
+    </div>
+
     <UserAboutCard
       @show-terms="termsDialogVisible = true"
       @show-privacy="privacyDialogVisible = true"
@@ -101,6 +121,7 @@ const bindings = ref({
 
 const llmLoading = ref(false)
 const llmError = ref('')
+const closeBehavior = ref('quit')
 
 function apiBase() {
   return getApiBaseUrl()
@@ -175,7 +196,7 @@ async function loadStats() {
 }
 
 async function reloadAll() {
-  await Promise.all([loadUserData(), loadStats(), loadBindings()])
+  await Promise.all([loadUserData(), loadStats(), loadBindings(), loadCloseBehavior()])
 }
 
 onMounted(async () => {
@@ -192,6 +213,26 @@ function onNicknameUpdated() {
 
 function onLlmSaved() {
   // LLM settings saved, no extra action needed
+}
+
+async function loadCloseBehavior() {
+  if (typeof window !== 'undefined' && window.electronAPI?.store?.get) {
+    try {
+      const behavior = await window.electronAPI.store.get('close_behavior', 'quit')
+      closeBehavior.value = behavior
+    } catch { /* ignore */ }
+  }
+}
+
+async function saveCloseBehavior(value) {
+  if (typeof window !== 'undefined' && window.electronAPI?.store?.set) {
+    try {
+      await window.electronAPI.store.set('close_behavior', value)
+      ElMessage.success('设置已保存')
+    } catch {
+      ElMessage.error('保存设置失败')
+    }
+  }
 }
 
 function onPasswordChanged() {
@@ -256,9 +297,57 @@ function goHistory() {
   box-shadow: 0 4px 12px rgba(245, 108, 108, 0.3);
 }
 
+.settings-card {
+  background: var(--color-card-bg);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  border: 2.5px solid var(--color-pencil);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.15);
+}
+
+.settings-card .card-header {
+  padding: 16px 20px;
+  border-bottom: 2px dashed var(--color-pencil);
+}
+
+.settings-card .card-header .card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+.settings-card .card-content {
+  padding: 20px;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.setting-label {
+  font-size: 15px;
+  color: var(--color-text-primary);
+}
+
+.setting-select {
+  width: 200px;
+}
+
 @media (max-width: 768px) {
   .user-center-container {
     padding: 16px;
+  }
+
+  .setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .setting-select {
+    width: 100%;
   }
 }
 </style>

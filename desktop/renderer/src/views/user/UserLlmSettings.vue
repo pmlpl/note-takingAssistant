@@ -156,7 +156,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { normalizeOpenAiCompatibleBaseUrl } from '@/utils/common'
@@ -202,7 +202,10 @@ const cloudSaved = reactive({
 
 const cloudEditKey = ref(false)
 
+let isLoadingSettings = false
+
 async function loadSettings() {
+  isLoadingSettings = true
   try {
     const localSettings = await window.electronAPI?.store?.get('local_llm_settings')
     if (localSettings && typeof localSettings === 'object') {
@@ -226,8 +229,21 @@ async function loadSettings() {
     cloudSaved.apiKeyLast4 = s.apiKeyLast4 || null
   } catch {
     /* ignore */
+  } finally {
+    isLoadingSettings = false
   }
 }
+
+watch(() => form.useLocal, async (newVal) => {
+  if (isLoadingSettings) return
+  try {
+    const current = await window.electronAPI?.store?.get('local_llm_settings')
+    const updated = { ...(current || {}), enabled: newVal }
+    await window.electronAPI?.store?.set('local_llm_settings', updated)
+  } catch {
+    /* ignore */
+  }
+})
 
 onMounted(() => {
   loadSettings()
@@ -304,6 +320,8 @@ async function handleSave() {
       ElMessage.success('本地模型设置已保存')
       emit('save', { useLocal: true, ...settings })
     } else {
+      await window.electronAPI?.store?.set('local_llm_settings', { enabled: false })
+
       const baseUrl = cloudForm.baseUrl.trim()
       const payload = {
         baseUrl,
