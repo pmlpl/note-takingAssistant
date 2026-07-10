@@ -38,3 +38,13 @@ class ChatRequest(BaseModel):
     """AI对话请求模型"""
     message: str
     history: Optional[List[ChatMessage]] = Field(default_factory=list)
+
+
+class AgentChatRequest(BaseModel):
+    """Agent 对话请求模型（带 Function Calling 工具调用能力）
+
+    conversation_id 可选：传入则将消息持久化到指定对话，否则不持久化（兼容旧用法）。
+    """
+    message: str
+    history: Optional[List[ChatMessage]] = Field(default_factory=list)
+    conversation_id: Optional[int] = None

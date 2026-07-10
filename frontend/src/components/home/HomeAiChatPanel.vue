@@ -2,9 +2,20 @@
   <el-aside width="480px" class="right-ai-panel">
     <div class="ai-header">
       <div class="ai-header-main">
-        <h3><IconAI :size="24" />AI 助手</h3>
+        <h3>
+          <IconAI :size="24" />AI 助手
+          <el-button
+            link
+            size="small"
+            class="ai-header-history-btn"
+            title="历史对话"
+            @click="toggleConversationDrawer"
+          >
+            <el-icon><Menu /></el-icon>
+          </el-button>
+        </h3>
         <p>
-          智能问答与辅助 · 本地最多保留 {{ HOME_CHAT_MAX_MESSAGES }} 条，超出自动丢弃最早消息
+          智能问答与辅助 · 对话历史自动同步到云端
         </p>
       </div>
       <el-button
@@ -18,6 +29,76 @@
         清空对话
       </el-button>
     </div>
+
+    <!-- 历史对话抽屉 -->
+    <el-drawer
+      v-model="showConversationDrawer"
+      title="历史对话"
+      direction="ltr"
+      size="320px"
+      :with-header="false"
+      append-to-body
+      class="conversation-drawer"
+    >
+      <div class="conversation-drawer-inner">
+        <div class="conversation-drawer-header">
+          <span class="conversation-drawer-title">历史对话</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            @click="createNewConversation"
+            title="新建对话"
+          >
+            + 新建
+          </el-button>
+        </div>
+        <div
+          v-loading="isLoadingConversations"
+          class="conversation-drawer-list"
+        >
+          <div
+            v-for="conv in conversationList"
+            :key="conv.id"
+            :class="[
+              'conversation-item',
+              { active: conv.id === currentConversationId }
+            ]"
+            @click="switchConversation(conv.id)"
+          >
+            <div class="conversation-item-main">
+              <div class="conversation-item-title">{{ conv.title || '未命名对话' }}</div>
+              <div class="conversation-item-time">
+                {{ formatConversationTime(conv.updated_at || conv.created_at) }}
+              </div>
+            </div>
+            <div class="conversation-item-actions" @click.stop>
+              <el-button
+                link
+                size="small"
+                title="重命名"
+                @click="renameConversationById(conv.id)"
+              >
+                <el-icon><Edit /></el-icon>
+              </el-button>
+              <el-button
+                link
+                size="small"
+                type="danger"
+                title="删除"
+                @click="deleteConversationById(conv.id)"
+              >
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </div>
+          </div>
+          <div v-if="!isLoadingConversations && conversationList.length === 0" class="conversation-empty">
+            <p>暂无历史对话</p>
+            <p class="conversation-empty-hint">发送第一条消息即可创建对话</p>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
 
     <div class="ai-chat-area">
       <div class="chat-messages-stack">
@@ -44,6 +125,88 @@
               <span v-else class="user-avatar">👤</span>
             </div>
             <div class="message-content">
+              <div
+                v-if="message.role === 'assistant' && message.agents && message.agents.length"
+                class="message-agents"
+              >
+                <span
+                  v-for="agent in message.agents"
+                  :key="agent.name"
+                  :class="['message-agent-chip', agent.status]"
+                  :title="agent.reason"
+                >
+                  {{ agent.emoji }} {{ agent.display_name }}
+                  <span v-if="agent.status === 'running'" class="agent-status-dot"></span>
+                </span>
+              </div>
+
+              <div
+                v-if="message.role === 'assistant' && message.subAgents && message.subAgents.length"
+                class="message-sub-agents"
+              >
+                <span class="sub-agents-label">→</span>
+                <span
+                  v-for="sub in message.subAgents"
+                  :key="sub.name"
+                  :class="['message-sub-agent-chip', sub.status]"
+                  :title="`正在调用 ${sub.tool} 工具`"
+                >
+                  {{ sub.emoji }} {{ sub.display_name }}
+                  <span v-if="sub.status === 'running'" class="agent-status-dot"></span>
+                </span>
+              </div>
+
+              <div
+                v-if="message.role === 'assistant' && message.thinking"
+                class="message-thinking"
+              >
+                <div class="message-thinking-label">
+                  💭 思考
+                  <el-button
+                    link
+                    size="small"
+                    class="thinking-toggle-btn"
+                    @click="message.thinkingCollapsed = !message.thinkingCollapsed"
+                  >
+                    {{ message.thinkingCollapsed ? '展开' : '收起' }}
+                  </el-button>
+                </div>
+                <div v-show="!message.thinkingCollapsed" class="message-thinking-text">
+                  {{ message.thinking }}
+                </div>
+              </div>
+
+              <div
+                v-if="message.role === 'assistant' && message.toolCalls && message.toolCalls.length"
+                class="message-tools"
+              >
+                <div
+                  v-for="tool in message.toolCalls"
+                  :key="tool.id"
+                  class="message-tool-card"
+                >
+                  <div class="message-tool-header">
+                    <span class="message-tool-name">🔧 {{ getToolLabel(tool.name) }}</span>
+                    <span :class="['message-tool-status', tool.status]">
+                      {{ tool.status === 'running' ? '运行中...' : '已完成' }}
+                    </span>
+                  </div>
+                  <div v-if="tool.args && hasArgs(tool.args)" class="message-tool-args">
+                    <span
+                      v-for="(val, key) in tool.args"
+                      :key="key"
+                      class="message-tool-arg"
+                    >
+                      <span class="message-tool-arg-key">{{ key }}:</span>
+                      <span class="message-tool-arg-val">{{ formatArgValue(val) }}</span>
+                    </span>
+                  </div>
+                  <div v-if="tool.result && tool.result.error" class="message-tool-error">
+                    ❌ {{ tool.result.error }}
+                  </div>
+                </div>
+              </div>
+
               <div class="message-text" v-html="renderMessage(message.content)"></div>
               <div
                 v-if="message.role === 'assistant' && extractMindmapDiagramSource(message.content)"
@@ -124,6 +287,60 @@
         </div>
 
         <div class="quick-actions">
+          <el-popover placement="top" :width="320" trigger="click">
+            <template #reference>
+              <el-button size="small" :disabled="isAiOutputInProgress">
+                助手列表
+              </el-button>
+            </template>
+            <div class="agent-list-popover">
+              <div class="agent-list-title">Note助手 - 可用工具</div>
+              <div class="agent-list-main">
+                <span class="agent-emoji">📒</span>
+                <div class="agent-info">
+                  <div class="agent-name">Note助手</div>
+                  <div class="agent-desc">主助手，智能选择工具完成任务</div>
+                </div>
+              </div>
+              <div class="agent-list-sub-title">子工具</div>
+              <div class="agent-list-item">
+                <span class="agent-emoji">🔍</span>
+                <div class="agent-info">
+                  <div class="agent-name">搜索</div>
+                  <div class="agent-desc">search_notes / get_note_content</div>
+                </div>
+              </div>
+              <div class="agent-list-item">
+                <span class="agent-emoji">📝</span>
+                <div class="agent-info">
+                  <div class="agent-name">总结</div>
+                  <div class="agent-desc">summarize_note</div>
+                </div>
+              </div>
+              <div class="agent-list-item">
+                <span class="agent-emoji">✍️</span>
+                <div class="agent-info">
+                  <div class="agent-name">生成</div>
+                  <div class="agent-desc">generate_note / create_note</div>
+                </div>
+              </div>
+              <div class="agent-list-item">
+                <span class="agent-emoji">🌐</span>
+                <div class="agent-info">
+                  <div class="agent-name">翻译</div>
+                  <div class="agent-desc">translate_note</div>
+                </div>
+              </div>
+              <div class="agent-list-item">
+                <span class="agent-emoji">🧠</span>
+                <div class="agent-info">
+                  <div class="agent-name">思维导图</div>
+                  <div class="agent-desc">基于笔记内容生成 Mermaid</div>
+                </div>
+              </div>
+              <div class="agent-list-tip">提示：直接输入需求，Note助手会自动调用合适的工具</div>
+            </div>
+          </el-popover>
           <el-button size="small" :disabled="isAiOutputInProgress" @click="sendMindmapQuickPrompt">
             思维导图
           </el-button>
@@ -191,9 +408,43 @@
 </template>
 
 <script setup>
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown, Menu, Edit, Delete } from '@element-plus/icons-vue'
 import { IconAI, IconDocument, IconPlus, IconEdit } from '@/components/icons'
 import { useHomeInject } from '@/composables/home/useHomeInject'
+
+const TOOL_LABELS = {
+  search_notes: '搜索笔记',
+  get_note_content: '获取笔记内容',
+  summarize_note: '总结笔记',
+  generate_note: '生成笔记',
+  translate_note: '翻译笔记',
+  create_note: '创建笔记'
+}
+
+function getToolLabel(name) {
+  return TOOL_LABELS[name] || name
+}
+
+function formatArgValue(val) {
+  if (val == null) return ''
+  if (typeof val === 'string') {
+    return val.length > 30 ? val.slice(0, 30) + '...' : val
+  }
+  if (typeof val === 'number' || typeof val === 'boolean') {
+    return String(val)
+  }
+  try {
+    const s = JSON.stringify(val)
+    return s.length > 30 ? s.slice(0, 30) + '...' : s
+  } catch {
+    return String(val)
+  }
+}
+
+function hasArgs(args) {
+  if (!args || typeof args !== 'object') return false
+  return Object.keys(args).length > 0
+}
 
 const {
   HOME_CHAT_MAX_MESSAGES,
@@ -222,6 +473,17 @@ const {
   uploadNoteToAI,
   handleInput,
   sendMessage,
-  stopAiChatOutput
+  stopAiChatOutput,
+  // 对话历史持久化
+  currentConversationId,
+  conversationList,
+  showConversationDrawer,
+  isLoadingConversations,
+  switchConversation,
+  createNewConversation,
+  deleteConversationById,
+  renameConversationById,
+  toggleConversationDrawer,
+  formatConversationTime
 } = useHomeInject()
 </script>

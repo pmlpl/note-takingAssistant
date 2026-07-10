@@ -6,6 +6,7 @@ from .note_generator import generate_note_stream
 from .note_analyzer import analyze_note
 from .note_translator import translate_note_stream
 from .chat_service import chat_with_ai, chat_with_ai_stream
+from .agent_service import agent_chat_stream
 
 __all__ = [
     'generate_note_stream',
@@ -13,4 +14,5 @@ __all__ = [
     'translate_note_stream',
     'chat_with_ai',
     'chat_with_ai_stream',
+    'agent_chat_stream',
 ]

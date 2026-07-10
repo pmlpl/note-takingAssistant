@@ -10,6 +10,7 @@ from app.core.database import engine, Base
 from app.core.logger import app_logger as logger
 from app.models.kg import KGConceptDB, KGRelationDB, KGStatusDB  # noqa: F401
 from app.models.user import UserDB, OAuthAccountDB  # noqa: F401
+from app.models.ai_conversation import AIConversationDB, AIMessageDB  # noqa: F401
 
 
 async def _alembic_applied(conn) -> bool:
@@ -169,3 +170,70 @@ async def ensure_user_oauth_columns(db: AsyncSession) -> None:
     if is_nullable and is_nullable.upper() == "NO":
         await db.execute(text("ALTER TABLE users MODIFY COLUMN username VARCHAR(50) NULL"))
         logger.info("已将 users.username 改为可空")
+
+
+async def ensure_ai_conversation_tables(db: AsyncSession) -> None:
+    """创建 AI 对话持久化相关表（ai_conversations / ai_messages），幂等。
+
+    若 Alembic 已应用，则跳过；MySQL 下检测表存在性后建表。
+    """
+    if await _alembic_applied(db):
+        return
+    if engine.dialect.name != "mysql":
+        return
+
+    # 1) ai_conversations 表
+    conv_table_r = await db.execute(
+        text(
+            """
+            SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'ai_conversations'
+            """
+        )
+    )
+    if (conv_table_r.scalar() or 0) == 0:
+        await db.execute(
+            text(
+                """
+                CREATE TABLE ai_conversations (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    title TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_ai_conv_user (user_id),
+                    INDEX idx_ai_conv_user_updated (user_id, updated_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
+        )
+        logger.info("已创建表 ai_conversations")
+
+    # 2) ai_messages 表
+    msg_table_r = await db.execute(
+        text(
+            """
+            SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'ai_messages'
+            """
+        )
+    )
+    if (msg_table_r.scalar() or 0) == 0:
+        await db.execute(
+            text(
+                """
+                CREATE TABLE ai_messages (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    conversation_id INT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_ai_msg_conv (conversation_id),
+                    INDEX idx_ai_msg_conv_created (conversation_id, created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
+        )
+        logger.info("已创建表 ai_messages")

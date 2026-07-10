@@ -93,6 +93,16 @@ const allNotes = ref([])  // 所有笔记列表
 /** 聊天区未贴底时显示「↓」跳转按钮 */
 const showScrollToLatestBtn = ref(false)
 
+// ==================== 对话历史（持久化到后端）====================
+/** 当前激活的对话 id（null 表示尚未绑定到任何对话，发送首条消息时由后端创建） */
+const currentConversationId = ref(null)
+/** 对话列表（侧边抽屉用），按 updated_at 倒序 */
+const conversationList = ref([])
+/** 抽屉是否展开 */
+const showConversationDrawer = ref(false)
+/** 列表加载中 */
+const isLoadingConversations = ref(false)
+
 function clearHomeUiState() {
   recentNotes.value = []
   allNotes.value = []
@@ -106,6 +116,11 @@ function clearHomeUiState() {
   isAiOutputInProgress.value = false
   homeChatAbortController?.abort()
   homeChatAbortController = null
+  // 清空对话历史相关状态
+  currentConversationId.value = null
+  conversationList.value = []
+  showConversationDrawer.value = false
+  isLoadingConversations.value = false
 }
 
 // 过滤后的笔记列表（用于搜索）
@@ -193,7 +208,17 @@ async function ensureHomeSessionForCurrentUser() {
 async function bootstrapHomeData() {
   if (!userStore.isLoggedIn) return
 
-  loadChatHistory()
+  // 阶段二：优先从后端加载对话历史；保留 localStorage 仅作旧数据兜底
+  await loadConversationList()
+  if (conversationList.value.length > 0) {
+    // 自动选中最近一条对话
+    await switchConversation(conversationList.value[0].id)
+  } else {
+    // 没有历史对话：清空 chatHistory，等待用户首条消息触发后端创建新对话
+    chatHistory.value = []
+    currentConversationId.value = null
+  }
+
   await loadCurrentNoteFromCache()
 
   const noteId = router.currentRoute.value.query.noteId
@@ -673,11 +698,13 @@ function sendMessage() {
     let assistantIdx = -1
 
     try {
-      // 构建消息历史
-      let messages = chatHistory.value.slice(0, -1).slice(-10).map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }))
+      // 构建消息历史：过滤掉空内容消息（如仅有 thinking/toolCalls 的中间步骤）
+      let messages = chatHistory.value.slice(0, -1).slice(-10)
+        .filter(msg => msg.content && String(msg.content).trim())
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
 
       let messageForApi = userMessage
       if (hasNoteContext) {
@@ -688,21 +715,144 @@ function sendMessage() {
         )
       }
 
-      await aiApi.chatStream({
+      // 创建 assistant 消息占位（在首个事件到来时延迟显示，避免空消息）
+      const ensureAssistantMsg = () => {
+        if (assistantIdx < 0) {
+          chatHistory.value.push({
+            role: 'assistant',
+            content: '',
+            thinking: '',
+            thinkingCollapsed: true,
+            hasDelta: false,
+            toolCalls: [],
+            agents: [],
+            currentAgent: null,
+            timestamp: new Date()
+          })
+          assistantIdx = chatHistory.value.length - 1
+          isAiThinking.value = false
+        }
+        return chatHistory.value[assistantIdx]
+      }
+
+      await aiApi.agentChatStream({
         message: messageForApi,
         history: messages,
+        conversationId: currentConversationId.value ?? undefined,
         signal: streamAbort.signal,
-        onChunk: (acc) => {
-          if (assistantIdx < 0) {
-            chatHistory.value.push({
-              role: 'assistant',
-              content: acc,
-              timestamp: new Date()
-            })
-            assistantIdx = chatHistory.value.length - 1
-            isAiThinking.value = false
-          } else {
-            chatHistory.value[assistantIdx].content = acc
+        onEvent: (evt) => {
+          if (!evt || typeof evt !== 'object') return
+          switch (evt.type) {
+            case 'agent_start': {
+              const ag = {
+                name: evt.agent,
+                display_name: evt.display_name || evt.agent,
+                emoji: evt.emoji || '🤖',
+                reason: evt.reason || '',
+                status: 'running'
+              }
+              const msg = ensureAssistantMsg()
+              msg.agents = msg.agents || []
+              msg.agents.push(ag)
+              msg.currentAgent = evt.agent
+              break
+            }
+            case 'agent_end': {
+              const msg = ensureAssistantMsg()
+              msg.agents = msg.agents || []
+              const idx = msg.agents.findIndex(a => a.name === evt.agent)
+              if (idx >= 0) {
+                msg.agents[idx].status = evt.success === false ? 'error' : 'done'
+              }
+              msg.currentAgent = null
+              break
+            }
+            case 'sub_agent_start': {
+              const msg = ensureAssistantMsg()
+              msg.subAgents = msg.subAgents || []
+              msg.subAgents.push({
+                name: evt.agent,
+                display_name: evt.display_name || evt.agent,
+                emoji: evt.emoji || '',
+                tool: evt.tool || '',
+                status: 'running'
+              })
+              msg.currentSubAgent = evt.agent
+              break
+            }
+            case 'sub_agent_end': {
+              const msg = ensureAssistantMsg()
+              msg.subAgents = msg.subAgents || []
+              const idx = msg.subAgents.findIndex(a => a.name === evt.agent)
+              if (idx >= 0) {
+                msg.subAgents[idx].status = 'done'
+              }
+              msg.currentSubAgent = null
+              break
+            }
+            case 'thinking': {
+              const msg = ensureAssistantMsg()
+              const cur = String(msg.thinking || '')
+              msg.thinking = cur + (cur ? '\n' : '') + (evt.text || '')
+              break
+            }
+            case 'tool_start': {
+              const msg = ensureAssistantMsg()
+              msg.toolCalls = msg.toolCalls || []
+              msg.toolCalls.push({
+                id: evt.id,
+                name: evt.name,
+                args: evt.args || {},
+                status: 'running',
+                result: null
+              })
+              break
+            }
+            case 'tool_end': {
+              const msg = ensureAssistantMsg()
+              msg.toolCalls = msg.toolCalls || []
+              const idx = msg.toolCalls.findIndex(c => c.id === evt.id)
+              if (idx >= 0) {
+                msg.toolCalls[idx].status = 'done'
+                msg.toolCalls[idx].result = evt.result || null
+              } else {
+                msg.toolCalls.push({
+                  id: evt.id,
+                  name: evt.name,
+                  args: {},
+                  status: 'done',
+                  result: evt.result || null
+                })
+              }
+              break
+            }
+            case 'delta': {
+              const msg = ensureAssistantMsg()
+              msg.content = String(msg.content || '') + (evt.text || '')
+              break
+            }
+            case 'done': {
+              // 接收后端返回的 conversation_id（首次发送时后端自动创建并返回）
+              if (evt.conversation_id != null) {
+                currentConversationId.value = evt.conversation_id
+              }
+              break
+            }
+            case 'error': {
+              const msg = ensureAssistantMsg()
+              const errMsg = evt.message || 'AI 服务暂时不可用，请稍后重试'
+              if (!String(msg.content || '').trim()) {
+                msg.content = errMsg
+              } else {
+                msg.content = String(msg.content) + '\n\n> ⚠️ ' + errMsg
+              }
+              // 错误时也隐藏打字指示器
+              if (!msg.hasDelta) {
+                msg.hasDelta = true
+                isAiThinking.value = false
+              }
+              break
+            }
           }
           scheduleHomeChatScroll()
           scheduleDebouncedSaveChatHistory()
@@ -713,14 +863,25 @@ function sendMessage() {
         chatHistory.value.push({
           role: 'assistant',
           content: '抱歉，我暂时无法回答这个问题。',
+          thinking: '',
+          thinkingCollapsed: true,
+          toolCalls: [],
+          agents: [],
+          currentAgent: null,
           timestamp: new Date()
         })
         isAiThinking.value = false
       } else {
         const c = String(chatHistory.value[assistantIdx].content || '').trim()
         if (!c) {
-          chatHistory.value[assistantIdx].content =
-            '抱歉，我暂时无法回答这个问题。'
+          // 检查是否有思考或工具调用：有则保留，无则给兜底
+          const hasThinking = String(chatHistory.value[assistantIdx].thinking || '').trim()
+          const hasTools = (chatHistory.value[assistantIdx].toolCalls || []).length > 0
+          if (!hasThinking && !hasTools) {
+            chatHistory.value[assistantIdx].content = '抱歉，我暂时无法回答这个问题。'
+          } else {
+            chatHistory.value[assistantIdx].content = '已完成上述操作。'
+          }
         }
       }
 
@@ -778,6 +939,10 @@ function sendMessage() {
           chatHistory.value.push({
             role: 'assistant',
             content: fallback,
+            thinking: '',
+            toolCalls: [],
+            agents: [],
+            currentAgent: null,
             timestamp: new Date()
           })
         }
@@ -790,6 +955,11 @@ function sendMessage() {
           chatHistory.value.push({
             role: 'assistant',
             content: '（已停止生成）',
+            thinking: '',
+            thinkingCollapsed: true,
+            toolCalls: [],
+            agents: [],
+            currentAgent: null,
             timestamp: new Date()
           })
         }
@@ -802,6 +972,11 @@ function sendMessage() {
           chatHistory.value.push({
             role: 'assistant',
             content: fallback,
+            thinking: '',
+            thinkingCollapsed: true,
+            toolCalls: [],
+            agents: [],
+            currentAgent: null,
             timestamp: new Date()
           })
         }
@@ -816,6 +991,8 @@ function sendMessage() {
       homeChatStopWasUser = false
       saveChatHistory()
       await scrollToBottom()
+      // 阶段二：刷新对话列表（让最新更新的对话排到最前）
+      void loadConversationList()
     }
   })()
   
@@ -1031,6 +1208,11 @@ function loadChatHistory() {
 
     chatHistory.value = history.map((msg) => ({
       ...msg,
+      thinking: msg.thinking || '',
+      thinkingCollapsed: msg.thinkingCollapsed !== undefined ? msg.thinkingCollapsed : true,
+      toolCalls: Array.isArray(msg.toolCalls) ? msg.toolCalls : [],
+      agents: Array.isArray(msg.agents) ? msg.agents : [],
+      currentAgent: msg.currentAgent || null,
       timestamp: new Date(msg.timestamp)
     }))
     saveChatHistory()
@@ -1052,15 +1234,176 @@ async function confirmClearChat() {
   } catch {
     return
   }
+  // 如果当前对话存在，从后端删除；本地状态也清空
+  const cid = currentConversationId.value
+  if (cid != null) {
+    try {
+      await aiApi.deleteConversation(cid)
+    } catch (error) {
+      console.error('删除对话失败:', error)
+      ElMessage.error({ message: '删除对话失败', duration: MESSAGE_DURATION.SHORT })
+      return
+    }
+  }
   chatHistory.value = []
+  currentConversationId.value = null
   try {
     localStorage.removeItem(homeStorageKey('chat_history'))
   } catch {
     /* ignore */
   }
   ElMessage.success({ message: '已清空对话', duration: MESSAGE_DURATION.SHORT })
+  await loadConversationList()
   await nextTick()
   onChatScroll()
+}
+
+// ==================== 对话历史管理（持久化）====================
+/** 加载当前用户的对话列表 */
+async function loadConversationList() {
+  if (!userStore.isLoggedIn) {
+    conversationList.value = []
+    return
+  }
+  isLoadingConversations.value = true
+  try {
+    const list = await aiApi.listConversations()
+    conversationList.value = Array.isArray(list) ? list : []
+  } catch (error) {
+    console.error('加载对话列表失败:', error)
+    conversationList.value = []
+  } finally {
+    isLoadingConversations.value = false
+  }
+}
+
+/** 切换到指定对话，加载其消息 */
+async function switchConversation(conversationId) {
+  if (conversationId == null) return
+  try {
+    const detail = await aiApi.getConversation(conversationId)
+    if (!detail) return
+    currentConversationId.value = detail.id
+    chatHistory.value = (detail.messages || []).map((m) => ({
+        role: m.role,
+        content: m.content || '',
+        thinking: '',
+        thinkingCollapsed: true,
+        toolCalls: [],
+        agents: [],
+        currentAgent: null,
+        timestamp: m.created_at ? new Date(m.created_at) : new Date()
+      }))
+    showConversationDrawer.value = false
+    ElMessage.success({
+      message: `已切换到「${detail.title}」`,
+      duration: MESSAGE_DURATION.SHORT
+    })
+    await nextTick()
+    onChatScroll()
+    await scrollToBottom()
+  } catch (error) {
+    console.error('切换对话失败:', error)
+    ElMessage.error({ message: '加载对话失败', duration: MESSAGE_DURATION.SHORT })
+  }
+}
+
+/** 新建空对话（前端只清空当前状态，等用户发首条消息时由后端创建并返回 conversation_id） */
+async function createNewConversation() {
+  chatHistory.value = []
+  currentConversationId.value = null
+  showConversationDrawer.value = false
+  try {
+    localStorage.removeItem(homeStorageKey('chat_history'))
+  } catch {
+    /* ignore */
+  }
+  await nextTick()
+  onChatScroll()
+  ElMessage.success({ message: '已开启新对话', duration: MESSAGE_DURATION.SHORT })
+}
+
+/** 删除指定对话 */
+async function deleteConversationById(conversationId) {
+  if (conversationId == null) return
+  try {
+    await ElMessageBox.confirm('确定删除此对话？所有消息将一并删除。', '删除对话', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return
+  }
+  try {
+    await aiApi.deleteConversation(conversationId)
+    ElMessage.success({ message: '已删除', duration: MESSAGE_DURATION.SHORT })
+    // 如果删除的是当前对话，清空当前状态
+    if (currentConversationId.value === conversationId) {
+      chatHistory.value = []
+      currentConversationId.value = null
+    }
+    await loadConversationList()
+    // 删除后若没有当前对话，自动选中第一条
+    if (currentConversationId.value == null && conversationList.value.length > 0) {
+      await switchConversation(conversationList.value[0].id)
+    }
+  } catch (error) {
+    console.error('删除对话失败:', error)
+    ElMessage.error({ message: '删除失败', duration: MESSAGE_DURATION.SHORT })
+  }
+}
+
+/** 重命名对话标题 */
+async function renameConversationById(conversationId) {
+  if (conversationId == null) return
+  const conv = conversationList.value.find((c) => c.id === conversationId)
+  if (!conv) return
+  let newTitle = ''
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新标题', '重命名对话', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValue: conv.title || '',
+      inputPattern: /\S+/,
+      inputErrorMessage: '标题不能为空'
+    })
+    newTitle = (value || '').trim()
+  } catch {
+    return
+  }
+  if (!newTitle) return
+  try {
+    await aiApi.renameConversation(conversationId, newTitle)
+    ElMessage.success({ message: '已重命名', duration: MESSAGE_DURATION.SHORT })
+    await loadConversationList()
+  } catch (error) {
+    console.error('重命名失败:', error)
+    ElMessage.error({ message: '重命名失败', duration: MESSAGE_DURATION.SHORT })
+  }
+}
+
+/** 切换抽屉显示 */
+function toggleConversationDrawer() {
+  showConversationDrawer.value = !showConversationDrawer.value
+  if (showConversationDrawer.value) {
+    void loadConversationList()
+  }
+}
+
+/** 格式化对话列表的时间显示 */
+function formatConversationTime(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const now = new Date()
+  const diff = now - d
+  const oneDay = 24 * 60 * 60 * 1000
+  if (diff < oneDay && d.getDate() === now.getDate()) {
+    return `今天 ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  }
+  if (diff < 2 * oneDay) return '昨天'
+  if (diff < 7 * oneDay) return `${Math.floor(diff / oneDay)}天前`
+  return `${d.getMonth() + 1}月${d.getDate()}日`
 }
 
 // 获取笔记预览文本
@@ -1092,6 +1435,19 @@ function getNotePreview(content) {
     filteredNotes,
     showScrollToLatestBtn,
     renderedContent,
+    // 对话历史持久化
+    currentConversationId,
+    conversationList,
+    showConversationDrawer,
+    isLoadingConversations,
+    loadConversationList,
+    switchConversation,
+    createNewConversation,
+    deleteConversationById,
+    renameConversationById,
+    toggleConversationDrawer,
+    formatConversationTime,
+    // 笔记/AI 操作
     createNewNote,
     importNote,
     viewNote,

@@ -1,6 +1,7 @@
 import api from './index'
 import { useUserStore } from '@/store'
 import { streamPlainTextPost } from '@/utils/streamPlainTextPost'
+import { streamSseEventsPost } from '@/utils/streamSseEvents'
 
 /** 本地大模型可能较慢，默认 10 分钟；可通过环境变量覆盖 */
 const AI_REQUEST_TIMEOUT_MS =
@@ -86,6 +87,70 @@ export async function chatStream({ message, history, onChunk, signal }) {
   })
 }
 
+/**
+ * Agent 流式对话：SSE 事件流，支持工具调用过程展示。
+ *
+ * 事件类型：
+ * - { type: 'thinking', text: string } 模型在调用工具前的思考说明
+ * - { type: 'tool_start', id: string, name: string, args: object } 开始执行工具
+ * - { type: 'tool_end', id: string, name: string, result: object } 工具执行结束
+ * - { type: 'delta', text: string } 最终回答的文本增量
+ * - { type: 'done', finish_reason?: string } 完成
+ * - { type: 'error', message: string } 错误
+ *
+ * @param {object} opts
+ * @param {string} opts.message
+ * @param {{ role: string, content: string }[]} [opts.history]
+ * @param {number} [opts.conversationId] 对话 ID（持久化场景传入）
+ * @param {(event: object) => void} opts.onEvent
+ * @param {AbortSignal} [opts.signal]
+ * @returns {Promise<void>}
+ */
+export async function agentChatStream({
+  message,
+  history,
+  conversationId,
+  onEvent,
+  signal
+}) {
+  return streamSseEventsPost({
+    url: '/api/v1/ai/agent-chat-stream',
+    body: {
+      message,
+      history: history || [],
+      conversation_id: conversationId ?? undefined
+    },
+    headers: authHeaders(),
+    onEvent,
+    signal
+  })
+}
+
+/**
+ * AI 对话历史持久化相关接口
+ */
+export async function listConversations() {
+  return api.get('/v1/ai/conversations').then((r) => r.data ?? r)
+}
+
+export async function createConversation(title) {
+  return api.post('/v1/ai/conversations', { title: title || undefined }).then((r) => r.data ?? r)
+}
+
+export async function getConversation(conversationId) {
+  return api.get(`/v1/ai/conversations/${conversationId}`).then((r) => r.data ?? r)
+}
+
+export async function renameConversation(conversationId, title) {
+  return api
+    .patch(`/v1/ai/conversations/${conversationId}`, { title })
+    .then((r) => r.data ?? r)
+}
+
+export async function deleteConversation(conversationId) {
+  return api.delete(`/v1/ai/conversations/${conversationId}`).then((r) => r.data ?? r)
+}
+
 export const aiApi = {
   generateNote(data) {
     return api.post('/v1/ai/generate-note', data, { timeout: AI_REQUEST_TIMEOUT_MS })
@@ -98,6 +163,14 @@ export const aiApi = {
   translateNoteStream,
   generateNoteStream,
   chatStream,
+  agentChatStream,
+
+  // 对话历史持久化
+  listConversations,
+  createConversation,
+  getConversation,
+  renameConversation,
+  deleteConversation,
 
   /**
    * AI 对话接口

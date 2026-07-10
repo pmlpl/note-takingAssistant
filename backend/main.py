@@ -4,7 +4,11 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from app.api.v1 import user, note, ai, public, kg, oauth
 from app.core.database import engine, Base, AsyncSessionLocal
-from app.core.startup_migrations import ensure_user_llm_columns, ensure_user_oauth_columns
+from app.core.startup_migrations import (
+    ensure_user_llm_columns,
+    ensure_user_oauth_columns,
+    ensure_ai_conversation_tables,
+)
 from app.core.config import settings
 from app.core.logger import app_logger as logger
 import os
@@ -26,6 +30,7 @@ async def lifespan(app: FastAPI):
     async with AsyncSessionLocal() as session:
         await ensure_user_llm_columns(session)
         await ensure_user_oauth_columns(session)
+        await ensure_ai_conversation_tables(session)
         await session.commit()
     yield
     # 关闭时执行清理操作

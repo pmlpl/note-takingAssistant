@@ -6,6 +6,7 @@ from app.services import (
     chat_with_ai,
     chat_with_ai_stream,
     translate_note_stream,
+    agent_chat_stream,
 )
 from app.core.field_crypto import SecretCryptoError
 from app.core.security import get_current_user
@@ -14,11 +15,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_async_db
 from app.crud import user as crud_user
 from app.crud import ai_usage as crud_ai_usage
+from app.crud import ai_conversation as crud_ai_conversation
 from app.models.ai import (
     GenerateNoteRequest,
     SummarizeNoteRequest,
     TranslateNoteRequest,
     ChatRequest,
+    AgentChatRequest,
+)
+from app.models.ai_conversation import (
+    AIConversationCreateRequest,
+    AIConversationDetailOut,
+    AIConversationOut,
+    AIMessageOut,
 )
 
 router = APIRouter()
@@ -217,3 +226,163 @@ async def chat_stream_endpoint(
         raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"对话失败：{str(e)}")
+
+
+@router.post("/agent-chat-stream", summary="Agent对话流式（带工具调用）")
+async def agent_chat_stream_endpoint(
+    req: AgentChatRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
+):
+    """Agent 流式对话：基于 Function Calling 主动调用工具（搜索/获取/总结/生成/翻译/创建笔记）。
+
+    响应体为 SSE 事件流（`text/event-stream`），每个事件为 `data: {json}\\n\\n`，事件类型：
+    - thinking：模型在调用工具前的思考说明
+    - tool_start：开始执行工具（含工具名和参数）
+    - tool_end：工具执行结束（含结果或摘要）
+    - delta：最终回答的文本增量
+    - done：完成（携带 conversation_id 便于前端刷新对话列表）
+    - error：错误
+
+    持久化：传入 conversation_id 则追加消息到指定对话；不传则自动创建新对话并返回其 id。
+    """
+    try:
+        db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
+        if not db_user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+
+        async def stream_generator():
+            try:
+                async for event in agent_chat_stream(
+                    req.message,
+                    req.history,
+                    db=db,
+                    db_user=db_user,
+                    conversation_id=req.conversation_id,
+                    persist=True,
+                ):
+                    yield event
+            finally:
+                await crud_ai_usage.log_ai_usage(db, db_user.id, "chat")
+
+        return StreamingResponse(
+            stream_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+    except HTTPException:
+        raise
+    except SecretCryptoError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"对话失败：{str(e)}") from e
+
+
+# ============== 对话历史持久化接口 ==============
+async def _get_db_user_or_404(db: AsyncSession, current_user: dict):
+    """获取当前登录的数据库用户（统一封装，避免重复代码）"""
+    db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
+    if not db_user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return db_user
+
+
+@router.get("/conversations", summary="获取对话列表", response_model=list[AIConversationOut])
+async def list_conversations_endpoint(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
+):
+    """获取当前用户的全部 AI 对话列表，按最近更新倒序。"""
+    db_user = await _get_db_user_or_404(db, current_user)
+    items = await crud_ai_conversation.list_conversations(db, db_user.id, limit=100)
+    return items
+
+
+@router.post("/conversations", summary="新建对话", response_model=AIConversationOut)
+async def create_conversation_endpoint(
+    req: AIConversationCreateRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
+):
+    """新建空对话；title 可选，不传则使用「新对话」。"""
+    db_user = await _get_db_user_or_404(db, current_user)
+    title = (req.title or "").strip() or "新对话"
+    conv = await crud_ai_conversation.create_conversation(db, db_user.id, title)
+    return conv
+
+
+@router.get(
+    "/conversations/{conversation_id}",
+    summary="获取对话详情（含全部消息）",
+    response_model=AIConversationDetailOut,
+)
+async def get_conversation_endpoint(
+    conversation_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
+):
+    """获取指定对话的元信息和全部消息（按时间正序）。"""
+    db_user = await _get_db_user_or_404(db, current_user)
+    conv = await crud_ai_conversation.get_conversation(db, conversation_id, db_user.id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    messages = await crud_ai_conversation.list_messages(db, conversation_id, db_user.id)
+    return AIConversationDetailOut(
+        id=conv.id,
+        title=conv.title,
+        created_at=conv.created_at,
+        updated_at=conv.updated_at,
+        messages=[AIMessageOut.model_validate(m) for m in messages],
+    )
+
+
+@router.patch(
+    "/conversations/{conversation_id}",
+    summary="重命名对话标题",
+    response_model=AIConversationOut,
+)
+async def rename_conversation_endpoint(
+    conversation_id: int,
+    req: AIConversationCreateRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
+):
+    """重命名对话标题；title 为空时返回 400。"""
+    db_user = await _get_db_user_or_404(db, current_user)
+    title = (req.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="标题不能为空")
+    conv = await crud_ai_conversation.rename_conversation(
+        db, conversation_id, db_user.id, title
+    )
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    return conv
+
+
+@router.delete(
+    "/conversations/{conversation_id}",
+    summary="删除对话（级联删除消息）",
+)
+async def delete_conversation_endpoint(
+    conversation_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = _ai_rate_limit,
+):
+    """删除指定对话及其全部消息。"""
+    db_user = await _get_db_user_or_404(db, current_user)
+    ok = await crud_ai_conversation.delete_conversation(
+        db, conversation_id, db_user.id
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    return {"message": "删除成功", "id": conversation_id}
