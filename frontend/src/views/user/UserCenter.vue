@@ -110,10 +110,6 @@ const llmForm = reactive({
   model: ''
 })
 
-function apiBase() {
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-}
-
 function buildAvatarUrl(avatarPath) {
   if (!avatarPath) return ''
   if (/^https?:\/\//i.test(avatarPath)) {
@@ -121,7 +117,7 @@ function buildAvatarUrl(avatarPath) {
     return `${base}?t=${Date.now()}`
   }
   const path = avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`
-  return `${apiBase()}${path}?t=${Date.now()}`
+  return `${path}?t=${Date.now()}`
 }
 
 function persistUserToStorage() {

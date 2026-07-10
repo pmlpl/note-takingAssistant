@@ -76,10 +76,6 @@ const email = computed(() => userStore.user?.email || '')
 const emailVerified = computed(() => userStore.user?.email_verified || false)
 const createdAt = computed(() => userStore.user?.created_at || '')
 
-function apiBase() {
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-}
-
 function buildAvatarUrl(avatarPath) {
   if (!avatarPath) return ''
   if (/^https?:\/\//i.test(avatarPath)) {
@@ -87,7 +83,7 @@ function buildAvatarUrl(avatarPath) {
     return `${base}?t=${Date.now()}`
   }
   const path = avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`
-  return `${apiBase()}${path}?t=${Date.now()}`
+  return `${path}?t=${Date.now()}`
 }
 
 function persistUserToStorage() {
