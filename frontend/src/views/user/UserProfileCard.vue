@@ -77,7 +77,7 @@ const emailVerified = computed(() => userStore.user?.email_verified || false)
 const createdAt = computed(() => userStore.user?.created_at || '')
 
 function apiBase() {
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+  return import.meta.env.VITE_API_BASE_URL || ''
 }
 
 function buildAvatarUrl(avatarPath) {
