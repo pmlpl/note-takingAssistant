@@ -1,5 +1,5 @@
 <template>
-  <el-aside width="480px" class="right-ai-panel">
+  <el-aside width="560px" class="right-ai-panel">
     <div class="ai-header">
       <div class="ai-header-main">
         <h3>
@@ -17,6 +17,14 @@
         <p>
           智能问答与辅助 · 对话历史自动同步到云端
         </p>
+        <!-- 视图切换 -->
+        <div class="ai-view-toggle">
+          <el-radio-group v-model="viewMode" size="small" @change="setViewMode">
+            <el-radio-button value="all">全部</el-radio-button>
+            <el-radio-button value="chat">仅聊天</el-radio-button>
+            <el-radio-button value="note">仅笔记</el-radio-button>
+          </el-radio-group>
+        </div>
       </div>
       <el-button
         v-if="chatHistory.length > 0"
@@ -287,60 +295,6 @@
         </div>
 
         <div class="quick-actions">
-          <el-popover placement="top" :width="320" trigger="click">
-            <template #reference>
-              <el-button size="small" :disabled="isAiOutputInProgress">
-                助手列表
-              </el-button>
-            </template>
-            <div class="agent-list-popover">
-              <div class="agent-list-title">Note助手 - 可用工具</div>
-              <div class="agent-list-main">
-                <span class="agent-emoji">📒</span>
-                <div class="agent-info">
-                  <div class="agent-name">Note助手</div>
-                  <div class="agent-desc">主助手，智能选择工具完成任务</div>
-                </div>
-              </div>
-              <div class="agent-list-sub-title">子工具</div>
-              <div class="agent-list-item">
-                <span class="agent-emoji">🔍</span>
-                <div class="agent-info">
-                  <div class="agent-name">搜索</div>
-                  <div class="agent-desc">search_notes / get_note_content</div>
-                </div>
-              </div>
-              <div class="agent-list-item">
-                <span class="agent-emoji">📝</span>
-                <div class="agent-info">
-                  <div class="agent-name">总结</div>
-                  <div class="agent-desc">summarize_note</div>
-                </div>
-              </div>
-              <div class="agent-list-item">
-                <span class="agent-emoji">✍️</span>
-                <div class="agent-info">
-                  <div class="agent-name">生成</div>
-                  <div class="agent-desc">generate_note / create_note</div>
-                </div>
-              </div>
-              <div class="agent-list-item">
-                <span class="agent-emoji">🌐</span>
-                <div class="agent-info">
-                  <div class="agent-name">翻译</div>
-                  <div class="agent-desc">translate_note</div>
-                </div>
-              </div>
-              <div class="agent-list-item">
-                <span class="agent-emoji">🧠</span>
-                <div class="agent-info">
-                  <div class="agent-name">思维导图</div>
-                  <div class="agent-desc">基于笔记内容生成 Mermaid</div>
-                </div>
-              </div>
-              <div class="agent-list-tip">提示：直接输入需求，Note助手会自动调用合适的工具</div>
-            </div>
-          </el-popover>
           <el-button size="small" :disabled="isAiOutputInProgress" @click="sendMindmapQuickPrompt">
             思维导图
           </el-button>
@@ -484,6 +438,9 @@ const {
   deleteConversationById,
   renameConversationById,
   toggleConversationDrawer,
-  formatConversationTime
+  formatConversationTime,
+  // 视图模式
+  viewMode,
+  setViewMode,
 } = useHomeInject()
 </script>

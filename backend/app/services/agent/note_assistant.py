@@ -152,7 +152,7 @@ NOTE_ASSISTANT_SYSTEM_PROMPT = """你是 NoteMind「笔记助手」，一个帮�
 | summarize_note | 总结笔记 | 用户要求总结、概括、提炼要点 |
 | generate_note | 生成笔记 | 用户要求写一篇、创作、生成新笔记 |
 | translate_note | 翻译笔记 | 用户要求翻译、翻译成其他语言 |
-| create_note | 保存笔记 | 用户要求保存到笔记库、加入我的笔记 |
+| create_note | 保存笔记 | 用户要求保存到我的笔记、加入我的笔记 |
 
 ## 工作原则
 1. 分析用户意图，选择最合适的工具

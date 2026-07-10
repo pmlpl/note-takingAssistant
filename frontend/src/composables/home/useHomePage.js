@@ -93,6 +93,17 @@ const allNotes = ref([])  // 所有笔记列表
 /** 聊天区未贴底时显示「↓」跳转按钮 */
 const showScrollToLatestBtn = ref(false)
 
+// ==================== 视图模式（全部/仅AI/仅笔记）====================
+const viewMode = ref('all')  // 'all' | 'chat' | 'note'
+
+function setViewMode(mode) {
+  viewMode.value = mode
+  // 切换后延迟触发一次重排，确保滚动容器尺寸更新
+  setTimeout(() => {
+    scrollChatToLatest()
+  }, 50)
+}
+
 // ==================== 对话历史（持久化到后端）====================
 /** 当前激活的对话 id（null 表示尚未绑定到任何对话，发送首条消息时由后端创建） */
 const currentConversationId = ref(null)
@@ -824,6 +835,26 @@ function sendMessage() {
                   result: evt.result || null
                 })
               }
+              // AI保存笔记成功后，弹提示并提供跳转链接
+              if (evt.name === 'create_note' && evt.result?.id) {
+                setTimeout(() => {
+                  loadRecentNotes()
+                  loadAllNotes()
+                }, 300)
+                ElMessage.success({
+                  message: '已保存到我的笔记，点击查看',
+                  type: 'success',
+                  duration: MESSAGE_DURATION.LONG,
+                  onClick: () => {
+                    router.push('/notes')
+                  }
+                })
+              } else if (evt.name === 'create_note' && evt.result?.error) {
+                ElMessage.error({
+                  message: `保存失败：${evt.result.error}`,
+                  duration: MESSAGE_DURATION.LONG
+                })
+              }
               break
             }
             case 'delta': {
@@ -1469,6 +1500,9 @@ function getNotePreview(content) {
     closeNoteSelector,
     selectNoteForContext,
     confirmClearChat,
-    extractMindmapDiagramSource
+    extractMindmapDiagramSource,
+    // 视图模式
+    viewMode,
+    setViewMode,
   }
 }

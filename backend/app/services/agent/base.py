@@ -91,7 +91,7 @@ class BaseAgent(ABC):
                 }
                 if use_tools:
                     kwargs["tools"] = self.tools_definition
-                    kwargs["tool_choice"] = "required"  # 强制调用工具，提高工具调用成功率
+                    kwargs["tool_choice"] = "auto"  # 让模型自主选择是否调用工具
                 response = await client.chat.completions.create(**kwargs)
             except Exception as e:
                 if use_tools and self._looks_like_tools_unsupported(e):

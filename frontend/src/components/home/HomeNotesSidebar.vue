@@ -3,6 +3,14 @@
     <div class="sidebar-header">
       <h3><IconNotebook :size="32" />笔记管理</h3>
     </div>
+    <!-- 视图切换 -->
+    <div class="sidebar-view-toggle">
+      <el-radio-group v-model="viewMode" size="small" @change="setViewMode">
+        <el-radio-button value="all">全部</el-radio-button>
+        <el-radio-button value="chat">仅聊天</el-radio-button>
+        <el-radio-button value="note">仅笔记</el-radio-button>
+      </el-radio-group>
+    </div>
     <div class="sidebar-actions">
       <el-button type="primary" @click="createNewNote" class="action-btn">
         <IconPlus :size="18" />
@@ -33,5 +41,5 @@
 import { IconPlus, IconUpload, IconDocument, IconNotebook } from '@/components/icons'
 import { useHomeInject } from '@/composables/home/useHomeInject'
 
-const { recentNotes, createNewNote, importNote, viewNote, goToHistory } = useHomeInject()
+const { recentNotes, createNewNote, importNote, viewNote, goToHistory, viewMode, setViewMode } = useHomeInject()
 </script>

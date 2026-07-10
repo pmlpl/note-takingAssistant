@@ -1,5 +1,5 @@
 <template>
-  <div class="home-container">
+  <div class="home-container" :class="`view-mode-${viewMode}`">
     <el-container class="main-layout">
       <HomeNotesSidebar />
       <HomeNotePreview />
@@ -9,7 +9,7 @@
 </template>
 
 <script setup>
-import { provide } from 'vue'
+import { provide, computed } from 'vue'
 import HomeNotesSidebar from '@/components/home/HomeNotesSidebar.vue'
 import HomeNotePreview from '@/components/home/HomeNotePreview.vue'
 import HomeAiChatPanel from '@/components/home/HomeAiChatPanel.vue'
@@ -18,5 +18,8 @@ import '@/assets/styles/home.css'
 
 defineOptions({ name: 'Home' })
 
-provide(HOME_PAGE_KEY, useHomePage())
+const homePage = useHomePage()
+const viewMode = computed(() => homePage.viewMode.value)
+
+provide(HOME_PAGE_KEY, homePage)
 </script>

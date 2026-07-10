@@ -224,6 +224,64 @@
 .ai-header-main { flex: 1; min-width: 0; }
 .ai-header-clear { flex-shrink: 0; margin-top: 2px; }
 
+/* 视图切换按钮 */
+.ai-view-toggle {
+  margin-top: 6px;
+}
+.ai-view-toggle :deep(.el-radio-group) {
+  width: 100%;
+  display: flex;
+}
+.ai-view-toggle :deep(.el-radio-button__inner) {
+  flex: 1;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-color: var(--color-pencil);
+  color: var(--color-pencil);
+  background: #fff;
+  font-family: var(--font-body);
+}
+.ai-view-toggle :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: var(--color-pencil);
+  color: #fff;
+  border-color: var(--color-pencil);
+}
+.ai-view-toggle :deep(.el-radio-button:first-child .el-radio-button__inner) {
+  border-radius: var(--radius-wobbly-sm) 0 0 var(--radius-wobbly-sm);
+}
+.ai-view-toggle :deep(.el-radio-button:last-child .el-radio-button__inner) {
+  border-radius: 0 var(--radius-wobbly-sm) var(--radius-wobbly-sm) 0;
+}
+
+/* 左侧栏视图切换按钮 */
+.sidebar-view-toggle {
+  margin-bottom: 16px;
+}
+.sidebar-view-toggle :deep(.el-radio-group) {
+  width: 100%;
+  display: flex;
+}
+.sidebar-view-toggle :deep(.el-radio-button__inner) {
+  flex: 1;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-color: var(--color-pencil);
+  color: var(--color-pencil);
+  background: #fff;
+  font-family: var(--font-body);
+}
+.sidebar-view-toggle :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: var(--color-pencil);
+  color: #fff;
+  border-color: var(--color-pencil);
+}
+.sidebar-view-toggle :deep(.el-radio-button:first-child .el-radio-button__inner) {
+  border-radius: var(--radius-wobbly-sm) 0 0 var(--radius-wobbly-sm);
+}
+.sidebar-view-toggle :deep(.el-radio-button:last-child .el-radio-button__inner) {
+  border-radius: 0 var(--radius-wobbly-sm) var(--radius-wobbly-sm) 0;
+}
+
 .ai-header h3 {
   font-family: var(--font-heading);
   font-size: 18px;
@@ -368,7 +426,7 @@
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  overflow-x: auto;
+  overflow-x: hidden;
   padding: 20px;
   min-height: 0;
 }
@@ -471,6 +529,7 @@
 
 .message-content {
   max-width: 70%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -484,6 +543,9 @@
   font-size: 14px;
   line-height: 1.6;
   word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow: hidden;
   border: 2px solid var(--color-pencil);
   font-family: var(--font-body);
 }
@@ -512,15 +574,23 @@
 .message-mindmap-actions { margin-top: 4px; }
 .message-item.assistant .message-mindmap-actions { align-self: flex-start; }
 
-.message-text :deep(p) { margin: 8px 0; }
+.message-text :deep(p) { margin: 8px 0; overflow-wrap: anywhere; word-break: break-word; }
 .message-text :deep(p:first-child) { margin-top: 0; }
 .message-text :deep(p:last-child)  { margin-bottom: 0; }
+.message-text :deep(ul),
+.message-text :deep(ol) {
+  overflow-wrap: anywhere; word-break: break-word;
+  padding-left: 1.5em; margin: 8px 0;
+}
+.message-text :deep(li) { overflow-wrap: anywhere; word-break: break-word; }
 .message-text :deep(code) {
   background: var(--color-muted);
   padding: 2px 6px;
   border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 13px;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 .message-item.user .message-text :deep(code) { background: rgba(255,255,255,0.2); }
 .message-text :deep(pre) {
@@ -530,6 +600,13 @@
   overflow-x: auto;
   margin: 8px 0;
   border: 2px solid var(--color-muted);
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.message-text :deep(pre) code {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .message-item.user .message-text :deep(pre) { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
 .message-text :deep(img)   { max-width: 100%; height: auto; }
@@ -683,99 +760,6 @@
   border-color: #e1f3d8;
 }
 
-/* 助手列表弹窗 */
-.agent-list-popover {
-  padding: 4px 0;
-}
-
-.agent-list-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #303133;
-  padding: 0 4px 8px;
-  border-bottom: 1px solid #ebeef5;
-  margin-bottom: 8px;
-}
-
-.agent-list-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 4px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  margin-bottom: 8px;
-}
-
-.agent-list-main .agent-emoji {
-  font-size: 24px;
-  line-height: 1.2;
-}
-
-.agent-list-main .agent-name {
-  font-weight: 600;
-  color: #fff !important;
-}
-
-.agent-list-main .agent-desc {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85) !important;
-}
-
-.agent-list-sub-title {
-  font-size: 11px;
-  font-weight: 500;
-  color: #909399;
-  padding: 4px;
-  margin-bottom: 4px;
-}
-
-.agent-list-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 6px 4px;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.agent-list-item:hover {
-  background: #f5f7fa;
-}
-
-.agent-list-item .agent-emoji {
-  font-size: 20px;
-  line-height: 1.4;
-}
-
-.agent-list-item .agent-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.agent-list-item .agent-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 2px;
-}
-
-.agent-list-item .agent-desc {
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.4;
-}
-
-.agent-list-tip {
-  margin-top: 8px;
-  padding: 6px 8px;
-  font-size: 11px;
-  color: #909399;
-  background: #f5f7fa;
-  border-radius: 4px;
-  line-height: 1.4;
-}
-
 /* Agent 工具调用过程 */
 .message-tools {
   display: flex;
@@ -913,6 +897,36 @@
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══ View Mode ═══ */
+
+/* 仅聊天模式：隐藏左侧栏和中间预览，AI 面板撑满 */
+.view-mode-chat .main-layout {
+  justify-content: center;
+}
+.view-mode-chat .left-sidebar {
+  display: none;
+}
+.view-mode-chat .center-preview {
+  display: none;
+}
+.view-mode-chat .right-ai-panel {
+  width: 100% !important;
+  max-width: 900px;
+  margin: 0 auto;
+  flex: 0 0 auto;
+}
+
+/* 仅笔记模式：隐藏 AI 面板，左侧+ 预览区撑满 */
+.view-mode-note .right-ai-panel {
+  display: none;
+}
+.view-mode-note .left-sidebar {
+  width: 280px !important;
+}
+.view-mode-note .center-preview {
+  flex: 1;
 }
 
 .uploaded-note-banner .note-name {
