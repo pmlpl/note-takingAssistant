@@ -39,24 +39,43 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(scope="session")
+def _setup_db_tables():
+    """在所有测试开始前，用全局 engine 创建数据库表（一次 session 建一次）"""
+    import asyncio
+    from app.core.database import engine, Base
+    from app.models import user as user_model
+    from app.models import note as note_model
+    from app.models import ai_usage as ai_usage_model
+    from app.models import kg as kg_model
+    from app.models import ai_conversation as ai_conv_model
+
+    async def _create_all():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.get_event_loop().run_until_complete(_create_all())
+    yield
+    asyncio.get_event_loop().run_until_complete(engine.dispose())
+
+
+@pytest.fixture(scope="session", autouse=True)
+def db_setup(_setup_db_tables):
+    """确保数据库表已创建，所有测试自动依赖"""
+    yield
+
+
 @pytest_asyncio.fixture(scope="function")
 async def async_db_session():
     """提供异步数据库会话，测试结束后回滚所有变更"""
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import sessionmaker
     from app.core.config import settings
+    from app.models import user as user_model
+    from app.models import note as note_model
+    from app.models import ai_usage as ai_usage_model
 
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        from app.models.note import NoteDB
-        from app.models.user import UserDB
-        from app.models.ai_usage import AIUsageLog
-        from app.models.note import Base as NoteBase
-        from app.models.user import Base as UserBase
-        from app.models.ai_usage import Base as AIBase
-        await conn.run_sync(UserBase.metadata.create_all)
-        await conn.run_sync(NoteBase.metadata.create_all)
-        await conn.run_sync(AIBase.metadata.create_all)
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
