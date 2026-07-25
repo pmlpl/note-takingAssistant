@@ -5,7 +5,8 @@ import pytest_asyncio
 import asyncio
 from cryptography.fernet import Fernet
 
-os.environ.setdefault("SKIP_APP_LIFESPAN", "1")
+# 注意：测试中不设置 SKIP_APP_LIFESPAN，让 TestClient(app) 的 with 上下文触发 lifespan，
+# lifespan 会调用 init_db() 自动创建所有表（用全局 engine，避免事件循环冲突）
 os.environ.setdefault("DB_HOST", "127.0.0.1")
 os.environ.setdefault("DB_PORT", "3306")
 os.environ.setdefault("DB_USER", "root")
@@ -39,41 +40,12 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture(scope="session")
-def _setup_db_tables():
-    """在所有测试开始前，用全局 engine 创建数据库表（一次 session 建一次）"""
-    import asyncio
-    from app.core.database import engine, Base
-    from app.models import user as user_model
-    from app.models import note as note_model
-    from app.models import ai_usage as ai_usage_model
-    from app.models import kg as kg_model
-    from app.models import ai_conversation as ai_conv_model
-
-    async def _create_all():
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-    asyncio.get_event_loop().run_until_complete(_create_all())
-    yield
-    asyncio.get_event_loop().run_until_complete(engine.dispose())
-
-
-@pytest.fixture(scope="session", autouse=True)
-def db_setup(_setup_db_tables):
-    """确保数据库表已创建，所有测试自动依赖"""
-    yield
-
-
 @pytest_asyncio.fixture(scope="function")
 async def async_db_session():
     """提供异步数据库会话，测试结束后回滚所有变更"""
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import sessionmaker
     from app.core.config import settings
-    from app.models import user as user_model
-    from app.models import note as note_model
-    from app.models import ai_usage as ai_usage_model
 
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
 

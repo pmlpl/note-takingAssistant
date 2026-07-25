@@ -2,12 +2,17 @@ from fastapi.testclient import TestClient
 from main import app
 import pytest
 
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    """每个测试用 with 触发 lifespan，确保数据库表已创建"""
+    with TestClient(app) as c:
+        yield c
 
 
 @pytest.fixture
-def auth_token():
-    email = f"test_{__name__}@example.com"
+def auth_token(client):
+    email = f"test_{__name__}_{__import__('os').urandom(4).hex()}@example.com"
     password = "Test123456"
 
     client.post("/api/v1/user/register", json={
@@ -24,15 +29,15 @@ def auth_token():
     return response.json()["access_token"]
 
 
-def test_health_endpoint():
+def test_health_endpoint(client):
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
     assert "message" in data
 
 
-def test_register_success():
-    email = f"register_test_{__name__}@example.com"
+def test_register_success(client):
+    email = f"register_test_{__name__}_{__import__('os').urandom(4).hex()}@example.com"
     password = "Register123"
 
     response = client.post("/api/v1/user/register", json={
@@ -46,8 +51,8 @@ def test_register_success():
     assert data["email"] == email
 
 
-def test_register_duplicate_email():
-    email = f"dup_test_{__name__}@example.com"
+def test_register_duplicate_email(client):
+    email = f"dup_test_{__name__}_{__import__('os').urandom(4).hex()}@example.com"
     password = "Dup123456"
 
     client.post("/api/v1/user/register", json={
@@ -65,7 +70,7 @@ def test_register_duplicate_email():
     assert "该邮箱已被注册" in response.json()["detail"]
 
 
-def test_register_invalid_password():
+def test_register_invalid_password(client):
     response = client.post("/api/v1/user/register", json={
         "email": "invalid@example.com",
         "password": "short",
@@ -74,8 +79,8 @@ def test_register_invalid_password():
     assert response.status_code == 400
 
 
-def test_login_success():
-    email = f"login_test_{__name__}@example.com"
+def test_login_success(client):
+    email = f"login_test_{__name__}_{__import__('os').urandom(4).hex()}@example.com"
     password = "Login123456"
 
     client.post("/api/v1/user/register", json={
@@ -95,8 +100,8 @@ def test_login_success():
     assert data["token_type"] == "bearer"
 
 
-def test_login_wrong_password():
-    email = f"wrongpwd_test_{__name__}@example.com"
+def test_login_wrong_password(client):
+    email = f"wrongpwd_test_{__name__}_{__import__('os').urandom(4).hex()}@example.com"
     password = "Wrong123456"
 
     client.post("/api/v1/user/register", json={
@@ -112,12 +117,12 @@ def test_login_wrong_password():
     assert response.status_code == 401
 
 
-def test_get_me_without_auth():
+def test_get_me_without_auth(client):
     response = client.get("/api/v1/user/me")
     assert response.status_code == 401
 
 
-def test_get_me_with_auth(auth_token):
+def test_get_me_with_auth(client, auth_token):
     response = client.get(
         "/api/v1/user/me",
         headers={"Authorization": f"Bearer {auth_token}"}
@@ -128,7 +133,7 @@ def test_get_me_with_auth(auth_token):
     assert "email" in data
 
 
-def test_create_note_with_auth(auth_token):
+def test_create_note_with_auth(client, auth_token):
     response = client.post(
         "/api/v1/note/",
         headers={"Authorization": f"Bearer {auth_token}"},
@@ -145,7 +150,7 @@ def test_create_note_with_auth(auth_token):
     assert data["title"] == "Test API Note"
 
 
-def test_get_note_list_with_auth(auth_token):
+def test_get_note_list_with_auth(client, auth_token):
     response = client.get(
         "/api/v1/note/",
         headers={"Authorization": f"Bearer {auth_token}"}
@@ -155,7 +160,7 @@ def test_get_note_list_with_auth(auth_token):
     assert isinstance(data, list)
 
 
-def test_get_note_detail_with_auth(auth_token):
+def test_get_note_detail_with_auth(client, auth_token):
     create_response = client.post(
         "/api/v1/note/",
         headers={"Authorization": f"Bearer {auth_token}"},
@@ -178,7 +183,7 @@ def test_get_note_detail_with_auth(auth_token):
     assert data["title"] == "Detail Test Note"
 
 
-def test_update_note_with_auth(auth_token):
+def test_update_note_with_auth(client, auth_token):
     create_response = client.post(
         "/api/v1/note/",
         headers={"Authorization": f"Bearer {auth_token}"},
@@ -208,7 +213,7 @@ def test_update_note_with_auth(auth_token):
     assert data["is_favorite"] == 1
 
 
-def test_delete_note_with_auth(auth_token):
+def test_delete_note_with_auth(client, auth_token):
     create_response = client.post(
         "/api/v1/note/",
         headers={"Authorization": f"Bearer {auth_token}"},
@@ -234,7 +239,7 @@ def test_delete_note_with_auth(auth_token):
     assert get_response.status_code == 404
 
 
-def test_note_crud_without_auth():
+def test_note_crud_without_auth(client):
     response = client.post("/api/v1/note/", json={
         "title": "Unauthorized Note",
         "content": "<p>Should fail</p>",
