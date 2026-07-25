@@ -51,8 +51,12 @@ async def async_db_session():
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
         tx = await session.begin()
-        yield session
-        await tx.rollback()
+        try:
+            yield session
+        finally:
+            # 仅当事务仍处于活跃状态才回滚（避免 ResourceClosedError）
+            if tx.is_active:
+                await tx.rollback()
 
     await engine.dispose()
 
