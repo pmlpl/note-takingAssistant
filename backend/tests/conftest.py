@@ -2,6 +2,7 @@
 import os
 import pytest
 import pytest_asyncio
+import asyncio
 from cryptography.fernet import Fernet
 
 os.environ.setdefault("SKIP_APP_LIFESPAN", "1")
@@ -27,7 +28,18 @@ os.environ.setdefault("API_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("FRONTEND_URL", "http://localhost:5174")
 
 
-@pytest_asyncio.fixture
+@pytest.fixture(scope="session")
+def event_loop():
+    """创建一个 session 级别的事件循环，避免 'Event loop is closed' 错误"""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest_asyncio.fixture(scope="function")
 async def async_db_session():
     """提供异步数据库会话，测试结束后回滚所有变更"""
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -55,15 +67,16 @@ async def async_db_session():
     await engine.dispose()
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="function")
 async def test_user_id(async_db_session):
-    """创建测试用户并返回 user_id"""
+    """创建测试用户并返回 user_id（使用随机 email 避免并行测试冲突）"""
     from app.core.security import get_password_hash
     from app.models.user import UserDB
 
+    random_suffix = os.urandom(4).hex()
     user = UserDB(
-        username=f"testuser_{os.urandom(4).hex()}",
-        email="test@example.com",
+        username=f"testuser_{random_suffix}",
+        email=f"test_{random_suffix}@example.com",
         hashed_password=get_password_hash("test123"),
     )
     async_db_session.add(user)
