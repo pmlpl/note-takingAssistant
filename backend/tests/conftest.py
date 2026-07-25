@@ -31,13 +31,10 @@ os.environ.setdefault("API_BASE_URL", "http://localhost:8000")
 os.environ.setdefault("FRONTEND_URL", "http://localhost:5174")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(autouse=True)
 def event_loop():
-    """创建一个 session 级别的事件循环，避免 'Event loop is closed' 错误"""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
+    """每个测试用独立的事件循环，避免 'Event loop is closed' 错误"""
+    loop = asyncio.new_event_loop()
     yield loop
     loop.close()
 
