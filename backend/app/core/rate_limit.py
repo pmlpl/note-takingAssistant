@@ -4,9 +4,11 @@
 - 未登录接口（register/login）按客户端 IP 节流
 - 已登录接口（ai/notes/user）按用户名节流
 - Redis 不可用时降级为「放行」而非拒绝，保证基本可用性
+- 测试环境（RATE_LIMIT_DISABLED=1）直接放行，避免 CI 单 IP 触发限流
 """
 from __future__ import annotations
 
+import os
 import time
 from typing import Callable, Dict, Optional
 
@@ -16,6 +18,11 @@ from app.core.redis_client import (
     redis_client,
     _rate_limit_bump as _redis_bump,  # type: ignore[attr-defined]
 )
+
+
+def _is_disabled() -> bool:
+    """测试环境可通过环境变量禁用速率限制"""
+    return os.environ.get("RATE_LIMIT_DISABLED", "0") == "1"
 
 
 # 命名限流策略：key_prefix -> (max_requests, window_seconds)
@@ -55,6 +62,8 @@ def check_and_bump(policy_name: str, identifier: str) -> None:
     对当前请求做「计数 + 校验」两步操作。
     通过（或 Redis 不可用时降级放行）不抛异常；超过阈值则抛 RateLimitExceeded。
     """
+    if _is_disabled():
+        return  # 测试环境：直接放行
     if policy_name not in LIMIT_POLICIES:
         return  # 未知策略：放行（保守处理）
     max_req, window_sec = LIMIT_POLICIES[policy_name]

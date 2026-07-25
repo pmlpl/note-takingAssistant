@@ -7,6 +7,8 @@ from cryptography.fernet import Fernet
 
 # 注意：测试中不设置 SKIP_APP_LIFESPAN，让 TestClient(app) 的 with 上下文触发 lifespan，
 # lifespan 会调用 init_db() 自动创建所有表（用全局 engine，避免事件循环冲突）
+# 测试环境禁用速率限制，避免 CI 单 IP 触发 429
+os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
 os.environ.setdefault("DB_HOST", "127.0.0.1")
 os.environ.setdefault("DB_PORT", "3306")
 os.environ.setdefault("DB_USER", "root")
