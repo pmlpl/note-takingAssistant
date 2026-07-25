@@ -75,6 +75,10 @@ FastAPI、SQLAlchemy、MySQL、Redis、OpenAI SDK、bcrypt、pytest
 
 Docker、Docker Compose、Nginx、Certbot
 
+### 工程化
+
+GitHub Actions（CI 自动测试 + lint）、Ruff、ESLint、GitHub Container Registry（GHCR 镜像发布）
+
 ---
 
 ## 快速开始
@@ -95,6 +99,42 @@ Docker、Docker Compose、Nginx、Certbot
 2. 执行 `docker compose up -d` 启动所有服务
 
 详见部署文档（DEPLOY.md，本地分发）。
+
+---
+
+## CI/CD 与发布流程
+
+本项目接入了完整的 GitHub Actions CI/CD 流水线：
+
+### 持续集成（CI）
+
+每次推送到 `master` 分支或提交 PR 时自动触发：
+
+- **前端**：`npm ci` → ESLint 检查 → Vitest 单元测试 → Vite 构建 → npm audit
+- **后端**：`pip install` → Ruff lint/format 检查 → pytest（含 MySQL + Redis service） → pip-audit
+- **桌面端**：Electron 构建验证
+
+Lint 步骤为 informational 模式（`continue-on-error: true`），不阻断流水线，便于渐进式修复历史代码。
+
+### 持续交付（CD）
+
+推送 `v*.*.*` 格式的 tag 时自动触发 release workflow：
+
+```bash
+# 发布新版本
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+自动完成：
+
+1. **构建并推送 Docker 镜像到 GHCR**：
+   - `ghcr.io/<owner>/note-taking-assistant/backend:v1.2.0`
+   - `ghcr.io/<owner>/note-taking-assistant/frontend:v1.2.0`
+   - 同时打 `:latest` 标签
+2. **创建 GitHub Release**：自动从 CHANGELOG.md 提取本版本说明，附 Docker 镜像拉取命令
+
+部署时只需在 `docker-compose.yml` 中将 `build:` 替换为 `image:` 指向 GHCR 镜像即可。
 
 ---
 
