@@ -76,6 +76,9 @@ note-app.tar.gz
 .trae/
 reasonix.toml
 
+# Deployment docs (contains server-specific details, should not be committed)
+DEPLOY.md
+
 # Testing
 .pytest_cache/
 .coverage

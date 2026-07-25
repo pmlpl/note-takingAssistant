@@ -4,7 +4,7 @@
 
 # NoteMind
 
-![Version](https://img.shields.io/badge/Version-1.1.0-10b981?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.2.0-10b981?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)
 
 </div>
@@ -91,7 +91,10 @@ Docker、Docker Compose、Nginx、Certbot
 
 ### 生产部署
 
-使用 Docker Compose 部署，详见部署文档。
+1. 复制 `cp .env.docker .env` 并填写真实配置
+2. 执行 `docker compose up -d` 启动所有服务
+
+详见部署文档（DEPLOY.md，本地分发）。
 
 ---
 
@@ -127,7 +130,7 @@ Docker、Docker Compose、Nginx、Certbot
 |------|------|
 | [`backend/README.md`](backend/README.md) | 后端开发说明 |
 | 应用内 `/manual` | 终端用户操作手册 |
-| [`../Desktop-note/README.md`](../Desktop-note/README.md) | 桌面版说明 |
+| [`desktop/README.md`](desktop/README.md) | 桌面版说明 |
 
 ---
 
@@ -149,6 +152,6 @@ Docker、Docker Compose、Nginx、Certbot
 
 <br>
 
-**v1.1.0** · 最后更新：2026-07-03
+**v1.2.0** · 最后更新：2026-07-03
 
 </div>

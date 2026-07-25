@@ -100,7 +100,7 @@ app.include_router(public.router, prefix="/api/v1/public", tags=["公开接口"]
 # 测试接口
 @app.get("/", tags=["测试"])
 def home():
-    return {"message": "NoteMind AI Note Assistant backend running successfully!"}
+    return {"message": "NoteMind AI 笔记助手后端服务运行成功！"}
 
 # 启动服务器（是否 auto-reload 由配置项控制，生产环境必须关闭）
 if __name__ == "__main__":

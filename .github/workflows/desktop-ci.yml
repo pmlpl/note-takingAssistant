@@ -4,24 +4,31 @@ on:
   push:
     branches: [main, master]
     paths:
-      - 'Desktop-note/**'
+      - 'desktop/**'
   pull_request:
     branches: [main, master]
     paths:
-      - 'Desktop-note/**'
+      - 'desktop/**'
 
 jobs:
   build:
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: Desktop-note
+        working-directory: desktop
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-node@v4
         with:
-          dotnet-version: 8.0.x
-      - name: Restore dependencies
-        run: dotnet restore SmartNote.sln
-      - name: Build
-        run: dotnet build SmartNote.sln --configuration Release --no-restore
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install desktop dependencies
+        run: npm ci
+      - name: Install renderer dependencies
+        run: npm ci
+        working-directory: desktop/renderer
+      - name: Build renderer
+        run: npm run build:renderer
+      - name: Copy frontend
+        run: npm run copy:frontend
