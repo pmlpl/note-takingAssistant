@@ -186,7 +186,7 @@ git push origin v1.2.0
 
 ## License
 
-**MIT License**
+**MIT License**（详见 [LICENSE](LICENSE)）
 
 ---
 
