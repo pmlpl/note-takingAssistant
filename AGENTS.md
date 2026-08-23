@@ -49,7 +49,7 @@ NoteMind 智能笔记助手，个人学习与创作场景的全栈应用。
 ## 已知不一致（截至 2026-08-23）
 
 - **版本治理**：`git tag` 仅有 v1.0.1 / v1.1.0，**v1.2.0 从未打 tag**；`frontend/package.json` 与 `desktop/package.json` 版本仍为 1.1.0；CHANGELOG 的 [1.1.0] / [1.1.1] 条目分别对应 tag v1.0.1 / v1.1.0（错位一位）。统一策略待产品决策，改动版本相关文档前先确认。
-- **重复文档**：`desktop/renderer/src/components/icons/README.md` 与 `frontend/src/components/icons/README.md` 字节级重复（SHA256 一致），删除需 owner 确认。
+- **重复文档（已解决）**：`desktop/renderer/src/components/icons/README.md` 曾与 `frontend/src/components/icons/README.md` 字节级重复（SHA256 一致），已由 owner 确认后删除（2026-08-23），保留 `frontend/` 副本。
 - **README 页脚**：`v1.2.0 · 最后更新` 日期在每次文档更新时同步。
 
 ## 本仓库 agent 职责边界
