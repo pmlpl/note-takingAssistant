@@ -98,7 +98,7 @@ GitHub Actions（CI 自动测试 + lint）、Ruff、ESLint、GitHub Container Re
 1. 复制 `cp .env.docker .env` 并填写真实配置
 2. 执行 `docker compose up -d` 启动所有服务
 
-详见部署文档（DEPLOY.md，本地分发）。
+> 完整的部署操作细节（服务器配置、HTTPS 证书等）不随仓库公开，仅限项目内部使用。
 
 ---
 

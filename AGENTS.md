@@ -20,7 +20,7 @@ NoteMind 智能笔记助手，个人学习与创作场景的全栈应用。
 |------|------|----------|
 | `README.md` | 项目总览 + 全文档入口 | 版本徽标与 CHANGELOG 对齐；页脚日期随更新同步 |
 | `CHANGELOG.md` | 版本变更记录（Keep a Changelog） | **唯一版本基准**；每次对外变更必须记录 |
-| `DEPLOY.md` | 部署指南 | ⚠️ 冻结态：被 `.gitignore` 忽略但仍在 git index，含本机路径与域名，是否公开待 owner 决策 |
+| `DEPLOY.md` | 部署指南（仅本地保留） | 已从 git 跟踪移除（2026-08-23，owner 确认），不随仓库分发；`.gitignore` 已含该文件 |
 | `docs/architecture.md` | 架构说明（Mermaid、端口、安全） | 与 `docker-compose.yml` 保持一致 |
 | `docs/er-diagram.md` | 数据库 ER 图（9 张表） | 与 `backend/app/models/` 保持一致 |
 | `backend/README.md` | 后端开发说明 + API 接口一览 | API 表与 `backend/app/api/v1/*.py` 路由同步 |
