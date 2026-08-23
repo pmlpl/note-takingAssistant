@@ -1,5 +1,7 @@
 # NoteMind — 代码库健康审查与修改方案
 
+> **归档说明**：全部 13 项已完成。表内 3 项「未做」均已落地：Alembic 迁移（`backend/alembic/`，commit `554d241`）、UserCenter 组件拆分（`frontend/src/views/user/` 8 个文件，UserCenter.vue 1806 行 → 247 行）、ai_service 清理（`services/` 已无 `ai_service.py`，拆为 agent/chat/note 系列）。归档保留，状态表不再更新。
+
 > 审查日期：2026-06-29  
 > 项目版本：v1.1.0  
 > 审查范围：`note-takingAssistant/`（Web 全栈）+ `Desktop-note/`（桌面客户端）  
