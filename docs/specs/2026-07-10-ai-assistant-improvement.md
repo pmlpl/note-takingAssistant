@@ -1,5 +1,7 @@
 # AI 助手功能改进方案
 
+> **归档说明**：本方案核心已由 commit `ba99667`（2026-07-10「重构 AI 助手为单一主 Agent 架构」）实现：`agent-chat-stream` 端点、`ai_conversations`/`ai_messages` 持久化、`services/agent/` 多 Agent 工具调用均已落地。归档保留，不再作为待办。
+
 ## 一、现状分析
 
 ### 1.1 当前能力

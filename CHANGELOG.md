@@ -6,6 +6,27 @@
 
 ---
 
+## [Unreleased]
+
+> **AI 主 Agent 架构 + CI/CD 完善**（2026-07-10 ~ 2026-07-25 变更，尚未发布）
+
+### 🎉 新增
+
+- **AI 助手重构为单一主 Agent 架构**（`ba99667`）：基于 Function Calling 主动调用工具（搜索笔记 / 获取详情 / 总结 / 生成 / 翻译 / 创建笔记），SSE 事件流输出思考过程与工具执行进度
+- **对话历史持久化**：新增 `ai_conversations` / `ai_messages` 表，及对话列表 / 新建 / 详情 / 重命名 / 删除接口
+- **首页视图三态切换**（`f276f08`）：全部笔记 / 最近笔记 / 我的笔记切换，AI 面板加宽，移除助手列表，tool_choice 改为 auto
+- **CI 接入 lint + release workflow**（`a03a260`）：后端 Ruff + 前端 ESLint（informational 模式）；推送 `v*` 格式 tag 自动构建并发布 GHCR Docker 镜像（`backend` / `frontend`，含 `:latest`）+ 创建 GitHub Release
+- **核心 API 路由测试**（`7b7edf6`）：补充核心路由 pytest 用例
+
+### 🐛 修复
+
+- **HTTPS Mixed Content**（`ca2e594` 定稿）：头像与图片上传 URL 改用相对路径（`590211d` 引入，`f654d7c` 回退，最终相对路径方案落地）
+- **CI 测试稳定性**（07-25 共 6 个修复 commit）：测试环境禁用速率限制（`e99348c`）、TestClient 触发 lifespan 建表（`10a9ccd` / `5017552`）、event_loop 作用域修复（`589459f`）、异步会话事务状态检查（`93c64fb`）、package-lock 同步（`5aa21ce`）
+
+> **版本说明**：`git tag` 目前仅有 `v1.0.1`（2026-06-20）与 `v1.1.0`（2026-06-28），**v1.2.0 从未打 tag**；且现有 [1.1.0]（2026-06-20 安全加固+生产部署）与 [1.1.1]（2026-06-28 知识图谱+OAuth）条目分别对应 tag v1.0.1 / v1.1.0，版本号错位一位。版本号与 tag 治理策略待产品决策后统一（README / 各模块 README 标题随动）。
+
+---
+
 ## [1.2.0] - 2026-07-03
 
 > **桌面端功能完善 + 安全加固**

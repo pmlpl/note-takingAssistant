@@ -1,5 +1,7 @@
 # 文件上传安全改进清单
 
+> **归档说明**：本清单已实现完毕。P0-1（导入大小限制）落地为 `settings.MAX_IMPORT_BYTES`（默认 20MB），见 `backend/app/core/config.py` 与 `backend/app/api/v1/note.py`（`import_note` 流式读取校验，含 MD5 校验与可选覆盖）；配图上传另有 `IMAGE_MAX_BYTES`（5MB）上限。归档保留。
+
 > 审查日期：2026-06-30
 > 目标：提高上传体验 + 服务器安全
 > 执行引擎：Trae / Claude Code 可直接按行执行

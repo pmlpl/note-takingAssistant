@@ -168,9 +168,13 @@ git push origin v1.2.0
 
 | 文档 | 内容 |
 |------|------|
-| [`backend/README.md`](backend/README.md) | 后端开发说明 |
-| 应用内 `/manual` | 终端用户操作手册 |
+| [`CHANGELOG.md`](CHANGELOG.md) | 版本更新记录（Keep a Changelog） |
+| [`docs/architecture.md`](docs/architecture.md) | 架构说明（开发/生产架构、端口映射、安全） |
+| [`docs/er-diagram.md`](docs/er-diagram.md) | 数据库 ER 图（9 张表） |
+| [`backend/README.md`](backend/README.md) | 后端开发说明与 API 接口一览 |
 | [`desktop/README.md`](desktop/README.md) | 桌面版说明 |
+| [`docs/specs/`](docs/specs/) | 历史方案与审查文档归档 |
+| 应用内 `/manual` | 终端用户操作手册 |
 
 ---
 
@@ -192,6 +196,6 @@ git push origin v1.2.0
 
 <br>
 
-**v1.2.0** · 最后更新：2026-07-03
+**v1.2.0** · 最后更新：2026-08-23
 
 </div>
