@@ -3,7 +3,8 @@
 提供对 ai_conversations / ai_messages 表的基本增删查改。
 所有操作均以 user_id 为隔离维度，防止跨用户访问。
 """
-from typing import List, Optional
+
+from typing import Optional
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.sql import func
@@ -13,9 +14,7 @@ from app.models.ai_conversation import AIConversationDB, AIMessageDB
 
 
 # ============== 对话 (Conversation) CRUD ==============
-async def list_conversations(
-    db, user_id: int, limit: int = 50
-) -> List[AIConversationDB]:
+async def list_conversations(db, user_id: int, limit: int = 50) -> list[AIConversationDB]:
     """列出用户的全部对话，按 updated_at 倒序"""
     result = await db.execute(
         select(AIConversationDB)
@@ -26,9 +25,7 @@ async def list_conversations(
     return list(result.scalars().all())
 
 
-async def get_conversation(
-    db, conversation_id: int, user_id: int
-) -> Optional[AIConversationDB]:
+async def get_conversation(db, conversation_id: int, user_id: int) -> Optional[AIConversationDB]:
     """获取单个对话（必须属于该用户）"""
     result = await db.execute(
         select(AIConversationDB).where(
@@ -39,9 +36,7 @@ async def get_conversation(
     return result.scalar_one_or_none()
 
 
-async def create_conversation(
-    db, user_id: int, title: str
-) -> AIConversationDB:
+async def create_conversation(db, user_id: int, title: str) -> AIConversationDB:
     """创建新对话"""
     conv = AIConversationDB(user_id=user_id, title=title)
     db.add(conv)
@@ -50,11 +45,9 @@ async def create_conversation(
     return conv
 
 
-async def rename_conversation(
-    db, conversation_id: int, user_id: int, title: str
-) -> Optional[AIConversationDB]:
+async def rename_conversation(db, conversation_id: int, user_id: int, title: str) -> Optional[AIConversationDB]:
     """重命名对话标题"""
-    result = await db.execute(
+    await db.execute(
         update(AIConversationDB)
         .where(
             AIConversationDB.id == conversation_id,
@@ -75,9 +68,7 @@ async def delete_conversation(db, conversation_id: int, user_id: int) -> bool:
     if not conv:
         return False
     # 先删消息，再删对话，确保即使外键级联未启用也能清理
-    await db.execute(
-        delete(AIMessageDB).where(AIMessageDB.conversation_id == conversation_id)
-    )
+    await db.execute(delete(AIMessageDB).where(AIMessageDB.conversation_id == conversation_id))
     await db.execute(
         delete(AIConversationDB).where(
             AIConversationDB.id == conversation_id,
@@ -89,9 +80,7 @@ async def delete_conversation(db, conversation_id: int, user_id: int) -> bool:
 
 
 # ============== 消息 (Message) CRUD ==============
-async def list_messages(
-    db, conversation_id: int, user_id: int
-) -> List[AIMessageDB]:
+async def list_messages(db, conversation_id: int, user_id: int) -> list[AIMessageDB]:
     """列出某对话的全部消息（按时间正序）
 
     先校验 conversation 属于该用户，再查消息。

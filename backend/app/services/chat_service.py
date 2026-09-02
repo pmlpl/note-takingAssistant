@@ -2,18 +2,21 @@
 AI 聊天服务
 负责 AI 对话功能（异步 OpenAI 客户端）
 """
+
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional
+from collections.abc import AsyncIterator
+from typing import Any, Optional
 
 from app.models.user import UserDB
 from app.services.llm_runtime import openai_client_and_model_for_user
 from app.utils.llm_errors import format_llm_error
+
 from .prompts import CHAT_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
 
-def _message_as_dict(msg: Any) -> Dict[str, str]:
+def _message_as_dict(msg: Any) -> dict[str, str]:
     """将 Pydantic 模型或 dict 规范为 {role, content}。"""
     if isinstance(msg, dict):
         return {
@@ -32,10 +35,10 @@ def _message_as_dict(msg: Any) -> Dict[str, str]:
     }
 
 
-def _build_chat_messages(message: str, history: Optional[List[Any]] = None) -> List[Dict[str, str]]:
+def _build_chat_messages(message: str, history: Optional[list[Any]] = None) -> list[dict[str, str]]:
     """合并 system、整理 history，得到发给模型的 messages（含末尾 user）。"""
-    system_extras: List[str] = []
-    conversation: List[Dict[str, str]] = []
+    system_extras: list[str] = []
+    conversation: list[dict[str, str]] = []
 
     for msg in (history or [])[-10:]:
         row = _message_as_dict(msg)
@@ -52,7 +55,7 @@ def _build_chat_messages(message: str, history: Optional[List[Any]] = None) -> L
     if system_extras:
         system_content += "\n\n# 附加上下文\n" + "\n\n".join(system_extras)
 
-    messages: List[Dict[str, str]] = [{"role": "system", "content": system_content}]
+    messages: list[dict[str, str]] = [{"role": "system", "content": system_content}]
     messages.extend(conversation)
     messages.append({"role": "user", "content": message})
     return messages
@@ -60,7 +63,7 @@ def _build_chat_messages(message: str, history: Optional[List[Any]] = None) -> L
 
 async def chat_with_ai(
     message: str,
-    history: Optional[List[Any]] = None,
+    history: Optional[list[Any]] = None,
     *,
     db_user: UserDB,
 ) -> str:
@@ -91,7 +94,7 @@ async def chat_with_ai(
 
 async def chat_with_ai_stream(
     message: str,
-    history: Optional[List[Any]] = None,
+    history: Optional[list[Any]] = None,
     *,
     db_user: UserDB,
 ) -> AsyncIterator[str]:

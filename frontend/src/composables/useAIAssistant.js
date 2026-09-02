@@ -44,7 +44,7 @@ export function useAIAssistant() {
     isAiThinking.value = true
     
     // 后台异步执行 AI 请求
-    const aiPromise = (async () => {
+    ;(async () => {
       try {
         let messages = chatHistory.value.slice(0, -1).slice(-10).map(msg => ({
           role: msg.role,

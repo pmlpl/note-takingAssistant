@@ -1,9 +1,11 @@
 """查看当前数据库的表结构和样本数据"""
+
 import asyncio
 import sys
 
 sys.path.insert(0, ".")
 from sqlalchemy import text
+
 from app.core.database import engine
 
 
@@ -23,9 +25,7 @@ async def inspect_db():
 
             # 字段
             cols = await conn.execute(text(f"DESCRIBE {t}"))
-            print(
-                f"{'字段名':<22}{'类型':<20}{'NULL':<6}{'KEY':<6}{'默认值':<14}Extra"
-            )
+            print(f"{'字段名':<22}{'类型':<20}{'NULL':<6}{'KEY':<6}{'默认值':<14}Extra")
             print("-" * 90)
             for c in cols:
                 name = c[0]
@@ -55,7 +55,7 @@ async def inspect_db():
                             if len(s) > 60:
                                 s = s[:60] + "..."
                             values.append(s)
-                    print(f"   #{i+1}: {values}")
+                    print(f"   #{i + 1}: {values}")
             except Exception as e:
                 print(f"   (读取样本失败: {e})")
 

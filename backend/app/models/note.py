@@ -1,8 +1,10 @@
-from pydantic import BaseModel, ConfigDict, field_validator
-from typing import Optional
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, field_validator
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.sql import func
+
 from app.core.database import Base
 
 
@@ -31,16 +33,14 @@ class NoteResponse(NoteBase):
     user_id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
+
     model_config = ConfigDict(
         from_attributes=True,
         # 允许从字符串解析日期
-        json_encoders={
-            datetime: lambda v: v.isoformat() if v else None
-        }
+        json_encoders={datetime: lambda v: v.isoformat() if v else None},
     )
-    
-    @field_validator('is_favorite', mode='before')
+
+    @field_validator("is_favorite", mode="before")
     @classmethod
     def convert_is_favorite(cls, v):
         """将数据库的 Integer 转换为布尔值"""
@@ -52,7 +52,7 @@ class NoteResponse(NoteBase):
 # SQLAlchemy数据库模型
 class NoteDB(Base):
     __tablename__ = "notes"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String(200), nullable=False)

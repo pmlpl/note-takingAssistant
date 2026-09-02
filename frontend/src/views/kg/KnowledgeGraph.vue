@@ -24,14 +24,14 @@
         <el-button :type="!is2DMode ? 'primary' : 'default'" @click="switchTo3D">
           3D 视图
         </el-button>
-        <el-button @click="refreshGraph" :loading="isRefreshing">
+        <el-button :loading="isRefreshing" @click="refreshGraph">
           刷新图谱
         </el-button>
       </div>
     </div>
 
     <div class="kg-content">
-      <div class="kg-canvas-wrap" ref="canvasWrap">
+      <div ref="canvasWrap" class="kg-canvas-wrap">
         <canvas ref="canvasEl" class="kg-canvas"></canvas>
         <div v-if="loading" class="kg-loading">
           <el-icon class="is-loading" :size="32"><Loading /></el-icon>
@@ -107,7 +107,7 @@
       </div>
     </div>
 
-    <div class="kg-stats" v-if="graphData.stats">
+    <div v-if="graphData.stats" class="kg-stats">
       <span>📝 笔记: {{ graphData.stats.note_count || 0 }}</span>
       <span>💡 概念: {{ graphData.stats.concept_count || 0 }}</span>
       <span>🔗 关系: {{ graphData.stats.edge_count || 0 }}</span>
@@ -495,10 +495,6 @@ function applyForces2D() {
 
 function startForceSimulation() {
   forceSimulationRunning = true
-}
-
-function stopForceSimulation() {
-  forceSimulationRunning = false
 }
 
 function applyForces3D() {

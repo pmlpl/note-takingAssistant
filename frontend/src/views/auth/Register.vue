@@ -9,42 +9,50 @@
           <p class="register-subtitle">创建新账号</p>
         </div>
 
-        <el-form :model="form" ref="formRef" label-width="80px">
-          <el-form-item label="邮箱" prop="email" :rules="[
-            { required: true, message: '请输入邮箱' },
-            { type: 'email', message: '请输入正确的邮箱格式' }
-          ]">
+        <el-form ref="formRef" :model="form" label-width="80px">
+          <el-form-item
+            label="邮箱" prop="email" :rules="[
+              { required: true, message: '请输入邮箱' },
+              { type: 'email', message: '请输入正确的邮箱格式' }
+            ]"
+          >
             <el-input v-model="form.email" placeholder="请输入邮箱地址" />
           </el-form-item>
-          <el-form-item label="昵称" prop="nickname" :rules="[
-            { min: 2, max: 32, message: '昵称长度为2-32个字符' }
-          ]">
+          <el-form-item
+            label="昵称" prop="nickname" :rules="[
+              { min: 2, max: 32, message: '昵称长度为2-32个字符' }
+            ]"
+          >
             <el-input v-model="form.nickname" placeholder="请输入昵称（可选，默认邮箱前缀）" />
           </el-form-item>
-          <el-form-item label="密码" prop="password" :rules="[
-            { required: true, message: '请输入密码' },
-            { min: 8, message: '密码至少8位' },
-            { pattern: /^(?=.*[A-Za-z])(?=.*\d)/, message: '密码必须同时包含字母和数字' }
-          ]">
+          <el-form-item
+            label="密码" prop="password" :rules="[
+              { required: true, message: '请输入密码' },
+              { min: 8, message: '密码至少8位' },
+              { pattern: /^(?=.*[A-Za-z])(?=.*\d)/, message: '密码必须同时包含字母和数字' }
+            ]"
+          >
             <el-input v-model="form.password" type="password" placeholder="请输入密码（至少8位，含字母和数字）" show-password />
           </el-form-item>
-          <el-form-item label="确认密码" prop="confirmPassword" :rules="[
-            { required: true, message: '请确认密码' },
-            {
-              validator: (rule, value, callback) => {
-                if (value !== form.password) {
-                  callback(new Error('两次输入的密码不一致'))
-                } else {
-                  callback()
-                }
-              },
-              trigger: 'blur'
-            }
-          ]">
+          <el-form-item
+            label="确认密码" prop="confirmPassword" :rules="[
+              { required: true, message: '请确认密码' },
+              {
+                validator: (rule, value, callback) => {
+                  if (value !== form.password) {
+                    callback(new Error('两次输入的密码不一致'))
+                  } else {
+                    callback()
+                  }
+                },
+                trigger: 'blur'
+              }
+            ]"
+          >
             <el-input v-model="form.confirmPassword" type="password" placeholder="请再次输入密码" show-password />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" @click="handleRegister" :loading="loading" class="register-btn">
+            <el-button type="primary" :loading="loading" class="register-btn" @click="handleRegister">
               {{ loading ? '注册中...' : '注 册' }}
             </el-button>
           </el-form-item>

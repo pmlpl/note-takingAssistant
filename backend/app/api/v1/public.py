@@ -1,4 +1,5 @@
 """公开接口（欢迎页统计等，无需登录）"""
+
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
@@ -7,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_db
 from app.core.rate_limit import rate_limit_anon
-from app.models.user import UserDB
-from app.models.note import NoteDB
 from app.models.ai_usage import AIUsageLog
+from app.models.note import NoteDB
+from app.models.user import UserDB
 from app.utils.stats_series import build_daily_series
 
 router = APIRouter()

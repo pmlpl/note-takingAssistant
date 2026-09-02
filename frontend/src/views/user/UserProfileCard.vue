@@ -5,7 +5,7 @@
         <span class="card-title">个人信息</span>
       </div>
     </template>
-    <div class="section-fold-panel" v-loading="loading">
+    <div v-loading="loading" class="section-fold-panel">
       <el-alert
         v-if="error && !loading"
         type="error"
@@ -15,7 +15,7 @@
         class="section-alert"
       />
       <div class="user-header">
-        <div class="user-avatar-wrapper" v-loading="uploadingAvatar">
+        <div v-loading="uploadingAvatar" class="user-avatar-wrapper">
           <el-upload
             class="avatar-uploader"
             :show-file-list="false"
@@ -55,7 +55,7 @@ import { IconEdit } from '@/components/icons'
 import { ElMessage } from 'element-plus'
 import { Message, Calendar } from '@element-plus/icons-vue'
 
-const props = defineProps({
+defineProps({
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' }
 })

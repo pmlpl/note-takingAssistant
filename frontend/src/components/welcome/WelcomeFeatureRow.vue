@@ -3,9 +3,9 @@
     ref="root"
     class="feature-card tilt-card"
     :class="[revealClass, { 'is-visible': visible }]"
+    :style="cardStyle"
     @mousemove="onCardMouseMove"
     @mouseleave="onCardMouseLeave"
-    :style="cardStyle"
   >
     <div class="tilt-card-shine" :style="shineStyle" />
     <div class="feature-card__body">
@@ -33,8 +33,8 @@
       >
         Try Now
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12h14"/>
-          <path d="m12 5 7 7-7 7"/>
+          <path d="M5 12h14" />
+          <path d="m12 5 7 7-7 7" />
         </svg>
       </a>
     </div>
@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, h } from 'vue'
+import { ref, computed, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLazyReveal } from '@/composables/useLazyReveal'
 

@@ -237,7 +237,7 @@ async function bootstrapHomeData() {
       updateRecentNotesWithCurrent(fullNote)
 
       router.replace({ path: '/home' })
-    } catch (error) {
+    } catch {
       ElMessage.error({ message: '加载笔记失败', duration: MESSAGE_DURATION.SHORT })
     }
   } else {
@@ -299,7 +299,7 @@ async function loadRecentNotes() {
     // 使用新的 API 获取最近笔记（从 Redis 缓存）
     const notes = await noteApi.getRecentNotes()
     recentNotes.value = notes
-  } catch (error) {
+  } catch {
     if (!userStore.isLoggedIn) return
     ElMessage.error('加载最近笔记失败')
   }
@@ -491,7 +491,7 @@ async function viewNote(note) {
       
       // 8. 异步更新最近笔记列表（不阻塞）
       updateRecentNotesWithCurrent(fullNote)
-    } catch (error) {
+    } catch {
       ElMessage.error({ message: '加载笔记失败', duration: MESSAGE_DURATION.SHORT })
     }
   }, 0)
@@ -527,14 +527,6 @@ async function addToMyNotes(note) {
 function goToHistory() {
   // 跳转到历史笔记页面（显示所有笔记）
   router.push('/notes/history')
-}
-
-function selectNote(note) {
-  currentNote.value = note
-}
-
-function viewAllNotes() {
-  router.push('/notes/list')
 }
 
 // ==================== AI 助手功能 ====================
@@ -1182,61 +1174,7 @@ function saveChatHistory() {
   }
 }
 
-function chatHistoryBelongsToCurrentUser(parsed) {
-  const u = userStore.user
-  if (!u) return false
-  if (parsed.ownerId != null && u.id != null && Number(parsed.ownerId) !== Number(u.id)) {
-    return false
-  }
-  if (parsed.ownerEmail && u.email && parsed.ownerEmail !== u.email) {
-    return false
-  }
-  if (parsed.ownerUsername && u.username && parsed.ownerUsername !== u.username) {
-    return false
-  }
-  return true
-}
-
 // 从 localStorage 加载聊天历史（仅恢复当前用户的记录）
-function loadChatHistory() {
-  if (!homeUserScope()) return
-  try {
-    const cached = localStorage.getItem(homeStorageKey('chat_history'))
-    if (!cached) return
-
-    const parsed = JSON.parse(cached)
-    let history
-
-    if (Array.isArray(parsed)) {
-      history = parsed
-    } else if (parsed?.v === 1 && Array.isArray(parsed.messages)) {
-      if (!chatHistoryBelongsToCurrentUser(parsed)) {
-        localStorage.removeItem(homeStorageKey('chat_history'))
-        return
-      }
-      history = parsed.messages
-    } else {
-      localStorage.removeItem(homeStorageKey('chat_history'))
-      return
-    }
-
-    chatHistory.value = history.map((msg) => ({
-      ...msg,
-      thinking: msg.thinking || '',
-      thinkingCollapsed: msg.thinkingCollapsed !== undefined ? msg.thinkingCollapsed : true,
-      toolCalls: Array.isArray(msg.toolCalls) ? msg.toolCalls : [],
-      agents: Array.isArray(msg.agents) ? msg.agents : [],
-      currentAgent: msg.currentAgent || null,
-      timestamp: new Date(msg.timestamp)
-    }))
-    saveChatHistory()
-
-    setTimeout(() => scrollToBottom(), 100)
-  } catch (error) {
-    console.error('加载聊天历史失败:', error)
-    localStorage.removeItem(homeStorageKey('chat_history'))
-  }
-}
 
 async function confirmClearChat() {
   try {
@@ -1421,18 +1359,6 @@ function formatConversationTime(ts) {
 }
 
 // 获取笔记预览文本
-function getNotePreview(content) {
-  if (!content) return ''
-  // 去掉HTML标签和Markdown标记
-  const text = content
-    .replace(/<[^>]*>/g, '')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/`(.+?)`/g, '$1')
-    .substring(0, 80)
-  return text + (content.length > 80 ? '...' : '')
-}
   return {
     HOME_CHAT_MAX_MESSAGES,
     recentNotes,

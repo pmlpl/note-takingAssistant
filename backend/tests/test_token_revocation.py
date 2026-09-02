@@ -65,8 +65,9 @@ class TestTgenCheck:
 class TestGetCurrentUser:
     def test_valid_token_returns_email(self):
         token = _make_token("u@example.com")
-        with patch("app.core.security.is_token_blacklisted", return_value=False), patch(
-            "app.core.redis_client.redis_client", SimpleNamespace(client=None)
+        with (
+            patch("app.core.security.is_token_blacklisted", return_value=False),
+            patch("app.core.redis_client.redis_client", SimpleNamespace(client=None)),
         ):
             assert security.get_current_user(token) == {"email": "u@example.com"}
 

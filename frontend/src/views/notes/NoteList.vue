@@ -1,71 +1,71 @@
 ﻿<template>
-    <div class="note-list-page">
-      <!-- 顶部操作区 -->
-      <el-card class="top-bar" shadow="never">
-        <div class="search-action-group">
-          <el-input
-            v-model="searchQuery"
-            placeholder="按标题搜索笔记..."
-            size="large"
-            clearable
-            class="search-input"
-          >
-            <template #prefix>
-              <IconSearch :size="18" />
-            </template>
-          </el-input>
-          <el-button
-            type="primary"
-            size="large"
-            @click="navigate('/notes/edit')"
-            class="create-btn"
-          >
-            <IconPlus :size="18" color="gray"/>
-            创建笔记
-          </el-button>
-        </div>
-      </el-card>
-
-      <!-- 笔记网格区 -->
-      <div class="notes-content" v-loading="loading">
-        <div v-if="filteredNotes.length > 0" class="notes-grid">
-          <NoteCard
-            v-for="note in filteredNotes"
-            :key="note.id"
-            :note="note"
-            @click="viewNote(note)"
-            @edit="editNote(note)"
-            @delete="deleteNote(note)"
-          />
-        </div>
-
-        <div v-if="filteredNotes.length > 0 && totalPages > 1" class="pagination-wrapper">
-          <el-pagination
-            background
-            layout="prev, pager, next"
-            :total="total"
-            :page-size="pageSize"
-            :current-page="page"
-            @current-change="handlePageChange"
-          />
-        </div>
-
-        <!-- 空状态（勿用 v-else-if 接分页，否则有笔记且仅一页时会误显示） -->
-        <el-empty
-          v-if="!loading && filteredNotes.length === 0"
-          :description="emptyDescription"
-          :image-size="200"
+  <div class="note-list-page">
+    <!-- 顶部操作区 -->
+    <el-card class="top-bar" shadow="never">
+      <div class="search-action-group">
+        <el-input
+          v-model="searchQuery"
+          placeholder="按标题搜索笔记..."
+          size="large"
+          clearable
+          class="search-input"
         >
-          <el-button type="primary" @click="navigate('/notes/edit')">
-            <IconPlus :size="18" />
-            创建第一个笔记
-          </el-button>
-          <el-button v-if="hasNotesOutsideFavorites" class="empty-secondary-btn" @click="navigate('/notes/history')">
-            查看历史笔记（含未加入「我的笔记」的条目）
-          </el-button>
-        </el-empty>
+          <template #prefix>
+            <IconSearch :size="18" />
+          </template>
+        </el-input>
+        <el-button
+          type="primary"
+          size="large"
+          class="create-btn"
+          @click="navigate('/notes/edit')"
+        >
+          <IconPlus :size="18" color="gray" />
+          创建笔记
+        </el-button>
       </div>
+    </el-card>
+
+    <!-- 笔记网格区 -->
+    <div v-loading="loading" class="notes-content">
+      <div v-if="filteredNotes.length > 0" class="notes-grid">
+        <NoteCard
+          v-for="note in filteredNotes"
+          :key="note.id"
+          :note="note"
+          @click="viewNote(note)"
+          @edit="editNote(note)"
+          @delete="deleteNote(note)"
+        />
+      </div>
+
+      <div v-if="filteredNotes.length > 0 && totalPages > 1" class="pagination-wrapper">
+        <el-pagination
+          background
+          layout="prev, pager, next"
+          :total="total"
+          :page-size="pageSize"
+          :current-page="page"
+          @current-change="handlePageChange"
+        />
+      </div>
+
+      <!-- 空状态（勿用 v-else-if 接分页，否则有笔记且仅一页时会误显示） -->
+      <el-empty
+        v-if="!loading && filteredNotes.length === 0"
+        :description="emptyDescription"
+        :image-size="200"
+      >
+        <el-button type="primary" @click="navigate('/notes/edit')">
+          <IconPlus :size="18" />
+          创建第一个笔记
+        </el-button>
+        <el-button v-if="hasNotesOutsideFavorites" class="empty-secondary-btn" @click="navigate('/notes/history')">
+          查看历史笔记（含未加入「我的笔记」的条目）
+        </el-button>
+      </el-empty>
     </div>
+  </div>
 </template>
 
 <script setup>

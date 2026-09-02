@@ -3,14 +3,15 @@
 If Alembic has been applied (alembic_version table exists), all DDL is skipped
 since Alembic is the source of truth for schema management.
 """
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import engine, Base
+from app.core.database import engine
 from app.core.logger import app_logger as logger
-from app.models.kg import KGConceptDB, KGRelationDB, KGStatusDB  # noqa: F401
-from app.models.user import UserDB, OAuthAccountDB  # noqa: F401
 from app.models.ai_conversation import AIConversationDB, AIMessageDB  # noqa: F401
+from app.models.kg import KGConceptDB, KGRelationDB, KGStatusDB  # noqa: F401
+from app.models.user import OAuthAccountDB, UserDB  # noqa: F401
 
 
 async def _alembic_applied(conn) -> bool:
@@ -151,9 +152,7 @@ async def ensure_user_oauth_columns(db: AsyncSession) -> None:
         )
     )
     if (oauth_username_col_r.scalar() or 0) == 0:
-        await db.execute(
-            text("ALTER TABLE oauth_accounts ADD COLUMN provider_username VARCHAR(128) NULL")
-        )
+        await db.execute(text("ALTER TABLE oauth_accounts ADD COLUMN provider_username VARCHAR(128) NULL"))
         logger.info("已添加列 oauth_accounts.provider_username")
 
     username_null_r = await db.execute(

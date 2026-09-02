@@ -4,12 +4,12 @@
 - 文件魔数（magic number）校验，防止伪装图片
 - 文件名安全化（去除路径、保留扩展名）
 """
+
 from __future__ import annotations
 
 import mimetypes
 import os
 import secrets
-from typing import Tuple
 
 # 允许的扩展名 -> 对应的魔数（bytes）
 # 参考：https://en.wikipedia.org/wiki/List_of_file_signatures
@@ -33,7 +33,7 @@ def validate_image_bytes(
     file_bytes: bytes,
     filename: str,
     max_bytes: int = 5 * 1024 * 1024,
-) -> Tuple[bool, str, str]:
+) -> tuple[bool, str, str]:
     """校验图片文件。
 
     返回: (是否安全, 标准化扩展名, 错误信息)

@@ -1,10 +1,12 @@
-import bcrypt
 import uuid
-from datetime import timezone, timedelta, datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from jose import JWTError, jwt
+
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+
 from app.core.config import settings
 from app.core.redis_client import is_token_blacklisted
 
@@ -15,14 +17,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/user/login")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证密码"""
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 
 def get_password_hash(password: str) -> str:
     """获取密码哈希"""
     salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
-    return hashed.decode('utf-8')
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, token_gen: int = 0) -> str:
@@ -119,6 +121,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
             raise credentials_exception
         token_tgen = payload.get("tgen", 0) or 0
         from app.core.redis_client import redis_client as _redis_client_local
+
         if not _check_tgen_valid(email, token_tgen, _redis_client_local):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -126,7 +129,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         return {"email": email}
-    except JWTError as e:
+    except JWTError:
         raise credentials_exception
 
 

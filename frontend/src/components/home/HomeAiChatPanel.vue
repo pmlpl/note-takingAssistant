@@ -55,8 +55,8 @@
             size="small"
             type="primary"
             plain
-            @click="createNewConversation"
             title="新建对话"
+            @click="createNewConversation"
           >
             + 新建
           </el-button>
@@ -110,7 +110,7 @@
 
     <div class="ai-chat-area">
       <div class="chat-messages-stack">
-        <div class="chat-messages" ref="chatMessagesRef" @scroll.passive="onChatScroll">
+        <div ref="chatMessagesRef" class="chat-messages" @scroll.passive="onChatScroll">
           <div v-if="chatHistory.length === 0" class="welcome-message">
             <div class="welcome-icon">👋</div>
             <h4>您好！我是您的 AI 笔记助手</h4>
@@ -321,17 +321,17 @@
               type="textarea"
               :rows="3"
               placeholder="输入您的问题...（输入 /note 可选择笔记）"
-              @keydown.enter.prevent="sendMessage"
-              @input="handleInput"
               resize="none"
               class="ai-input"
+              @keydown.enter.prevent="sendMessage"
+              @input="handleInput"
             />
             <el-button
               class="upload-note-btn"
               size="small"
               circle
-              @click="uploadNoteToAI"
               title="上传笔记"
+              @click="uploadNoteToAI"
             >
               <IconPlus :size="16" />
             </el-button>
@@ -347,11 +347,11 @@
           </el-button>
           <el-button
             type="primary"
-            @click="sendMessage"
             :disabled="!aiMessage.trim() || isAiOutputInProgress"
             :loading="isAiOutputInProgress"
             class="send-btn"
             circle
+            @click="sendMessage"
           >
             <IconEdit :size="18" />
           </el-button>
@@ -402,7 +402,6 @@ function hasArgs(args) {
 }
 
 const {
-  HOME_CHAT_MAX_MESSAGES,
   chatHistory,
   isAiThinking,
   isAiOutputInProgress,

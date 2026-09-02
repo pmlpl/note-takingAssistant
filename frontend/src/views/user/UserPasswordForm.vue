@@ -57,9 +57,9 @@
           <el-form-item>
             <el-button
               type="primary"
-              @click="handleChange"
               :loading="changing"
               class="submit-btn"
+              @click="handleChange"
             >
               {{ changing ? '修改中...' : '确认修改' }}
             </el-button>

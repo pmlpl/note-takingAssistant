@@ -1,9 +1,10 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional, List
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey, Index
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.sql import func
-from sqlalchemy.dialects.mysql import JSON
+
 from app.core.database import Base
 
 
@@ -85,8 +86,8 @@ class KGEdge(BaseModel):
 
 
 class KGGraphResponse(BaseModel):
-    nodes: List[KGNode]
-    edges: List[KGEdge]
+    nodes: list[KGNode]
+    edges: list[KGEdge]
     stats: dict
 
 

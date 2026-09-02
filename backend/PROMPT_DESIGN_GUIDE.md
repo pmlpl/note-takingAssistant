@@ -119,7 +119,7 @@ if reference_notes and len(reference_notes) > 0:
     user_prompt += "\n\n以下是参考材料，请结合这些内容生成笔记：\n"
     for i, note in enumerate(reference_notes, 1):
         user_prompt += f"\n【参考资料{i} - {note.get('filename', '未知文件')}】\n"
-        content = note.get('content', '')
+        content = note.get("content", "")
         if len(content) > 2000:
             content = content[:2000] + "...（内容过长，已截断）"
         user_prompt += content

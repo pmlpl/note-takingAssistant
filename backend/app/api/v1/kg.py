@@ -1,20 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_async_db
-from app.core.security import get_current_user
+from app.core.logger import app_logger as logger
 from app.core.rate_limit import rate_limit_user
+from app.core.security import get_current_user
 from app.crud import user as crud_user
 from app.models.kg import KGGraphResponse, KGStatusResponse
 from app.services.knowledge_graph_service import (
     build_knowledge_graph,
+    get_kg_from_db,
+    get_kg_status,
     save_kg_to_db,
     update_kg_status,
-    get_kg_status,
-    get_kg_from_db,
 )
-from app.core.logger import app_logger as logger
 
 router = APIRouter()
 _kg_rate_limit = Depends(rate_limit_user("notes"))
@@ -73,6 +74,7 @@ async def refresh_kg(
     )
 
     import asyncio
+
     from app.core.database import AsyncSessionLocal
 
     async def _background_generate():

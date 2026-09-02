@@ -1,4 +1,5 @@
 """手动脚本：启动后端后执行 `python scripts/test_chat_api.py`，勿依赖 pytest 收集。"""
+
 import json
 
 import requests

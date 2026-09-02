@@ -1,202 +1,202 @@
 ﻿<template>
-    <div class="ai-summarize-page">
-      <!-- 页面头部 -->
-      <div class="page-header">
-        <div class="page-title">
-          <el-button link @click="goBack" class="back-btn">
-            <el-icon size="16"><DArrowLeft /></el-icon>
-            <span>返回</span>
-          </el-button>
-          <h2><IconTrend :size="36" color="var(--color-warning-deep)" /> AI 笔记总结</h2>
-        </div>
-        <div class="page-subtitle">
-          <p>智能分析笔记内容，提供总结、字数统计和优化建议</p>
-        </div>
+  <div class="ai-summarize-page">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="page-title">
+        <el-button link class="back-btn" @click="goBack">
+          <el-icon size="16"><DArrowLeft /></el-icon>
+          <span>返回</span>
+        </el-button>
+        <h2><IconTrend :size="36" color="var(--color-warning-deep)" /> AI 笔记总结</h2>
       </div>
-
-      <el-row :gutter="20">
-        <!-- 左侧：输入区 -->
-        <el-col :xs="24" :lg="10">
-          <el-card class="input-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <span>📄 选择笔记</span>
-              </div>
-            </template>
-            
-            <el-form :model="form" label-width="90px">
-              <el-form-item label="选择笔记" required>
-                <el-select 
-                  v-model="form.noteId" 
-                  placeholder="请选择要总结的笔记"
-                  style="width: 100%"
-                  @change="handleNoteSelect"
-                >
-                  <el-option 
-                    v-for="note in notes" 
-                    :key="note.id" 
-                    :label="note.title" 
-                    :value="note.id" 
-                  />
-                </el-select>
-              </el-form-item>
-              
-              <el-form-item label="或输入文本">
-                <el-input 
-                  v-model="form.content" 
-                  type="textarea"
-                  :rows="8"
-                  placeholder="也可以直接粘贴要分析的文本内容"
-                  maxlength="5000"
-                  show-word-limit
-                />
-              </el-form-item>
-
-              <el-form-item>
-                <el-button 
-                  type="primary" 
-                  @click="analyzeNote" 
-                  :loading="loading"
-                  size="large"
-                  class="analyze-btn"
-                  :disabled="!canAnalyze"
-                >
-                  <IconTrend :size="18" />
-                  {{ loading ? "AI分析中..." : "开始分析" }}
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </el-card>
-        </el-col>
-
-        <!-- 右侧：分析结果区 -->
-        <el-col :xs="24" :lg="14">
-          <!-- 分析结果 -->
-          <el-card class="result-card" shadow="hover" v-if="analysisResult">
-            <template #header>
-              <div class="card-header result-header">
-                <span>✨ 分析结果</span>
-                <el-button 
-                  size="default"
-                  @click="copyAnalysis"
-                >
-                  📋 复制结果
-                </el-button>
-              </div>
-            </template>
-            
-            <div class="analysis-content">
-              <!-- 0. 评分雷达图 -->
-              <div class="analysis-section">
-                <h3 class="section-title">
-                  <el-icon><MagicStick /></el-icon>
-                  笔记质量评估
-                </h3>
-                <div class="section-body">
-                  <div ref="radarChartRef" class="radar-chart"></div>
-                  <div class="radar-legend">
-                    <div class="legend-item">
-                      <span class="legend-color before"></span>
-                      <span>改进前评分</span>
-                    </div>
-                    <div class="legend-item">
-                      <span class="legend-color after"></span>
-                      <span>改进后预测</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 1. 内容总结 -->
-              <div class="analysis-section">
-                <h3 class="section-title">
-                  <el-icon><Document /></el-icon>
-                  内容总结
-                </h3>
-                <div class="section-body">
-                  <p>{{ analysisResult.summary }}</p>
-                </div>
-              </div>
-
-              <!-- 2. 字数统计 -->
-              <div class="analysis-section">
-                <h3 class="section-title">
-                  <el-icon><ScaleToOriginal /></el-icon>
-                  字数统计
-                </h3>
-                <div class="section-body stats-grid">
-                  <div class="stat-item">
-                    <div class="stat-value">{{ analysisResult.totalChars }}</div>
-                    <div class="stat-label">总字符数</div>
-                  </div>
-                  <div class="stat-item">
-                    <div class="stat-value">{{ analysisResult.chineseChars }}</div>
-                    <div class="stat-label">中文字符</div>
-                  </div>
-                  <div class="stat-item">
-                    <div class="stat-value">{{ analysisResult.englishWords }}</div>
-                    <div class="stat-label">英文单词</div>
-                  </div>
-                  <div class="stat-item">
-                    <div class="stat-value">{{ analysisResult.paragraphs }}</div>
-                    <div class="stat-label">段落数</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 3. 优化建议 -->
-              <div class="analysis-section">
-                <h3 class="section-title">
-                  <el-icon><MagicStick /></el-icon>
-                  优化建议
-                </h3>
-                <div class="section-body suggestions">
-                  <!-- 优点 -->
-                  <div class="suggestion-group good">
-                    <h4>✅ 做得好的地方</h4>
-                    <ul>
-                      <li v-for="(good, index) in analysisResult.strengths" :key="index">
-                        {{ good }}
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <!-- 不足 -->
-                  <div class="suggestion-group improve">
-                    <h4>💡 可以改进的地方</h4>
-                    <ul>
-                      <li v-for="(weakness, index) in analysisResult.weaknesses" :key="index">
-                        {{ weakness }}
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <!-- 具体建议 -->
-                  <div class="suggestion-group tips">
-                    <h4>📝 修改建议</h4>
-                    <ul>
-                      <li v-for="(tip, index) in analysisResult.suggestions" :key="index">
-                        {{ tip }}
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </el-card>
-
-          <!-- 空状态 -->
-          <el-card class="empty-card" v-else shadow="hover">
-            <div class="empty-state">
-              <IconTrend :size="80" color="var(--el-text-color-disabled)" />
-              <h3>等待分析</h3>
-              <p>在左侧选择笔记或输入文本，点击“开始分析”按钮</p>
-              <p class="hint">💡 AI 将为您提供内容总结、字数统计和优化建议</p>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
+      <div class="page-subtitle">
+        <p>智能分析笔记内容，提供总结、字数统计和优化建议</p>
+      </div>
     </div>
+
+    <el-row :gutter="20">
+      <!-- 左侧：输入区 -->
+      <el-col :xs="24" :lg="10">
+        <el-card class="input-card" shadow="hover">
+          <template #header>
+            <div class="card-header">
+              <span>📄 选择笔记</span>
+            </div>
+          </template>
+            
+          <el-form :model="form" label-width="90px">
+            <el-form-item label="选择笔记" required>
+              <el-select 
+                v-model="form.noteId" 
+                placeholder="请选择要总结的笔记"
+                style="width: 100%"
+                @change="handleNoteSelect"
+              >
+                <el-option 
+                  v-for="note in notes" 
+                  :key="note.id" 
+                  :label="note.title" 
+                  :value="note.id" 
+                />
+              </el-select>
+            </el-form-item>
+              
+            <el-form-item label="或输入文本">
+              <el-input 
+                v-model="form.content" 
+                type="textarea"
+                :rows="8"
+                placeholder="也可以直接粘贴要分析的文本内容"
+                maxlength="5000"
+                show-word-limit
+              />
+            </el-form-item>
+
+            <el-form-item>
+              <el-button 
+                type="primary" 
+                :loading="loading" 
+                size="large"
+                class="analyze-btn"
+                :disabled="!canAnalyze"
+                @click="analyzeNote"
+              >
+                <IconTrend :size="18" />
+                {{ loading ? "AI分析中..." : "开始分析" }}
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-col>
+
+      <!-- 右侧：分析结果区 -->
+      <el-col :xs="24" :lg="14">
+        <!-- 分析结果 -->
+        <el-card v-if="analysisResult" class="result-card" shadow="hover">
+          <template #header>
+            <div class="card-header result-header">
+              <span>✨ 分析结果</span>
+              <el-button 
+                size="default"
+                @click="copyAnalysis"
+              >
+                📋 复制结果
+              </el-button>
+            </div>
+          </template>
+            
+          <div class="analysis-content">
+            <!-- 0. 评分雷达图 -->
+            <div class="analysis-section">
+              <h3 class="section-title">
+                <el-icon><MagicStick /></el-icon>
+                笔记质量评估
+              </h3>
+              <div class="section-body">
+                <div ref="radarChartRef" class="radar-chart"></div>
+                <div class="radar-legend">
+                  <div class="legend-item">
+                    <span class="legend-color before"></span>
+                    <span>改进前评分</span>
+                  </div>
+                  <div class="legend-item">
+                    <span class="legend-color after"></span>
+                    <span>改进后预测</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 1. 内容总结 -->
+            <div class="analysis-section">
+              <h3 class="section-title">
+                <el-icon><Document /></el-icon>
+                内容总结
+              </h3>
+              <div class="section-body">
+                <p>{{ analysisResult.summary }}</p>
+              </div>
+            </div>
+
+            <!-- 2. 字数统计 -->
+            <div class="analysis-section">
+              <h3 class="section-title">
+                <el-icon><ScaleToOriginal /></el-icon>
+                字数统计
+              </h3>
+              <div class="section-body stats-grid">
+                <div class="stat-item">
+                  <div class="stat-value">{{ analysisResult.totalChars }}</div>
+                  <div class="stat-label">总字符数</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ analysisResult.chineseChars }}</div>
+                  <div class="stat-label">中文字符</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ analysisResult.englishWords }}</div>
+                  <div class="stat-label">英文单词</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ analysisResult.paragraphs }}</div>
+                  <div class="stat-label">段落数</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. 优化建议 -->
+            <div class="analysis-section">
+              <h3 class="section-title">
+                <el-icon><MagicStick /></el-icon>
+                优化建议
+              </h3>
+              <div class="section-body suggestions">
+                <!-- 优点 -->
+                <div class="suggestion-group good">
+                  <h4>✅ 做得好的地方</h4>
+                  <ul>
+                    <li v-for="(good, index) in analysisResult.strengths" :key="index">
+                      {{ good }}
+                    </li>
+                  </ul>
+                </div>
+                  
+                <!-- 不足 -->
+                <div class="suggestion-group improve">
+                  <h4>💡 可以改进的地方</h4>
+                  <ul>
+                    <li v-for="(weakness, index) in analysisResult.weaknesses" :key="index">
+                      {{ weakness }}
+                    </li>
+                  </ul>
+                </div>
+                  
+                <!-- 具体建议 -->
+                <div class="suggestion-group tips">
+                  <h4>📝 修改建议</h4>
+                  <ul>
+                    <li v-for="(tip, index) in analysisResult.suggestions" :key="index">
+                      {{ tip }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 空状态 -->
+        <el-card v-else class="empty-card" shadow="hover">
+          <div class="empty-state">
+            <IconTrend :size="80" color="var(--el-text-color-disabled)" />
+            <h3>等待分析</h3>
+            <p>在左侧选择笔记或输入文本，点击“开始分析”按钮</p>
+            <p class="hint">💡 AI 将为您提供内容总结、字数统计和优化建议</p>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+  </div>
 </template>
 
 <script setup>

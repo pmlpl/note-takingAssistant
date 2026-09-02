@@ -12,11 +12,11 @@
       </el-radio-group>
     </div>
     <div class="sidebar-actions">
-      <el-button type="primary" @click="createNewNote" class="action-btn">
+      <el-button type="primary" class="action-btn" @click="createNewNote">
         <IconPlus :size="18" />
         新建笔记
       </el-button>
-      <el-button @click="importNote" class="action-btn">
+      <el-button class="action-btn" @click="importNote">
         <IconUpload :size="18" />
         导入笔记
       </el-button>

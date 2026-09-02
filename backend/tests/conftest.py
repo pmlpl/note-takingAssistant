@@ -1,8 +1,10 @@
 """Pytest 全局配置与异步数据库 fixtures。"""
+
+import asyncio
 import os
+
 import pytest
 import pytest_asyncio
-import asyncio
 from cryptography.fernet import Fernet
 
 # 注意：测试中不设置 SKIP_APP_LIFESPAN，让 TestClient(app) 的 with 上下文触发 lifespan，
@@ -44,6 +46,7 @@ async def async_db_session():
     """提供异步数据库会话，测试结束后回滚所有变更"""
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import sessionmaker
+
     from app.core.config import settings
 
     engine = create_async_engine(settings.DATABASE_URL, echo=False)

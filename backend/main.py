@@ -1,17 +1,20 @@
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from contextlib import asynccontextmanager
-from app.api.v1 import user, note, ai, public, kg, oauth
-from app.core.database import engine, Base, AsyncSessionLocal
+
+from app.api.v1 import ai, kg, note, oauth, public, user
+from app.core.config import settings
+from app.core.database import AsyncSessionLocal, Base, engine
+from app.core.logger import app_logger as logger
 from app.core.startup_migrations import (
+    ensure_ai_conversation_tables,
     ensure_user_llm_columns,
     ensure_user_oauth_columns,
-    ensure_ai_conversation_tables,
 )
-from app.core.config import settings
-from app.core.logger import app_logger as logger
-import os
+
 
 # 异步初始化数据库表
 async def init_db():
@@ -19,8 +22,9 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+
 # 使用 lifespan 替代 on_event
-@asynccontextmanager # 这个装饰器用于异步上下文管理，确保在异步操作中正确处理资源释放
+@asynccontextmanager  # 这个装饰器用于异步上下文管理，确保在异步操作中正确处理资源释放
 async def lifespan(app: FastAPI):
     # 启动时执行
     if os.environ.get("SKIP_APP_LIFESPAN") == "1":
@@ -34,7 +38,7 @@ async def lifespan(app: FastAPI):
         await session.commit()
     yield
     # 关闭时执行清理操作
-    
+
     # 关闭数据库连接池
     try:
         await engine.dispose()
@@ -44,18 +48,21 @@ async def lifespan(app: FastAPI):
     # 关闭 Redis 连接
     try:
         from app.core.redis_client import redis_client
+
         if redis_client.is_available():
             redis_client.client.close()
     except Exception as e:
         logger.warning(f"关闭 Redis 连接时出错: {e}")
+
 
 # 初始化FastAPI
 app = FastAPI(
     title="NoteMind AI Note Assistant API",
     description="基于 FastAPI 的 NoteMind AI 笔记助手后端；AI 能力通过 OpenAI 兼容协议连接 LM Studio（或其它本地推理服务）。",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
+
 
 # 跨域配置（必加，否则Vue前端无法访问）
 # 支持多个 origin：FRONTEND_URL + CORS_ORIGINS（逗号分隔）+ 桌面端 app://localhost
@@ -73,6 +80,7 @@ def _get_cors_origins():
     # 桌面端默认 origin
     origins.add("app://localhost")
     return list(origins)
+
 
 _cors_origins = _get_cors_origins()
 _is_wildcard = "*" in _cors_origins
@@ -97,14 +105,17 @@ app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI智能模块"])
 app.include_router(kg.router, prefix="/api/v1/kg", tags=["知识图谱"])
 app.include_router(public.router, prefix="/api/v1/public", tags=["公开接口"])
 
+
 # 测试接口
 @app.get("/", tags=["测试"])
 def home():
     return {"message": "NoteMind AI 笔记助手后端服务运行成功！"}
 
+
 # 启动服务器（是否 auto-reload 由配置项控制，生产环境必须关闭）
 if __name__ == "__main__":
     import uvicorn
+
     reload_enabled = getattr(settings, "DEBUG", False) or False
     uvicorn.run(
         "main:app",

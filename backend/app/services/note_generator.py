@@ -2,19 +2,22 @@
 笔记生成服务
 负责 AI 生成笔记内容（异步 OpenAI 客户端，避免阻塞事件循环）
 """
-from typing import Any, AsyncIterator, List, Optional
+
+from collections.abc import AsyncIterator
+from typing import Any, Optional
 
 from app.models.user import UserDB
 from app.services.llm_runtime import openai_client_and_model_for_user
 from app.utils.llm_errors import format_llm_error
+
 from .prompts import NOTE_GENERATION_SYSTEM_PROMPT
 
 
-def _normalize_reference_notes(reference_notes: Optional[List[Any]]) -> List[dict]:
+def _normalize_reference_notes(reference_notes: Optional[list[Any]]) -> list[dict]:
     """规范化参考笔记列表，确保每项含 filename 与 content。"""
     if not reference_notes:
         return []
-    out: List[dict] = []
+    out: list[dict] = []
     for note in reference_notes:
         if isinstance(note, dict):
             out.append(note)
@@ -22,17 +25,19 @@ def _normalize_reference_notes(reference_notes: Optional[List[Any]]) -> List[dic
             # 处理Pydantic 模型，确保转换为字典
             out.append(note.model_dump())
         else:
-            out.append({
-                "filename": getattr(note, "filename", "未知文件"),
-                "content": getattr(note, "content", ""),
-            })
+            out.append(
+                {
+                    "filename": getattr(note, "filename", "未知文件"),
+                    "content": getattr(note, "content", ""),
+                }
+            )
     return out
 
 
 def _build_generation_prompt(
     topic: str,
     keyword: Optional[str] = None,
-    reference_notes: Optional[List[dict]] = None,
+    reference_notes: Optional[list[dict]] = None,
     word_count: int = 600,
 ) -> str:
     user_prompt = f"请为主题「{topic}」生成一篇学习笔记。"
@@ -65,7 +70,7 @@ def _build_generation_prompt(
 async def generate_note_stream(
     topic: str,
     keyword: Optional[str] = None,
-    reference_notes: Optional[List[Any]] = None,
+    reference_notes: Optional[list[Any]] = None,
     images: Optional[list] = None,
     word_count: int = 600,
     *,

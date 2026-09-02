@@ -1,12 +1,16 @@
 """
 数据库迁移脚本：创建AI使用记录表
 """
-import sys
+
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import asyncio
+
 from sqlalchemy import text
+
 from app.core.database import AsyncSessionLocal
 
 
@@ -15,21 +19,24 @@ async def migrate():
     db = None
     try:
         db = AsyncSessionLocal()
-        
+
         # 检查表是否已存在
-        result = await db.execute(text("""
-            SELECT TABLE_NAME 
-            FROM INFORMATION_SCHEMA.TABLES 
-            WHERE TABLE_SCHEMA = DATABASE() 
+        result = await db.execute(
+            text("""
+            SELECT TABLE_NAME
+            FROM INFORMATION_SCHEMA.TABLES
+            WHERE TABLE_SCHEMA = DATABASE()
             AND TABLE_NAME = 'ai_usage_logs'
-        """))
-        
+        """)
+        )
+
         if result.scalar():
             print("✓ ai_usage_logs 表已存在，跳过迁移")
             return
-        
+
         # 创建 ai_usage_logs 表
-        await db.execute(text("""
+        await db.execute(
+            text("""
             CREATE TABLE ai_usage_logs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 user_id INT NOT NULL,
@@ -37,11 +44,12 @@ async def migrate():
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI使用记录表'
-        """))
-        
+        """)
+        )
+
         await db.commit()
         print("✓ 成功创建 ai_usage_logs 表")
-        
+
     except Exception as e:
         if db:
             await db.rollback()
@@ -54,9 +62,10 @@ async def migrate():
 
 if __name__ == "__main__":
     import warnings
+
     # 忽略 aiomysql 连接清理警告
     warnings.filterwarnings("ignore", message=".*Event loop is closed.*")
-    
+
     print("开始执行数据库迁移...")
     try:
         asyncio.run(migrate())
@@ -64,4 +73,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"程序执行失败: {e}")
         import sys
+
         sys.exit(1)

@@ -7,14 +7,13 @@
 该脚本会直接在数据库中创建一个测试用户，无需邮件验证即可登录。
 仅用于本地开发测试，请勿在生产环境使用！
 """
+
 import argparse
 import asyncio
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.database import AsyncSessionLocal, Base, engine
 from app.core.security import get_password_hash
-from app.crud.user import get_user_by_email, create_user
+from app.crud.user import get_user_by_email
 
 
 async def main():
@@ -57,7 +56,7 @@ async def main():
         await session.commit()
         await session.refresh(user)
 
-        print(f"✅ 测试用户创建成功！")
+        print("✅ 测试用户创建成功！")
         print(f"  ID: {user.id}")
         print(f"  邮箱: {user.email}")
         print(f"  昵称: {user.nickname}")

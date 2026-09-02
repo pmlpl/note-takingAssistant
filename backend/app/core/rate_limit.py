@@ -6,16 +6,15 @@
 - Redis 不可用时降级为「放行」而非拒绝，保证基本可用性
 - 测试环境（RATE_LIMIT_DISABLED=1）直接放行，避免 CI 单 IP 触发限流
 """
+
 from __future__ import annotations
 
 import os
-import time
-from typing import Callable, Dict, Optional
+from collections.abc import Callable
 
 from fastapi import Depends, HTTPException, Request, status
 
 from app.core.redis_client import (
-    redis_client,
     _rate_limit_bump as _redis_bump,  # type: ignore[attr-defined]
 )
 
@@ -26,7 +25,7 @@ def _is_disabled() -> bool:
 
 
 # 命名限流策略：key_prefix -> (max_requests, window_seconds)
-LIMIT_POLICIES: Dict[str, tuple[int, int]] = {
+LIMIT_POLICIES: dict[str, tuple[int, int]] = {
     "register": (10, 3600),
     "login": (5, 60),
     "email_code": (3, 300),
@@ -83,6 +82,7 @@ def check_and_bump(policy_name: str, identifier: str) -> None:
 
 
 # ===== FastAPI Dependency 工厂 =====
+
 
 def rate_limit_anon(policy_name: str) -> Callable[[Request], None]:
     """未登录接口的限流依赖 —— 按客户端 IP。"""

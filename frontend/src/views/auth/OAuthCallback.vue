@@ -21,7 +21,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { Loading, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 
 const route = useRoute()

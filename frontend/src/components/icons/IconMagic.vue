@@ -18,14 +18,14 @@
     />
 
     <!-- 魔法粒子/星光 -->
-    <circle cx="6" cy="6" r="1" fill="currentColor" opacity="0.6"/>
-    <circle cx="20" cy="4" r="0.8" fill="currentColor" opacity="0.5"/>
-    <circle cx="21" cy="14" r="0.6" fill="currentColor" opacity="0.4"/>
-    <circle cx="4" cy="18" r="0.7" fill="currentColor" opacity="0.5"/>
+    <circle cx="6" cy="6" r="1" fill="currentColor" opacity="0.6" />
+    <circle cx="20" cy="4" r="0.8" fill="currentColor" opacity="0.5" />
+    <circle cx="21" cy="14" r="0.6" fill="currentColor" opacity="0.4" />
+    <circle cx="4" cy="18" r="0.7" fill="currentColor" opacity="0.5" />
 
     <!-- 小光点 -->
-    <circle cx="19" cy="7" r="0.5" fill="currentColor" opacity="0.7"/>
-    <circle cx="8" cy="19" r="0.5" fill="currentColor" opacity="0.6"/>
+    <circle cx="19" cy="7" r="0.5" fill="currentColor" opacity="0.7" />
+    <circle cx="8" cy="19" r="0.5" fill="currentColor" opacity="0.6" />
   </BaseIcon>
 </template>
 

@@ -1,7 +1,8 @@
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.models.user import UserDB, OAuthAccountDB
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.security import get_password_hash
+from app.models.user import OAuthAccountDB, UserDB
 
 
 async def get_user(db: AsyncSession, user_id: int):
@@ -26,12 +27,7 @@ async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100):
 
 async def create_user(db: AsyncSession, email: str, password: str, nickname: str = None, username: str = None):
     hashed_password = get_password_hash(password)
-    db_user = UserDB(
-        email=email,
-        nickname=nickname,
-        username=username,
-        hashed_password=hashed_password
-    )
+    db_user = UserDB(email=email, nickname=nickname, username=username, hashed_password=hashed_password)
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
@@ -43,6 +39,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
     if not user:
         return False
     from app.core.security import verify_password
+
     if not verify_password(password, user.hashed_password):
         return False
     return user
@@ -50,23 +47,27 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
 
 async def get_oauth_account(db: AsyncSession, provider: str, openid: str):
     result = await db.execute(
-        select(OAuthAccountDB).where(
-            OAuthAccountDB.provider == provider,
-            OAuthAccountDB.openid == openid
-        )
+        select(OAuthAccountDB).where(OAuthAccountDB.provider == provider, OAuthAccountDB.openid == openid)
     )
     return result.scalar_one_or_none()
 
 
-async def create_oauth_account(db: AsyncSession, user_id: int, provider: str, openid: str,
-                                access_token: str = None, avatar_url: str = None, provider_username: str = None):
+async def create_oauth_account(
+    db: AsyncSession,
+    user_id: int,
+    provider: str,
+    openid: str,
+    access_token: str = None,
+    avatar_url: str = None,
+    provider_username: str = None,
+):
     db_oauth = OAuthAccountDB(
         user_id=user_id,
         provider=provider,
         openid=openid,
         provider_username=provider_username,
         access_token=access_token,
-        avatar_url=avatar_url
+        avatar_url=avatar_url,
     )
     db.add(db_oauth)
     await db.commit()
@@ -75,28 +76,20 @@ async def create_oauth_account(db: AsyncSession, user_id: int, provider: str, op
 
 
 async def get_user_oauth_accounts(db: AsyncSession, user_id: int):
-    result = await db.execute(
-        select(OAuthAccountDB).where(OAuthAccountDB.user_id == user_id)
-    )
+    result = await db.execute(select(OAuthAccountDB).where(OAuthAccountDB.user_id == user_id))
     return result.scalars().all()
 
 
 async def get_user_oauth_by_provider(db: AsyncSession, user_id: int, provider: str):
     result = await db.execute(
-        select(OAuthAccountDB).where(
-            OAuthAccountDB.user_id == user_id,
-            OAuthAccountDB.provider == provider
-        )
+        select(OAuthAccountDB).where(OAuthAccountDB.user_id == user_id, OAuthAccountDB.provider == provider)
     )
     return result.scalar_one_or_none()
 
 
 async def delete_oauth_account(db: AsyncSession, user_id: int, provider: str):
     result = await db.execute(
-        select(OAuthAccountDB).where(
-            OAuthAccountDB.user_id == user_id,
-            OAuthAccountDB.provider == provider
-        )
+        select(OAuthAccountDB).where(OAuthAccountDB.user_id == user_id, OAuthAccountDB.provider == provider)
     )
     oauth_account = result.scalar_one_or_none()
     if oauth_account:

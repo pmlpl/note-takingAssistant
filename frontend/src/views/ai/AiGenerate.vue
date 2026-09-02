@@ -1,221 +1,221 @@
 <template>
   <div class="ai-generate-page">
-      <!-- 页面头部 -->
-      <div class="page-header">
-        <div class="page-title">
-          <el-button link @click="goBack" class="back-btn">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="page-title">
+        <el-button link class="back-btn" @click="goBack">
           <el-icon size="16"><DArrowLeft /></el-icon>
-            <span>返回</span>
+          <span>返回</span>
         </el-button>
         <h2><IconMagic :size="36" color="var(--color-green)" /> AI 笔记生成</h2>
-        </div>
-        <div class="page-subtitle">
-          <p>输入主题和关键词，AI 将为您自动生成专业笔记</p>
-        </div>
       </div>
+      <div class="page-subtitle">
+        <p>输入主题和关键词，AI 将为您自动生成专业笔记</p>
+      </div>
+    </div>
 
-      <el-row :gutter="20">
-        <!-- 左侧：输入区 -->
-        <el-col :xs="24" :lg="10">
-          <el-card class="input-card" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                  <IconNotebook :size="24"/>
-                  <span>输入信息</span>
-              </div>
-            </template>
-
-            <el-form :model="form" label-width="90px">
-              <el-form-item label="笔记主题" required>
-                <el-input
-                  v-model="form.topic"
-                  placeholder="例如：Python基础语法、机器学习入门"
-                  maxlength="50"
-                  show-word-limit
-                />
-              </el-form-item>
-
-              <el-form-item label="补充关键词">
-                <el-input
-                  v-model="form.keyword"
-                  type="textarea"
-                  :rows="3"
-                  placeholder="可选，多个关键词用逗号分隔&#10;例如：变量、函数、循环、类"
-                  maxlength="200"
-                  show-word-limit
-                />
-              </el-form-item>
-
-              <el-form-item label="期望字数">
-                <el-slider
-                  v-model="form.wordCount"
-                  :min="300"
-                  :max="1500"
-                  :step="100"
-                  :marks="{
-                    300: '简洁',
-                    600: '标准',
-                    1000: '详细',
-                    1500: '深入'
-                  }"
-                  show-input
-                />
-              </el-form-item>
-
-              <el-form-item label="输出格式" style="margin-top: 32px;" class="format-selector-item">
-                <el-radio-group v-model="form.outputFormat" size="large" class="format-radio-group">
-                  <el-radio-button value="md">
-                    <IconDocument :size="16" />
-                    Markdown
-                  </el-radio-button>
-                  <el-radio-button value="docx">
-                    <IconDocument :size="16" />
-                    Word文档
-                  </el-radio-button>
-                  <el-radio-button value="txt">
-                    <IconDocument :size="16" />
-                    纯文本
-                  </el-radio-button>
-                </el-radio-group>
-              </el-form-item>
-
-              <!-- 参考笔记上传 -->
-              <el-form-item label="参考笔记" style="margin-top: 32px;">
-                <div class="reference-section">
-                  <el-upload
-                    v-model:file-list="noteFileList"
-                    action="#"
-                    :auto-upload="false"
-                    :on-change="handleNoteChange"
-                    :on-remove="handleNoteRemove"
-                    :limit="2"
-                    accept=".txt,.md,.doc,.docx,.pdf"
-                    drag
-                  >
-                    <el-icon class="el-icon--upload"><IconUpload :size="40" /></el-icon>
-                    <div class="el-upload__text">
-                      拖拽文件到此处或 <em>点击上传</em>
-                    </div>
-                    <template #tip>
-                      <div class="el-upload__tip">
-                        支持 TXT、MD、DOC、PDF 格式，最多2个文件
-                      </div>
-                    </template>
-                  </el-upload>
-                </div>
-              </el-form-item>
-
-              <!-- 图片上传区域 -->
-              <el-form-item label="参考图片">
-                <div class="upload-section">
-                  <el-upload
-                    v-model:file-list="fileList"
-                    action="#"
-                    list-type="picture-card"
-                    :auto-upload="false"
-                    :on-change="handleImageChange"
-                    :on-remove="handleImageRemove"
-                    :limit="3"
-                    accept="image/*"
-                  >
-                    <el-icon><IconPlus :size="20" /></el-icon>
-                    <template #tip>
-                      <div class="el-upload__tip">
-                        最多上传3张图片，供AI参考或插入
-                      </div>
-                    </template>
-                  </el-upload>
-                </div>
-              </el-form-item>
-
-              <el-form-item>
-                <el-button
-                  type="primary"
-                  @click="generateNote"
-                  :loading="loading"
-                  size="large"
-                  class="generate-btn"
-                >
-                  <IconMagic :size="18" />
-                  {{ loading ? "AI生成中..." : "开始生成" }}
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </el-card>
-        </el-col>
-
-        <!-- 右侧：结果展示区 -->
-        <el-col :xs="24" :lg="14">
-          <el-card class="result-card" shadow="hover">
-            <template #header>
-              <div class="card-header result-header">
-                <div class="header-left">
-                  <span>✨ 生成结果</span>
-                  <el-radio-group v-if="noteContent" v-model="displayMode" size="small" class="display-mode-switch">
-                    <el-radio-button value="rich">富文本</el-radio-button>
-                    <el-radio-button value="markdown">Markdown</el-radio-button>
-                  </el-radio-group>
-                </div>
-                <div class="result-actions">
-                  <el-button
-                    v-if="noteContent"
-                    type="success"
-                    @click="saveNote"
-                    :loading="saving"
-                    size="default"
-                  >
-                    💾 保存到笔记
-                  </el-button>
-                  <el-button
-                    v-if="noteContent"
-                    size="default"
-                    @click="copyContent"
-                  >
-                    📋 复制内容
-                  </el-button>
-                  <el-button
-                    v-if="noteContent"
-                    type="primary"
-                    size="default"
-                    @click="downloadNote"
-                  >
-                    ⬇️ 下载{{ getFormatName(form.outputFormat) }}
-                  </el-button>
-                </div>
-              </div>
-            </template>
-                    
-            <!-- 加载中状态 -->
-            <div v-if="loading && !noteContent" class="loading-state">
-              <el-icon class="is-loading" :size="40"><Loading /></el-icon>
-              <p>AI 正在思考中...</p>
-              <p class="hint">请稍候，内容将实时显示</p>
+    <el-row :gutter="20">
+      <!-- 左侧：输入区 -->
+      <el-col :xs="24" :lg="10">
+        <el-card class="input-card" shadow="hover">
+          <template #header>
+            <div class="card-header">
+              <IconNotebook :size="24" />
+              <span>输入信息</span>
             </div>
-                    
-            <!-- 内容显示区域 -->
-            <div v-else-if="noteContent" class="note-content-wrapper">
-              <!-- 富文本模式（默认）：统一管线渲染（含 mermaid 图表） -->
-              <MarkdownContent
-                v-if="displayMode === 'rich'"
-                :content="rawMarkdown"
-                class="note-content prose"
+          </template>
+
+          <el-form :model="form" label-width="90px">
+            <el-form-item label="笔记主题" required>
+              <el-input
+                v-model="form.topic"
+                placeholder="例如：Python基础语法、机器学习入门"
+                maxlength="50"
+                show-word-limit
               />
-              <!-- Markdown 原始模式 -->
-              <div v-else class="note-content markdown-raw">
-                <pre>{{ rawMarkdown }}</pre>
+            </el-form-item>
+
+            <el-form-item label="补充关键词">
+              <el-input
+                v-model="form.keyword"
+                type="textarea"
+                :rows="3"
+                placeholder="可选，多个关键词用逗号分隔&#10;例如：变量、函数、循环、类"
+                maxlength="200"
+                show-word-limit
+              />
+            </el-form-item>
+
+            <el-form-item label="期望字数">
+              <el-slider
+                v-model="form.wordCount"
+                :min="300"
+                :max="1500"
+                :step="100"
+                :marks="{
+                  300: '简洁',
+                  600: '标准',
+                  1000: '详细',
+                  1500: '深入'
+                }"
+                show-input
+              />
+            </el-form-item>
+
+            <el-form-item label="输出格式" style="margin-top: 32px;" class="format-selector-item">
+              <el-radio-group v-model="form.outputFormat" size="large" class="format-radio-group">
+                <el-radio-button value="md">
+                  <IconDocument :size="16" />
+                  Markdown
+                </el-radio-button>
+                <el-radio-button value="docx">
+                  <IconDocument :size="16" />
+                  Word文档
+                </el-radio-button>
+                <el-radio-button value="txt">
+                  <IconDocument :size="16" />
+                  纯文本
+                </el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+
+            <!-- 参考笔记上传 -->
+            <el-form-item label="参考笔记" style="margin-top: 32px;">
+              <div class="reference-section">
+                <el-upload
+                  v-model:file-list="noteFileList"
+                  action="#"
+                  :auto-upload="false"
+                  :on-change="handleNoteChange"
+                  :on-remove="handleNoteRemove"
+                  :limit="2"
+                  accept=".txt,.md,.doc,.docx,.pdf"
+                  drag
+                >
+                  <el-icon class="el-icon--upload"><IconUpload :size="40" /></el-icon>
+                  <div class="el-upload__text">
+                    拖拽文件到此处或 <em>点击上传</em>
+                  </div>
+                  <template #tip>
+                    <div class="el-upload__tip">
+                      支持 TXT、MD、DOC、PDF 格式，最多2个文件
+                    </div>
+                  </template>
+                </el-upload>
+              </div>
+            </el-form-item>
+
+            <!-- 图片上传区域 -->
+            <el-form-item label="参考图片">
+              <div class="upload-section">
+                <el-upload
+                  v-model:file-list="fileList"
+                  action="#"
+                  list-type="picture-card"
+                  :auto-upload="false"
+                  :on-change="handleImageChange"
+                  :on-remove="handleImageRemove"
+                  :limit="3"
+                  accept="image/*"
+                >
+                  <el-icon><IconPlus :size="20" /></el-icon>
+                  <template #tip>
+                    <div class="el-upload__tip">
+                      最多上传3张图片，供AI参考或插入
+                    </div>
+                  </template>
+                </el-upload>
+              </div>
+            </el-form-item>
+
+            <el-form-item>
+              <el-button
+                type="primary"
+                :loading="loading"
+                size="large"
+                class="generate-btn"
+                @click="generateNote"
+              >
+                <IconMagic :size="18" />
+                {{ loading ? "AI生成中..." : "开始生成" }}
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </el-col>
+
+      <!-- 右侧：结果展示区 -->
+      <el-col :xs="24" :lg="14">
+        <el-card class="result-card" shadow="hover">
+          <template #header>
+            <div class="card-header result-header">
+              <div class="header-left">
+                <span>✨ 生成结果</span>
+                <el-radio-group v-if="noteContent" v-model="displayMode" size="small" class="display-mode-switch">
+                  <el-radio-button value="rich">富文本</el-radio-button>
+                  <el-radio-button value="markdown">Markdown</el-radio-button>
+                </el-radio-group>
+              </div>
+              <div class="result-actions">
+                <el-button
+                  v-if="noteContent"
+                  type="success"
+                  :loading="saving"
+                  size="default"
+                  @click="saveNote"
+                >
+                  💾 保存到笔记
+                </el-button>
+                <el-button
+                  v-if="noteContent"
+                  size="default"
+                  @click="copyContent"
+                >
+                  📋 复制内容
+                </el-button>
+                <el-button
+                  v-if="noteContent"
+                  type="primary"
+                  size="default"
+                  @click="downloadNote"
+                >
+                  ⬇️ 下载{{ getFormatName(form.outputFormat) }}
+                </el-button>
               </div>
             </div>
+          </template>
                     
-            <!-- 空状态 -->
-            <div v-else class="empty-state">
-              <IconMagic :size="80" color="var(--el-text-color-disabled)" />
-              <h3>等待生成</h3>
-              <p>在左侧输入主题和关键词，点击“开始生成”按钮</p>
-              <p class="hint">💡 提示：上传参考笔记和图片可以让 AI 更好地理解您的需求</p>
+          <!-- 加载中状态 -->
+          <div v-if="loading && !noteContent" class="loading-state">
+            <el-icon class="is-loading" :size="40"><Loading /></el-icon>
+            <p>AI 正在思考中...</p>
+            <p class="hint">请稍候，内容将实时显示</p>
+          </div>
+                    
+          <!-- 内容显示区域 -->
+          <div v-else-if="noteContent" class="note-content-wrapper">
+            <!-- 富文本模式（默认）：统一管线渲染（含 mermaid 图表） -->
+            <MarkdownContent
+              v-if="displayMode === 'rich'"
+              :content="rawMarkdown"
+              class="note-content prose"
+            />
+            <!-- Markdown 原始模式 -->
+            <div v-else class="note-content markdown-raw">
+              <pre>{{ rawMarkdown }}</pre>
             </div>
-          </el-card>
-        </el-col>
-      </el-row>
+          </div>
+                    
+          <!-- 空状态 -->
+          <div v-else class="empty-state">
+            <IconMagic :size="80" color="var(--el-text-color-disabled)" />
+            <h3>等待生成</h3>
+            <p>在左侧输入主题和关键词，点击“开始生成”按钮</p>
+            <p class="hint">💡 提示：上传参考笔记和图片可以让 AI 更好地理解您的需求</p>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -225,7 +225,7 @@ import { useRouter } from 'vue-router'
 import { useNoteStore, useUserStore } from '@/store'
 import { aiApi } from '@/api/ai'
 import { noteApi } from '@/api/note'
-import { IconMagic, IconPlus, IconEdit, IconUpload, IconDocument } from '@/components/icons'
+import { IconMagic, IconPlus, IconUpload, IconDocument } from '@/components/icons'
 import { ElMessage } from 'element-plus'
 import {IconNotebook} from "@/components/icons/index.js";
 import { Loading, DArrowLeft } from '@element-plus/icons-vue'

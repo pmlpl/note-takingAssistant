@@ -17,7 +17,7 @@
       </div>
     </template>
     <Transition name="section-fold">
-      <div v-show="visible" class="section-fold-panel" v-loading="loading">
+      <div v-show="visible" v-loading="loading" class="section-fold-panel">
         <!-- 昵称修改 -->
         <div class="binding-section">
           <div class="binding-item">
@@ -59,16 +59,20 @@
                 size="small"
                 type="danger"
                 plain
-                @click="handleUnbindGithub"
                 :loading="unbindingGithub"
-              >解除</el-button>
+                @click="handleUnbindGithub"
+              >
+                解除
+              </el-button>
               <el-button
                 v-else
                 size="small"
                 type="primary"
-                @click="handleBindGithub"
                 :loading="bindingGithub"
-              >绑定</el-button>
+                @click="handleBindGithub"
+              >
+                绑定
+              </el-button>
             </div>
           </div>
         </div>
@@ -98,20 +102,26 @@
                 type="warning"
                 plain
                 @click="showChangeEmailDialog = true"
-              >换绑</el-button>
+              >
+                换绑
+              </el-button>
               <el-button
                 v-if="bindings.email && bindings.has_password"
                 size="small"
                 type="danger"
                 plain
                 @click="showUnbindEmailDialog = true"
-              >解除</el-button>
+              >
+                解除
+              </el-button>
               <el-button
                 v-if="!bindings.email"
                 size="small"
                 type="primary"
                 @click="showBindEmailDialog = true"
-              >绑定</el-button>
+              >
+                绑定
+              </el-button>
             </div>
           </div>
         </div>
@@ -127,7 +137,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showNicknameDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleUpdateNickname" :loading="savingNickname">保存</el-button>
+        <el-button type="primary" :loading="savingNickname" @click="handleUpdateNickname">保存</el-button>
       </template>
     </el-dialog>
 
@@ -141,9 +151,9 @@
           <div class="code-input-row">
             <el-input v-model="bindEmailForm.code" placeholder="请输入验证码" clearable />
             <el-button
-              @click="handleSendBindCode"
               :disabled="bindCodeCooldown > 0"
               :loading="sendingBindCode"
+              @click="handleSendBindCode"
             >
               {{ bindCodeCooldown > 0 ? `${bindCodeCooldown}s` : '发送验证码' }}
             </el-button>
@@ -152,7 +162,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showBindEmailDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleBindEmail" :loading="bindingEmail">确认绑定</el-button>
+        <el-button type="primary" :loading="bindingEmail" @click="handleBindEmail">确认绑定</el-button>
       </template>
     </el-dialog>
 
@@ -166,9 +176,9 @@
           <div class="code-input-row">
             <el-input v-model="changeEmailForm.code" placeholder="请输入验证码" clearable />
             <el-button
-              @click="handleSendChangeCode"
               :disabled="changeCodeCooldown > 0"
               :loading="sendingChangeCode"
+              @click="handleSendChangeCode"
             >
               {{ changeCodeCooldown > 0 ? `${changeCodeCooldown}s` : '发送验证码' }}
             </el-button>
@@ -177,7 +187,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showChangeEmailDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleChangeEmail" :loading="changingEmail">确认换绑</el-button>
+        <el-button type="primary" :loading="changingEmail" @click="handleChangeEmail">确认换绑</el-button>
       </template>
     </el-dialog>
 
@@ -197,7 +207,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showUnbindEmailDialog = false">取消</el-button>
-        <el-button type="danger" @click="handleUnbindEmail" :loading="unbindingEmail">确认解除</el-button>
+        <el-button type="danger" :loading="unbindingEmail" @click="handleUnbindEmail">确认解除</el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -205,7 +215,6 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store'
 import { userApi, oauthApi } from '@/api/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -227,7 +236,6 @@ const props = defineProps({
 
 const emit = defineEmits(['nickname-updated', 'bindings-changed', 'reload-user'])
 
-const router = useRouter()
 const userStore = useUserStore()
 const visible = ref(props.defaultVisible)
 
@@ -333,7 +341,7 @@ async function handleBindGithub() {
             bindingGithub.value = false
           }, 500)
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }, 1000)

@@ -1,6 +1,7 @@
 """将按日聚合结果填充为连续日期序列（欢迎页图表）"""
+
+from collections.abc import Callable, Iterable
 from datetime import date, timedelta
-from typing import Callable, Iterable
 
 
 def build_daily_series(

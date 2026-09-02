@@ -1,160 +1,160 @@
 <template>
-    <div class="note-translate-page">
-      <header class="page-header">
-        <el-button link class="back-btn" @click="goBack">
-          <el-icon size="16"><DArrowLeft /></el-icon>
-          <span>返回</span>
-        </el-button>
-        <h2 class="page-heading">
-          <IconTranslate :size="36" color="var(--color-blue)" />
-          翻译笔记
-        </h2>
-        <p class="page-subtitle">
-          支持多种语言互译，让笔记跨越语言障碍
-        </p>
-      </header>
+  <div class="note-translate-page">
+    <header class="page-header">
+      <el-button link class="back-btn" @click="goBack">
+        <el-icon size="16"><DArrowLeft /></el-icon>
+        <span>返回</span>
+      </el-button>
+      <h2 class="page-heading">
+        <IconTranslate :size="36" color="var(--color-blue)" />
+        翻译笔记
+      </h2>
+      <p class="page-subtitle">
+        支持多种语言互译，让笔记跨越语言障碍
+      </p>
+    </header>
 
-      <div class="translate-workspace">
-        <el-row :gutter="20" class="translate-row">
-          <!-- 原文 -->
-          <el-col :xs="24" :lg="10">
-            <section class="translate-panel">
-              <div class="panel-head">
-                <span class="panel-label panel-label--source">原文</span>
-                <span class="panel-hint">富文本 / Markdown 预览</span>
-              </div>
-              <div class="panel-body">
-                <div class="source-toolbar">
-                  <el-upload
-                    class="toolbar-upload"
-                    action="#"
-                    :auto-upload="false"
-                    :show-file-list="false"
-                    accept=".md,.txt,.docx"
-                    :on-change="handleFileUpload"
-                  >
-                    <el-button plain>
-                      <IconUpload :size="16" /> 上传文件
-                    </el-button>
-                  </el-upload>
-                  <el-select
-                    v-model="form.noteId"
-                    clearable
-                    filterable
-                    placeholder="从我的笔记选择"
-                    class="toolbar-select"
-                    @change="onNotePick"
-                  >
-                    <el-option
-                      v-for="n in notes"
-                      :key="n.id"
-                      :label="n.title"
-                      :value="n.id"
-                    />
-                  </el-select>
-                </div>
-                <p class="toolbar-tip">支持 .md / .txt 直接填入；.docx 导入为笔记后填入</p>
-
-                <div class="doc-preview">
-                  <div v-if="!effectiveSource" class="doc-preview-empty">
-                    <IconTranslate :size="40" color="var(--el-text-color-disabled)" />
-                    <p>上传、选择笔记或在下方编辑原文</p>
-                  </div>
-                  <MarkdownContent
-                    v-else
-                    :content="form.sourceText"
-                    class="preview-body source-preview-body"
-                  />
-                </div>
-
-                <el-collapse v-model="sourceEditOpen" class="source-edit-collapse">
-                  <el-collapse-item title="编辑原文（发送给翻译接口）" name="1">
-                    <el-input
-                      v-model="form.sourceText"
-                      type="textarea"
-                      :rows="6"
-                      placeholder="粘贴 Markdown、HTML 或纯文本"
-                      maxlength="50000"
-                      show-word-limit
-                    />
-                  </el-collapse-item>
-                </el-collapse>
-                <p v-if="truncationHint" class="hint">{{ truncationHint }}</p>
-              </div>
-            </section>
-          </el-col>
-
-          <!-- 翻译枢纽 -->
-          <el-col :xs="24" :lg="4" class="hub-col">
-            <div class="translate-hub">
-              <div class="hub-line hub-line--left" aria-hidden="true" />
-              <div class="hub-card">
-                <div class="hub-icon-wrap">
-                  <IconTranslate :size="28" color="var(--color-blue)" />
-                </div>
-                <p class="hub-title">翻译为</p>
-                <el-select v-model="form.targetLang" class="hub-select" size="large">
+    <div class="translate-workspace">
+      <el-row :gutter="20" class="translate-row">
+        <!-- 原文 -->
+        <el-col :xs="24" :lg="10">
+          <section class="translate-panel">
+            <div class="panel-head">
+              <span class="panel-label panel-label--source">原文</span>
+              <span class="panel-hint">富文本 / Markdown 预览</span>
+            </div>
+            <div class="panel-body">
+              <div class="source-toolbar">
+                <el-upload
+                  class="toolbar-upload"
+                  action="#"
+                  :auto-upload="false"
+                  :show-file-list="false"
+                  accept=".md,.txt,.docx"
+                  :on-change="handleFileUpload"
+                >
+                  <el-button plain>
+                    <IconUpload :size="16" /> 上传文件
+                  </el-button>
+                </el-upload>
+                <el-select
+                  v-model="form.noteId"
+                  clearable
+                  filterable
+                  placeholder="从我的笔记选择"
+                  class="toolbar-select"
+                  @change="onNotePick"
+                >
                   <el-option
-                    v-for="opt in langOptions"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
+                    v-for="n in notes"
+                    :key="n.id"
+                    :label="n.title"
+                    :value="n.id"
                   />
                 </el-select>
-                <el-button
-                  type="primary"
-                  size="large"
-                  class="hub-btn"
-                  :loading="loading"
-                  :disabled="!canTranslate"
-                  @click="runTranslate"
-                >
-                  {{ loading ? '翻译中…' : '开始翻译' }}
-                </el-button>
-                <p v-if="!canTranslate" class="hub-tip">请先载入原文</p>
               </div>
-              <div class="hub-line hub-line--right" aria-hidden="true" />
-            </div>
-          </el-col>
+              <p class="toolbar-tip">支持 .md / .txt 直接填入；.docx 导入为笔记后填入</p>
 
-          <!-- 译文 -->
-          <el-col :xs="24" :lg="10">
-            <section class="translate-panel translate-panel--result">
-              <div class="panel-head">
-                <div class="panel-head-main">
-                  <span class="panel-label panel-label--target">译文</span>
-                  <span class="panel-hint">Markdown 预览 · 平铺水印</span>
-                </div>
-                <el-button
-                  v-if="translatedRaw"
-                  size="small"
-                  plain
-                  type="primary"
-                  @click="copyTranslation"
-                >
-                  复制全文
-                </el-button>
-              </div>
-              <div class="panel-body panel-body--result">
-                <div v-if="!translatedRaw" class="doc-preview doc-preview--empty">
+              <div class="doc-preview">
+                <div v-if="!effectiveSource" class="doc-preview-empty">
                   <IconTranslate :size="40" color="var(--el-text-color-disabled)" />
-                  <p>翻译结果将显示在这里</p>
+                  <p>上传、选择笔记或在下方编辑原文</p>
                 </div>
-                <div
+                <MarkdownContent
                   v-else
-                  class="doc-preview doc-preview--translation"
-                >
-                  <MarkdownContent
-                    :content="translatedRaw"
-                    class="preview-body source-preview-body preview-body--watermarked"
-                  />
-                </div>
+                  :content="form.sourceText"
+                  class="preview-body source-preview-body"
+                />
               </div>
-            </section>
-          </el-col>
-        </el-row>
-      </div>
+
+              <el-collapse v-model="sourceEditOpen" class="source-edit-collapse">
+                <el-collapse-item title="编辑原文（发送给翻译接口）" name="1">
+                  <el-input
+                    v-model="form.sourceText"
+                    type="textarea"
+                    :rows="6"
+                    placeholder="粘贴 Markdown、HTML 或纯文本"
+                    maxlength="50000"
+                    show-word-limit
+                  />
+                </el-collapse-item>
+              </el-collapse>
+              <p v-if="truncationHint" class="hint">{{ truncationHint }}</p>
+            </div>
+          </section>
+        </el-col>
+
+        <!-- 翻译枢纽 -->
+        <el-col :xs="24" :lg="4" class="hub-col">
+          <div class="translate-hub">
+            <div class="hub-line hub-line--left" aria-hidden="true" />
+            <div class="hub-card">
+              <div class="hub-icon-wrap">
+                <IconTranslate :size="28" color="var(--color-blue)" />
+              </div>
+              <p class="hub-title">翻译为</p>
+              <el-select v-model="form.targetLang" class="hub-select" size="large">
+                <el-option
+                  v-for="opt in langOptions"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+              <el-button
+                type="primary"
+                size="large"
+                class="hub-btn"
+                :loading="loading"
+                :disabled="!canTranslate"
+                @click="runTranslate"
+              >
+                {{ loading ? '翻译中…' : '开始翻译' }}
+              </el-button>
+              <p v-if="!canTranslate" class="hub-tip">请先载入原文</p>
+            </div>
+            <div class="hub-line hub-line--right" aria-hidden="true" />
+          </div>
+        </el-col>
+
+        <!-- 译文 -->
+        <el-col :xs="24" :lg="10">
+          <section class="translate-panel translate-panel--result">
+            <div class="panel-head">
+              <div class="panel-head-main">
+                <span class="panel-label panel-label--target">译文</span>
+                <span class="panel-hint">Markdown 预览 · 平铺水印</span>
+              </div>
+              <el-button
+                v-if="translatedRaw"
+                size="small"
+                plain
+                type="primary"
+                @click="copyTranslation"
+              >
+                复制全文
+              </el-button>
+            </div>
+            <div class="panel-body panel-body--result">
+              <div v-if="!translatedRaw" class="doc-preview doc-preview--empty">
+                <IconTranslate :size="40" color="var(--el-text-color-disabled)" />
+                <p>翻译结果将显示在这里</p>
+              </div>
+              <div
+                v-else
+                class="doc-preview doc-preview--translation"
+              >
+                <MarkdownContent
+                  :content="translatedRaw"
+                  class="preview-body source-preview-body preview-body--watermarked"
+                />
+              </div>
+            </div>
+          </section>
+        </el-col>
+      </el-row>
     </div>
+  </div>
 </template>
 
 <script setup>

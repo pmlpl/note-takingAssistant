@@ -2,14 +2,14 @@
 
 SSRF 防御：在构造用户自定义 base_url 的客户端前，会调用 `assert_safe_llm_url` 拦截私有 IP / 元数据服务 / 非白名单端口。
 """
+
 import httpx
 from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.utils.openai_compatible_url import (
-    normalize_openai_compatible_base_url,
     assert_safe_llm_url,
-    UnsafeLlmUrlError,
+    normalize_openai_compatible_base_url,
 )
 
 # 本地 LM Studio 常见「冷启动 + 首 token」远超默认 5min 读超时，单独放宽 read
@@ -26,10 +26,9 @@ llm_shared_http_client = httpx.AsyncClient(
     trust_env=settings.LLM_HTTP_TRUST_ENV,
 )
 
-_default_llm_base = (
-    normalize_openai_compatible_base_url((settings.LM_STUDIO_URL or "").strip())
-    or (settings.LM_STUDIO_URL or "").strip().rstrip("/")
-)
+_default_llm_base = normalize_openai_compatible_base_url((settings.LM_STUDIO_URL or "").strip()) or (
+    settings.LM_STUDIO_URL or ""
+).strip().rstrip("/")
 
 # 兼容旧导入：无用户上下文时的服务端默认客户端
 async_openai_client = AsyncOpenAI(

@@ -3,16 +3,16 @@
     <Toolbar
       class="rich-text-toolbar"
       :editor="editorRef"
-      :defaultConfig="toolbarConfig"
+      :default-config="toolbarConfig"
       mode="default"
     />
     <Editor
-      class="rich-text-editor"
       v-model="valueHtml"
-      :defaultConfig="editorConfig"
+      class="rich-text-editor"
+      :default-config="editorConfig"
       mode="default"
-      @onCreated="handleCreated"
-      @onChange="handleChange"
+      @on-created="handleCreated"
+      @on-change="handleChange"
     />
   </div>
 </template>

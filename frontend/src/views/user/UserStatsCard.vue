@@ -17,7 +17,7 @@
       </div>
     </template>
     <Transition name="section-fold">
-      <div v-show="visible" class="section-fold-panel" v-loading="loading">
+      <div v-show="visible" v-loading="loading" class="section-fold-panel">
         <el-alert
           v-if="error && !loading"
           type="error"

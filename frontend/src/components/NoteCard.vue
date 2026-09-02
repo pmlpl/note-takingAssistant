@@ -26,13 +26,17 @@
           size="small"
           class="action-link"
           @click.stop="emit('edit', note)"
-        >编辑</el-button>
+        >
+          编辑
+        </el-button>
         <el-button
           link
           size="small"
           class="action-link action-link--delete"
           @click.stop="emit('delete', note)"
-        >删除</el-button>
+        >
+          删除
+        </el-button>
       </div>
     </div>
   </div>

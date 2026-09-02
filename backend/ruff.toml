@@ -21,6 +21,7 @@ ignore = [
     "B008",   # FastAPI Depends() 在默认参数中是正常用法
     "B904",   # raise from 在某些场景下冗余
     "N805",   # Pydantic 模型方法第一个参数不强制 cls/self
+    "N815",   # API 请求/响应模型字段有意使用 camelCase（前端契约，配合 alias）
     "N818",   # 异常类名不强制 Error 后缀
     "UP007",  # 兼容 Python 3.9，暂不强制 X | None 语法
     "UP045",  # 同上，Optional[X] 不强制改 X | None

@@ -1,6 +1,11 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, text
+from sqlalchemy.sql import func
+
+from app.core.database import Base
 
 
 # Pydantic模型 - 用于请求/响应
@@ -62,15 +67,13 @@ class LLMSettingsPut(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     """修改密码请求模型"""
+
     currentPassword: str
     newPassword: str
     confirmPassword: str
 
 
 # SQLAlchemy数据库模型
-from sqlalchemy import Column, Integer, String, DateTime, Text, text, Boolean, ForeignKey
-from sqlalchemy.sql import func
-from app.core.database import Base
 
 
 class UserDB(Base):
@@ -80,13 +83,13 @@ class UserDB(Base):
     username = Column(String(50), unique=True, index=True, nullable=True)
     nickname = Column(String(50), nullable=True)
     email = Column(String(255), unique=True, index=True, nullable=True)
-    email_verified = Column(Boolean, nullable=False, server_default=text('0'), default=False)
+    email_verified = Column(Boolean, nullable=False, server_default=text("0"), default=False)
     hashed_password = Column(String(255), nullable=False)
     avatar_url = Column(Text, nullable=True)
     llm_base_url = Column(Text, nullable=True)
     llm_model = Column(String(512), nullable=True)
     llm_api_key_encrypted = Column(Text, nullable=True)
-    token_gen = Column(Integer, nullable=False, server_default=text('0'), default=0)
+    token_gen = Column(Integer, nullable=False, server_default=text("0"), default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

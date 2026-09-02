@@ -1,49 +1,49 @@
 ﻿<template>
-    <div class="note-edit-container">
-      <div class="edit-header">
-        <el-button @click="goBack">
-          <el-icon><ArrowLeft /></el-icon>
-          返回
+  <div class="note-edit-container">
+    <div class="edit-header">
+      <el-button @click="goBack">
+        <el-icon><ArrowLeft /></el-icon>
+        返回
+      </el-button>
+      <h2>{{ isEdit ? '编辑笔记' : '新建笔记' }}</h2>
+      <div class="header-actions">
+        <el-radio-group v-model="editorMode" size="small">
+          <el-radio-button value="rich">富文本</el-radio-button>
+          <el-radio-button value="markdown">Markdown</el-radio-button>
+        </el-radio-group>
+        <el-button type="primary" :loading="saving" @click="saveNote">
+          <IconUpload :size="18" />
+          保存
         </el-button>
-        <h2>{{ isEdit ? '编辑笔记' : '新建笔记' }}</h2>
-        <div class="header-actions">
-          <el-radio-group v-model="editorMode" size="small">
-            <el-radio-button value="rich">富文本</el-radio-button>
-            <el-radio-button value="markdown">Markdown</el-radio-button>
-          </el-radio-group>
-          <el-button type="primary" @click="saveNote" :loading="saving">
-            <IconUpload :size="18" />
-            保存
-          </el-button>
-        </div>
       </div>
-      <el-card>
-        <el-form :model="form" label-width="80px">
-          <el-form-item label="标题" prop="title" :rules="[{ required: true, message: '请输入标题' }]">
-            <el-input v-model="form.title" placeholder="请输入笔记标题" />
-          </el-form-item>
-          <el-form-item label="标签">
-            <el-input v-model="form.tags" placeholder="多个标签用逗号分隔" />
-          </el-form-item>
-          <el-form-item label="内容">
-            <!-- 富文本编辑器模式 -->
-            <RichText v-if="editorMode === 'rich'" v-model="form.content" />
-            <!-- Markdown/HTML 编辑器模式 -->
-            <div v-else class="markdown-editor">
-              <el-input
-                v-model="form.content"
-                type="textarea"
-                :rows="20"
-                placeholder="支持 Markdown 或 HTML 语法..."
-                class="markdown-input"
-              />
-              <!-- 渲染预览（支持 HTML 和 Markdown，统一管线） -->
-              <MarkdownContent :content="form.content" class="markdown-preview" />
-            </div>
-          </el-form-item>
-        </el-form>
-      </el-card>
     </div>
+    <el-card>
+      <el-form :model="form" label-width="80px">
+        <el-form-item label="标题" prop="title" :rules="[{ required: true, message: '请输入标题' }]">
+          <el-input v-model="form.title" placeholder="请输入笔记标题" />
+        </el-form-item>
+        <el-form-item label="标签">
+          <el-input v-model="form.tags" placeholder="多个标签用逗号分隔" />
+        </el-form-item>
+        <el-form-item label="内容">
+          <!-- 富文本编辑器模式 -->
+          <RichText v-if="editorMode === 'rich'" v-model="form.content" />
+          <!-- Markdown/HTML 编辑器模式 -->
+          <div v-else class="markdown-editor">
+            <el-input
+              v-model="form.content"
+              type="textarea"
+              :rows="20"
+              placeholder="支持 Markdown 或 HTML 语法..."
+              class="markdown-input"
+            />
+            <!-- 渲染预览（支持 HTML 和 Markdown，统一管线） -->
+            <MarkdownContent :content="form.content" class="markdown-preview" />
+          </div>
+        </el-form-item>
+      </el-form>
+    </el-card>
+  </div>
 </template>
 
 <script setup>
@@ -142,7 +142,7 @@ async function loadNote(id) {
       tags: note.tags || '',
       content: content
     }
-  }catch (error) {
+  } catch {
     ElMessage.error('加载笔记失败')
   }
 }

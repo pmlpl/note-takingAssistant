@@ -1,4 +1,5 @@
 """Encrypt/decrypt sensitive per-user fields (e.g. LLM API keys). Never log plaintext."""
+
 from __future__ import annotations
 
 import base64
@@ -44,9 +45,7 @@ def encrypt_secret(plaintext: str) -> str:
     """
     f = _fernet_explicit() or _fernet_derived()
     if not f:
-        raise SecretCryptoError(
-            "无法加密密钥：请在服务端配置 SECRET_KEY（或任选其一 ENCRYPTION_KEY）。"
-        )
+        raise SecretCryptoError("无法加密密钥：请在服务端配置 SECRET_KEY（或任选其一 ENCRYPTION_KEY）。")
     return f.encrypt(plaintext.encode("utf-8")).decode("ascii")
 
 
@@ -69,9 +68,7 @@ def decrypt_secret(ciphertext: str) -> str:
     if not f_derived:
         if tried_explicit:
             raise SecretCryptoError("Could not decrypt stored secret") from None
-        raise SecretCryptoError(
-            "无法解密密钥：请配置 SECRET_KEY 或与加密时一致的 ENCRYPTION_KEY。"
-        ) from None
+        raise SecretCryptoError("无法解密密钥：请配置 SECRET_KEY 或与加密时一致的 ENCRYPTION_KEY。") from None
 
     try:
         return f_derived.decrypt(tokens).decode("utf-8")

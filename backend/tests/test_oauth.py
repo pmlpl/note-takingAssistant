@@ -60,12 +60,13 @@ async def test_callback_new_user_creates_and_redirects_with_token():
         "email": "octo@example.com",
         "avatar_url": "https://avatar",
     }
-    with patch("app.api.v1.oauth.github_get_access_token", new=AsyncMock(return_value="tok")), patch(
-        "app.api.v1.oauth.github_get_user_info", new=AsyncMock(return_value=user_info)
-    ), patch("app.crud.user.get_oauth_account", new=AsyncMock(return_value=None)), patch(
-        "app.crud.user.get_user_by_email", new=AsyncMock(return_value=None)
-    ), patch("app.crud.user.create_user", new=AsyncMock(return_value=_FakeUser("octo@example.com"))), patch(
-        "app.crud.user.create_oauth_account", new=AsyncMock()
+    with (
+        patch("app.api.v1.oauth.github_get_access_token", new=AsyncMock(return_value="tok")),
+        patch("app.api.v1.oauth.github_get_user_info", new=AsyncMock(return_value=user_info)),
+        patch("app.crud.user.get_oauth_account", new=AsyncMock(return_value=None)),
+        patch("app.crud.user.get_user_by_email", new=AsyncMock(return_value=None)),
+        patch("app.crud.user.create_user", new=AsyncMock(return_value=_FakeUser("octo@example.com"))),
+        patch("app.crud.user.create_oauth_account", new=AsyncMock()),
     ):
         resp = await oauth.github_callback(code="code_x", state=None, error=None, db=_fake_db())
     assert isinstance(resp, RedirectResponse)
@@ -77,10 +78,11 @@ async def test_callback_new_user_creates_and_redirects_with_token():
 async def test_callback_existing_oauth_account_logs_in():
     user_info = {"id": 7, "login": "old", "name": "Old", "email": "old@example.com"}
     existing = MagicMock(user_id=5, provider_username=None, avatar_url=None)
-    with patch("app.api.v1.oauth.github_get_access_token", new=AsyncMock(return_value="tok")), patch(
-        "app.api.v1.oauth.github_get_user_info", new=AsyncMock(return_value=user_info)
-    ), patch("app.crud.user.get_oauth_account", new=AsyncMock(return_value=existing)), patch(
-        "app.crud.user.get_user", new=AsyncMock(return_value=_FakeUser("old@example.com"))
+    with (
+        patch("app.api.v1.oauth.github_get_access_token", new=AsyncMock(return_value="tok")),
+        patch("app.api.v1.oauth.github_get_user_info", new=AsyncMock(return_value=user_info)),
+        patch("app.crud.user.get_oauth_account", new=AsyncMock(return_value=existing)),
+        patch("app.crud.user.get_user", new=AsyncMock(return_value=_FakeUser("old@example.com"))),
     ):
         resp = await oauth.github_callback(code="code_x", state=None, error=None, db=_fake_db())
     assert "token=" in resp.headers["location"]

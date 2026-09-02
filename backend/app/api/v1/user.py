@@ -1,25 +1,39 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_async_db
-from app.models.user import UserCreate, UserLogin, Token, TokenWithUser, UserResponse, LLMSettingsPut, LLMSettingsResponse, ChangePasswordRequest
-from app.crud import user as crud_user
-from app.core.security import create_access_token, verify_password, get_password_hash, get_current_user, decode_token_without_verify
-from app.core.field_crypto import SecretCryptoError, encrypt_secret, decrypt_secret, api_key_last_four
-from app.core.redis_client import blacklist_token
-from app.core.rate_limit import rate_limit_anon, rate_limit_user
-from app.core.logger import app_logger as logger
-from app.utils.openai_compatible_url import (
-    normalize_openai_compatible_base_url,
-    assert_safe_llm_url,
-    UnsafeLlmUrlError,
-)
-from datetime import timedelta, timezone, datetime
-from app.core.config import settings
-from pydantic import BaseModel
 import os
 import re
-import uuid
+from datetime import timedelta
 from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.database import get_async_db
+from app.core.field_crypto import SecretCryptoError, api_key_last_four, decrypt_secret, encrypt_secret
+from app.core.logger import app_logger as logger
+from app.core.rate_limit import rate_limit_anon, rate_limit_user
+from app.core.redis_client import blacklist_token
+from app.core.security import (
+    create_access_token,
+    get_current_user,
+    get_password_hash,
+    verify_password,
+)
+from app.crud import user as crud_user
+from app.models.user import (
+    ChangePasswordRequest,
+    LLMSettingsPut,
+    LLMSettingsResponse,
+    TokenWithUser,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
+from app.utils.openai_compatible_url import (
+    UnsafeLlmUrlError,
+    assert_safe_llm_url,
+    normalize_openai_compatible_base_url,
+)
 
 router = APIRouter()
 
@@ -112,8 +126,8 @@ async def login(
             "email": db_user.email,
             "email_verified": bool(db_user.email_verified),
             "avatar_url": db_user.avatar_url,
-            "created_at": db_user.created_at
-        }
+            "created_at": db_user.created_at,
+        },
     }
 
 
@@ -174,7 +188,7 @@ async def get_current_user_info(
         "email": db_user.email,
         "email_verified": bool(db_user.email_verified),
         "avatar_url": db_user.avatar_url,
-        "created_at": db_user.created_at
+        "created_at": db_user.created_at,
     }
 
 
@@ -241,9 +255,7 @@ async def put_llm_settings(
             assert_safe_llm_url(stripped_base)
         except UnsafeLlmUrlError as e:
             raise HTTPException(status_code=400, detail=str(e)) from None
-    db_user.llm_base_url = (
-        normalize_openai_compatible_base_url(stripped_base) if stripped_base else None
-    )
+    db_user.llm_base_url = normalize_openai_compatible_base_url(stripped_base) if stripped_base else None
     db_user.llm_model = body.llm_model.strip() or None
 
     if not body.retain_api_key:
@@ -269,9 +281,7 @@ async def put_llm_settings(
             last4 = None
 
     return LLMSettingsResponse(
-        base_url=normalize_openai_compatible_base_url(db_user.llm_base_url)
-        if db_user.llm_base_url
-        else None,
+        base_url=normalize_openai_compatible_base_url(db_user.llm_base_url) if db_user.llm_base_url else None,
         llm_model=db_user.llm_model,
         api_key_last4=last4,
         has_stored_api_key=has_key,
@@ -286,8 +296,8 @@ async def change_password(
     _: None = Depends(rate_limit_user("notes")),
 ):
     """修改密码接口。改密后所有历史 token 失效（通过 token_gen 递增 + Redis 最小值同步）。"""
-    from app.core.redis_client import redis_client
     from app.core.config import settings
+    from app.core.redis_client import redis_client
 
     if req.newPassword != req.confirmPassword:
         raise HTTPException(status_code=400, detail="两次输入的密码不一致")
@@ -310,9 +320,7 @@ async def change_password(
     ttl = int(settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60 * 2)
     try:
         if redis_client.client:
-            redis_client.client.setex(
-                f"tgen_min:{db_user.email}", ttl, str(db_user.token_gen)
-            )
+            redis_client.client.setex(f"tgen_min:{db_user.email}", ttl, str(db_user.token_gen))
     except Exception as e:
         logger.info(f"⚠️ 同步 tgen_min 失败（不阻断改密成功）: {e}")
 
@@ -327,7 +335,7 @@ async def upload_avatar(
     _: None = Depends(rate_limit_user("notes")),
 ):
     """上传用户头像（做扩展名 + 魔数双重校验）。"""
-    from app.utils.file_upload import validate_image_bytes, safe_image_filename
+    from app.utils.file_upload import safe_image_filename, validate_image_bytes
 
     content = await file.read()
 
@@ -364,12 +372,12 @@ async def upload_avatar(
 
     # 生成访问 URL
     avatar_url = f"/uploads/avatars/{safe_name}"
-    
+
     # 更新数据库
     db_user.avatar_url = avatar_url
     await db.commit()
     await db.refresh(db_user)
-    
+
     return {"message": "头像上传成功", "avatar_url": avatar_url}
 
 
@@ -380,41 +388,37 @@ async def get_user_stats(
     _: None = Depends(rate_limit_user("notes")),
 ):
     """获取用户统计信息：笔记数量、AI使用次数、活跃天数"""
-    from sqlalchemy import select, func, distinct
-    from app.models.note import NoteDB
+
+    from sqlalchemy import distinct, func, select
+
     from app.crud import ai_usage as crud_ai_usage
-    from datetime import datetime, timedelta
-    
+    from app.models.note import NoteDB
+
     db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
     if not db_user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
+
     user_id = db_user.id
-    
+
     # 统计笔记数量
-    note_count_result = await db.execute(
-        select(func.count(NoteDB.id)).where(NoteDB.user_id == user_id)
-    )
+    note_count_result = await db.execute(select(func.count(NoteDB.id)).where(NoteDB.user_id == user_id))
     note_count = note_count_result.scalar() or 0
-    
+
     # 统计AI使用次数
     ai_usage = await crud_ai_usage.get_user_ai_usage_count(db, user_id)
-    
+
     # 计算活跃天数（有笔记创建的日期）
     active_dates_result = await db.execute(
         select(distinct(func.date(NoteDB.created_at))).where(NoteDB.user_id == user_id)
     )
     active_dates = active_dates_result.scalars().all()
     days_active = len(active_dates)
-    
-    return {
-        "note_count": note_count,
-        "ai_usage": ai_usage,
-        "days_active": days_active
-    }
+
+    return {"note_count": note_count, "ai_usage": ai_usage, "days_active": days_active}
 
 
 # ====== 账号绑定 ======
+
 
 class NicknameUpdate(BaseModel):
     nickname: str

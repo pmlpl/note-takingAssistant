@@ -1,4 +1,5 @@
 """将 OpenAI SDK / httpx 异常转为面向用户的中文提示。"""
+
 from __future__ import annotations
 
 

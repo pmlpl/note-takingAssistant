@@ -1,82 +1,82 @@
 ﻿<template>
-    <div class="history-notes-page">
-      <!-- 页面头部 -->
-      <div class="page-header">
-        <el-button link @click="goBack" class="back-btn">
-          <el-icon size="16"><DArrowLeft /></el-icon>
-          <span>返回</span>
+  <div class="history-notes-page">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <el-button link class="back-btn" @click="goBack">
+        <el-icon size="16"><DArrowLeft /></el-icon>
+        <span>返回</span>
+      </el-button>
+      <h2><IconDocument :size="32" color="var(--color-blue)" /> 历史笔记</h2>
+      <p>查看所有笔记，共 {{ totalNotes }} 个</p>
+    </div>
+
+    <!-- 搜索和筛选区 -->
+    <el-card class="search-card" shadow="hover">
+      <div class="search-bar">
+        <el-input
+          v-model="searchQuery"
+          placeholder="按标题搜索笔记..."
+          prefix-icon="Search"
+          clearable
+          class="search-input"
+          @input="handleSearch"
+        />
+        <el-button type="primary" @click="createNewNote">
+          <IconPlus :size="18" />
+          新建笔记
         </el-button>
-        <h2><IconDocument :size="32" color="var(--color-blue)" /> 历史笔记</h2>
-        <p>查看所有笔记，共 {{ totalNotes }} 个</p>
       </div>
+    </el-card>
 
-      <!-- 搜索和筛选区 -->
-      <el-card class="search-card" shadow="hover">
-        <div class="search-bar">
-          <el-input
-            v-model="searchQuery"
-            placeholder="按标题搜索笔记..."
-            prefix-icon="Search"
-            clearable
-            class="search-input"
-            @input="handleSearch"
-          />
-          <el-button type="primary" @click="createNewNote">
-            <IconPlus :size="18" />
-            新建笔记
-          </el-button>
-        </div>
-      </el-card>
-
-      <!-- 笔记列表 -->
-      <el-card class="notes-list-card" shadow="hover" v-loading="loading">
-        <div v-if="filteredNotes.length > 0" class="notes-grid">
-          <div
-            v-for="note in filteredNotes"
-            :key="note.id"
-            class="note-card-item"
-            @click="viewNote(note)"
-          >
-            <div class="note-card-header" @click="viewNote(note)">
-              <IconDocument :size="24" color="var(--color-blue)" />
-              <h3 class="note-card-title">{{ note.title }}</h3>
-            </div>
-            <div class="note-card-content">
-              {{ truncateContent(note.content) }}
-            </div>
-            <div class="note-card-footer">
-              <span class="note-date">{{ formatDate(note.created_at) }}</span>
-              <el-button
-                type="danger" 
-                link 
-                @click.stop="deleteNote(note)"
-              >
-                删除
-              </el-button>
-            </div>
+    <!-- 笔记列表 -->
+    <el-card v-loading="loading" class="notes-list-card" shadow="hover">
+      <div v-if="filteredNotes.length > 0" class="notes-grid">
+        <div
+          v-for="note in filteredNotes"
+          :key="note.id"
+          class="note-card-item"
+          @click="viewNote(note)"
+        >
+          <div class="note-card-header" @click="viewNote(note)">
+            <IconDocument :size="24" color="var(--color-blue)" />
+            <h3 class="note-card-title">{{ note.title }}</h3>
+          </div>
+          <div class="note-card-content">
+            {{ truncateContent(note.content) }}
+          </div>
+          <div class="note-card-footer">
+            <span class="note-date">{{ formatDate(note.created_at) }}</span>
+            <el-button
+              type="danger" 
+              link 
+              @click.stop="deleteNote(note)"
+            >
+              删除
+            </el-button>
           </div>
         </div>
+      </div>
         
-        <!-- 空状态 -->
-        <div v-else class="empty-state">
-          <IconDocument :size="80" color="var(--el-text-color-disabled)" />
-          <h3>暂无笔记</h3>
-          <p>点击右上角"新建笔记"开始创建</p>
-        </div>
+      <!-- 空状态 -->
+      <div v-else class="empty-state">
+        <IconDocument :size="80" color="var(--el-text-color-disabled)" />
+        <h3>暂无笔记</h3>
+        <p>点击右上角"新建笔记"开始创建</p>
+      </div>
 
-        <!-- 分页 -->
-        <div v-if="totalPages > 1" class="pagination-wrapper">
-          <el-pagination
-            background
-            layout="prev, pager, next"
-            :total="total"
-            :page-size="pageSize"
-            :current-page="page"
-            @current-change="handlePageChange"
-          />
-        </div>
-      </el-card>
-    </div>
+      <!-- 分页 -->
+      <div v-if="totalPages > 1" class="pagination-wrapper">
+        <el-pagination
+          background
+          layout="prev, pager, next"
+          :total="total"
+          :page-size="pageSize"
+          :current-page="page"
+          @current-change="handlePageChange"
+        />
+      </div>
+    </el-card>
+  </div>
 </template>
 
 <script setup>
@@ -176,10 +176,6 @@ function viewNote(note) {
   })
 }
 
-function editNote(note) {
-  router.push(`/notes/edit/${note.id}`)
-}
-
 // 删除笔记（从数据库中彻底删除）
 async function deleteNote(note) {
   const { ElMessageBox } = await import('element-plus')
@@ -196,7 +192,7 @@ async function deleteNote(note) {
     ElMessage.success({ message: '笔记已删除', duration: MESSAGE_DURATION.SHORT })
     
     // 重新加载列表
-    await loadAllNotes()
+    await loadNotes()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除笔记失败:', error)

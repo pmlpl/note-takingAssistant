@@ -1,34 +1,37 @@
 import random
-import string
 import secrets
+import string
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse, JSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, EmailStr
 
-from app.core.database import get_async_db
-from app.core.security import create_access_token, get_current_user
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.config import settings
-from app.core.rate_limit import rate_limit_anon
+from app.core.database import get_async_db
 from app.core.logger import app_logger as logger
+from app.core.rate_limit import rate_limit_anon
+from app.core.security import create_access_token, get_current_user
 from app.crud import user as crud_user
-from app.services.oauth_service import (
-    github_enabled,
-    get_github_authorize_url,
-    github_get_access_token,
-    github_get_user_info,
-    github_get_user_emails,
-)
 from app.services.email_service import send_verification_code_email
+from app.services.oauth_service import (
+    get_github_authorize_url,
+    github_enabled,
+    github_get_access_token,
+    github_get_user_emails,
+    github_get_user_info,
+)
 
 router = APIRouter()
 
 
 def get_current_user_optional(request: Request):
     """可选的当前用户：有 token 就解析，没有就返回 None"""
-    from jose import jwt, JWTError
+    from jose import JWTError, jwt
+
     from app.core.config import settings
+
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return None
@@ -44,6 +47,7 @@ def get_current_user_optional(request: Request):
 
 
 # ==================== GitHub OAuth ====================
+
 
 class GithubAuthorizeResponse(BaseModel):
     authorize_url: str
@@ -66,6 +70,7 @@ async def github_authorize(
     # 如果已登录，生成绑定模式的 state（bind_前缀），并在 Redis 中记录用户信息
     if current_user:
         from app.core.redis_client import redis_client
+
         try:
             if redis_client.client:
                 redis_client.client.setex(f"github_bind:{state}", 600, current_user["email"])
@@ -126,6 +131,7 @@ async def github_callback(
     # ===== 绑定模式 =====
     if is_bind_mode:
         from app.core.redis_client import redis_client
+
         # 从 Redis 取出绑定用户
         bind_email = None
         try:
@@ -269,6 +275,7 @@ def _bind_redirect(success: str = None, error: str = None):
 
 
 # ==================== 邮箱验证码 ====================
+
 
 class SendCodeRequest(BaseModel):
     email: str
@@ -420,6 +427,7 @@ async def verify_email_code(
 
 # ==================== 账号绑定相关 ====================
 
+
 class BindCodeRequest(BaseModel):
     email: str
     action: str  # "bind" 或 "change"
@@ -510,7 +518,9 @@ async def send_bind_code(
     else:
         if not settings.DEBUG:
             raise HTTPException(status_code=503, detail="邮件服务暂不可用")
-        logger.info(f"[DEV MODE] 邮箱绑定验证码: email={email}, action={action}, code={code} (有效期 {BIND_CODE_TTL} 秒)")
+        logger.info(
+            f"[DEV MODE] 邮箱绑定验证码: email={email}, action={action}, code={code} (有效期 {BIND_CODE_TTL} 秒)"
+        )
 
     _save_bind_code(key, code)
 

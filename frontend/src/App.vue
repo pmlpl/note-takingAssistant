@@ -1,6 +1,6 @@
 <template>
   <div id="app-container">
-  <!-- 已登录业务页：导航栏常驻，只切换主内容区 -->
+    <!-- 已登录业务页：导航栏常驻，只切换主内容区 -->
     <Layout v-if="useMainLayout">
       <router-view v-slot="{ Component, route: childRoute }">
         <transition name="page-content-fade">
@@ -25,7 +25,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Layout from '@/components/Layout.vue'
 

@@ -8,8 +8,6 @@ import {
   prepareMermaidSourceForRender,
   extractMindmapDiagramSource,
   stripHtml,
-  debounce,
-  throttle,
   generateId,
   normalizeOpenAiCompatibleBaseUrl,
 } from './common'

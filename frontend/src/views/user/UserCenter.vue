@@ -52,7 +52,7 @@
     />
 
     <div class="logout-section">
-      <el-button type="danger" @click="handleLogout" size="large" class="logout-btn">
+      <el-button type="danger" size="large" class="logout-btn" @click="handleLogout">
         <IconLogout :size="18" />
         退出登录
       </el-button>
@@ -109,16 +109,6 @@ const llmForm = reactive({
   baseUrl: '',
   model: ''
 })
-
-function buildAvatarUrl(avatarPath) {
-  if (!avatarPath) return ''
-  if (/^https?:\/\//i.test(avatarPath)) {
-    const base = avatarPath.split('?')[0]
-    return `${base}?t=${Date.now()}`
-  }
-  const path = avatarPath.startsWith('/') ? avatarPath : `/${avatarPath}`
-  return `${path}?t=${Date.now()}`
-}
 
 function persistUserToStorage() {
   if (userStore.user) {

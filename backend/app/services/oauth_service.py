@@ -1,5 +1,7 @@
+from urllib.parse import urlencode
+
 import httpx
-from urllib.parse import urlencode, quote
+
 from app.core.config import settings
 from app.core.logger import app_logger as logger
 

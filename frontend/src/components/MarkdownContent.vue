@@ -1,4 +1,5 @@
 <template>
+  <!-- eslint-disable-next-line vue/no-v-html -->
   <div ref="rootEl" class="markdown-content" v-bind="$attrs" v-html="safeHtml"></div>
 </template>
 

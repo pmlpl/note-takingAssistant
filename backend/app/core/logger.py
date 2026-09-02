@@ -1,4 +1,5 @@
 """结构化日志：统一替换 `print` 调用。"""
+
 from __future__ import annotations
 
 import logging

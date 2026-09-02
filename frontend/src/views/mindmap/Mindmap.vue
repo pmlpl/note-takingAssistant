@@ -1,81 +1,81 @@
 ﻿<template>
-    <div class="mindmap-page">
-      <div class="page-header">
-        <h2>
-          <IconMindmap :size="32" color="var(--color-blue)" />
-          思维导图（Mermaid）
-        </h2>
-        <p class="subtitle">
-          支持 Mermaid 语法，创建和分享思维导图。
-        </p>
-      </div>
-
-      <el-row :gutter="20" class="split-row">
-        <el-col :xs="24" :lg="10">
-          <el-card shadow="hover" class="panel-card">
-            <template #header>
-              <span>源代码</span>
-            </template>
-            <el-input
-              v-model="source"
-              type="textarea"
-              :autosize="{ minRows: 18, maxRows: 32 }"
-              placeholder="在此粘贴 Mermaid，例如：&#10;flowchart TD&#10;    A[开始] --> B[结束]"
-              class="source-input"
-              spellcheck="false"
-            />
-            <div class="toolbar">
-              <el-button type="primary" @click="renderPreview">渲染预览</el-button>
-              <el-button @click="clearAll">清空</el-button>
-              <el-button @click="pasteFromClipboard">从剪贴板粘贴</el-button>
-            </div>
-          </el-card>
-        </el-col>
-
-        <el-col :xs="24" :lg="14">
-          <el-card shadow="hover" class="panel-card preview-card">
-            <template #header>
-              <div class="preview-card-header">
-                <div class="preview-title-wrap">
-                  <span class="preview-title">预览</span>
-                  <span class="preview-hint">滚轮缩放，左键拖拽平移</span>
-                </div>
-                <div class="preview-actions">
-                  <el-button size="small" plain @click="resetPreviewView">
-                    复位视图
-                  </el-button>
-                  <el-button
-                    type="primary"
-                    plain
-                    size="small"
-                    :loading="savingPreviewPng"
-                    @click="savePreviewAsPng"
-                  >
-                    保存为 PNG
-                  </el-button>
-                </div>
-              </div>
-            </template>
-            <el-alert
-              v-if="parseError"
-              type="error"
-              :closable="false"
-              :title="parseError"
-              class="error-alert"
-            />
-            <div
-              ref="previewViewport"
-              class="preview-viewport"
-              :class="{ 'preview-viewport--panning': isPanning }"
-              @wheel.prevent="onPreviewWheel"
-              @mousedown="onPanStart"
-            >
-              <div ref="previewLayer" class="preview-layer" />
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
+  <div class="mindmap-page">
+    <div class="page-header">
+      <h2>
+        <IconMindmap :size="32" color="var(--color-blue)" />
+        思维导图（Mermaid）
+      </h2>
+      <p class="subtitle">
+        支持 Mermaid 语法，创建和分享思维导图。
+      </p>
     </div>
+
+    <el-row :gutter="20" class="split-row">
+      <el-col :xs="24" :lg="10">
+        <el-card shadow="hover" class="panel-card">
+          <template #header>
+            <span>源代码</span>
+          </template>
+          <el-input
+            v-model="source"
+            type="textarea"
+            :autosize="{ minRows: 18, maxRows: 32 }"
+            placeholder="在此粘贴 Mermaid，例如：&#10;flowchart TD&#10;    A[开始] --> B[结束]"
+            class="source-input"
+            spellcheck="false"
+          />
+          <div class="toolbar">
+            <el-button type="primary" @click="renderPreview">渲染预览</el-button>
+            <el-button @click="clearAll">清空</el-button>
+            <el-button @click="pasteFromClipboard">从剪贴板粘贴</el-button>
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" :lg="14">
+        <el-card shadow="hover" class="panel-card preview-card">
+          <template #header>
+            <div class="preview-card-header">
+              <div class="preview-title-wrap">
+                <span class="preview-title">预览</span>
+                <span class="preview-hint">滚轮缩放，左键拖拽平移</span>
+              </div>
+              <div class="preview-actions">
+                <el-button size="small" plain @click="resetPreviewView">
+                  复位视图
+                </el-button>
+                <el-button
+                  type="primary"
+                  plain
+                  size="small"
+                  :loading="savingPreviewPng"
+                  @click="savePreviewAsPng"
+                >
+                  保存为 PNG
+                </el-button>
+              </div>
+            </div>
+          </template>
+          <el-alert
+            v-if="parseError"
+            type="error"
+            :closable="false"
+            :title="parseError"
+            class="error-alert"
+          />
+          <div
+            ref="previewViewport"
+            class="preview-viewport"
+            :class="{ 'preview-viewport--panning': isPanning }"
+            @wheel.prevent="onPreviewWheel"
+            @mousedown="onPanStart"
+          >
+            <div ref="previewLayer" class="preview-layer" />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+  </div>
 </template>
 
 <script setup>

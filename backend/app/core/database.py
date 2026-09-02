@@ -1,5 +1,6 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
+
 from app.core.config import settings
 
 # 数据库URL
@@ -9,16 +10,12 @@ ASYNC_DATABASE_URL = settings.DATABASE_URL
 engine = create_async_engine(
     ASYNC_DATABASE_URL,
     pool_pre_ping=True,  # 连接前检查连接是否有效
-    pool_recycle=3600    # 连接回收时间（秒）
+    pool_recycle=3600,  # 连接回收时间（秒）
 )
 
 # 异步会话工厂
 AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False
+    engine, class_=AsyncSession, expire_on_commit=False, autocommit=False, autoflush=False
 )
 
 Base = declarative_base()

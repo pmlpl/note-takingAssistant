@@ -2,10 +2,11 @@
 笔记翻译：先将正文统一转为 Markdown（HTML 富文本先转换，避免截断 HTML 导致结构错乱），
 再对 Markdown 做流式翻译；输出为 Markdown，由前端渲染。
 """
+
 from __future__ import annotations
 
 import re
-from typing import Any, AsyncIterator, Dict
+from collections.abc import AsyncIterator
 
 import html2text
 from bs4 import BeautifulSoup
@@ -17,7 +18,7 @@ from app.utils.llm_errors import format_llm_error
 
 MAX_INPUT_CHARS = 8000
 
-TARGET_LANGUAGE_LABELS: Dict[str, str] = {
+TARGET_LANGUAGE_LABELS: dict[str, str] = {
     "zh": "Simplified Chinese (简体中文)",
     "en": "English",
     "ja": "Japanese (日本語)",
@@ -102,9 +103,7 @@ async def translate_note_stream(
     """
     text, _from_html, _truncated = prepare_markdown_for_translation(content)
 
-    lang_label = TARGET_LANGUAGE_LABELS.get(
-        (target_lang or "").strip().lower(), target_lang
-    )
+    lang_label = TARGET_LANGUAGE_LABELS.get((target_lang or "").strip().lower(), target_lang)
 
     client, model = openai_client_and_model_for_user(db_user)
 

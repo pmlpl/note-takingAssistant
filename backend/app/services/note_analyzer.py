@@ -2,17 +2,19 @@
 笔记分析服务
 负责 AI 分析笔记内容（异步 OpenAI 客户端）
 """
-import json
-from typing import Any, Dict
 
+import json
+from typing import Any
+
+from app.core.logger import app_logger as logger
 from app.models.user import UserDB
 from app.services.llm_runtime import openai_client_and_model_for_user
 from app.utils.llm_errors import format_llm_error
+
 from .prompts import NOTE_ANALYSIS_SYSTEM_PROMPT
-from app.core.logger import app_logger as logger
 
 
-async def analyze_note(content: str, *, db_user: UserDB) -> Dict[str, Any]:
+async def analyze_note(content: str, *, db_user: UserDB) -> dict[str, Any]:
     """
     对笔记内容进行 AI 分析，返回总结、优缺点和建议。
     """

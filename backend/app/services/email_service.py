@@ -1,7 +1,8 @@
 import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from email.utils import formataddr
+
 from app.core.config import settings
 from app.core.logger import app_logger as logger
 
