@@ -20,9 +20,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-      - name: ESLint (informational)
-        run: npm run lint -- --max-warnings=-1 || true
-        continue-on-error: true
+      - name: ESLint (gate)
+        run: npm run lint
       - run: npm run test
       - run: npm run build
       - name: npm audit (informational)
@@ -64,12 +63,10 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt -r requirements-dev.txt
-      - name: Ruff lint (informational)
-        run: ruff check . --statistics
-        continue-on-error: true
-      - name: Ruff format check (informational)
+      - name: Ruff lint (gate)
+        run: ruff check .
+      - name: Ruff format check (gate)
         run: ruff format --check .
-        continue-on-error: true
       - run: python -m pytest -q --cov=app --cov-report=term-missing --cov-fail-under=40 --tb=short -x
       - name: pip-audit (informational)
         run: |
