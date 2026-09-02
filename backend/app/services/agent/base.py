@@ -17,12 +17,13 @@
 - done: 完成（携带 agent_name 标识是哪个 Agent 完成的）
 - error: 错误
 """
+
 from __future__ import annotations
 
 import json
 import logging
-from abc import ABC
-from typing import Any, AsyncIterator, Dict, List, Optional
+from collections.abc import AsyncIterator
+from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,7 +41,7 @@ MAX_TOOL_RESULT_CHARS = 4000
 FINAL_ANSWER_CHUNK_SIZE = 80
 
 
-def sse_event(event_type: str, data: Optional[Dict[str, Any]] = None) -> str:
+def sse_event(event_type: str, data: Optional[dict[str, Any]] = None) -> str:
     """构造一条 SSE 事件：`data: {json}\\n\\n`"""
     payload = {"type": event_type}
     if data is not None:
@@ -48,7 +49,7 @@ def sse_event(event_type: str, data: Optional[Dict[str, Any]] = None) -> str:
     return "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
 
 
-class BaseAgent(ABC):
+class BaseAgent:
     """专业 Agent 基类"""
 
     # --- 子类必须实现的属性 ---
@@ -58,14 +59,14 @@ class BaseAgent(ABC):
     system_prompt: str = ""
 
     # --- 子类可选覆盖 ---
-    tools_definition: List[Dict[str, Any]] = []  # OpenAI Function Calling 格式
-    tool_handlers: Dict[str, callable] = {}  # tool_name -> async handler(db, user_id, args)
+    tools_definition: list[dict[str, Any]] = []  # OpenAI Function Calling 格式
+    tool_handlers: dict[str, callable] = {}  # tool_name -> async handler(db, user_id, args)
 
     # ============== 对外主入口 ==============
     async def run(
         self,
         message: str,
-        history: Optional[List[Any]] = None,
+        history: Optional[list[Any]] = None,
         *,
         db: AsyncSession,
         db_user: UserDB,
@@ -83,7 +84,7 @@ class BaseAgent(ABC):
 
         for round_idx in range(MAX_TOOL_ROUNDS):
             try:
-                kwargs: Dict[str, Any] = {
+                kwargs: dict[str, Any] = {
                     "model": model,
                     "messages": messages,
                     "temperature": 0.5,
@@ -95,9 +96,7 @@ class BaseAgent(ABC):
                 response = await client.chat.completions.create(**kwargs)
             except Exception as e:
                 if use_tools and self._looks_like_tools_unsupported(e):
-                    logger.warning(
-                        f"模型 {model} 不支持 tools 参数，[{self.name}] 降级"
-                    )
+                    logger.warning(f"模型 {model} 不支持 tools 参数，[{self.name}] 降级")
                     use_tools = False
                     async for evt in self._fallback_plain_stream(client, model, messages):
                         yield evt
@@ -155,9 +154,7 @@ class BaseAgent(ABC):
                     {"id": tc.id, "name": tool_name, "args": args, "agent": self.name},
                 )
 
-                result = await self._execute_tool(
-                    tool_name, args, db=db, db_user=db_user
-                )
+                result = await self._execute_tool(tool_name, args, db=db, db_user=db_user)
                 result_text = self._truncate_tool_result(result)
 
                 try:
@@ -197,12 +194,11 @@ class BaseAgent(ABC):
                 model=model,
                 messages=messages,
                 temperature=0.5,
-                max_tokens= 2048,
+                max_tokens=2048,
             )
             final_text = (
-                (final_response.choices[0].message.content or "").strip()
-                or "抱歉，工具调用次数已达上限，未能给出最终回答。"
-            )
+                final_response.choices[0].message.content or ""
+            ).strip() or "抱歉，工具调用次数已达上限，未能给出最终回答。"
             async for evt in self._emit_final_answer(final_text):
                 yield evt
         except Exception as e:
@@ -213,12 +209,12 @@ class BaseAgent(ABC):
     async def _execute_tool(
         self,
         tool_name: str,
-        args: Dict[str, Any],
+        args: dict[str, Any],
         *,
         db: AsyncSession,
         db_user: UserDB,
-    ) -> Dict[str, Any]:
-        """执行工具调用（复用 agent_service 中的实现作为兜底）"""
+    ) -> dict[str, Any]:
+        """执行工具调用，返回字典结果"""
         handler = self.tool_handlers.get(tool_name)
         if handler:
             try:
@@ -226,18 +222,13 @@ class BaseAgent(ABC):
             except Exception as e:
                 logger.exception(f"[{self.name}] 工具 {tool_name} 执行失败")
                 return {"error": f"工具执行失败：{str(e)}"}
-        # 兜底：调 agent_service 中的 _execute_tool
-        from app.services.agent_service import _execute_tool as _legacy_execute_tool
-
-        return await _legacy_execute_tool(tool_name, args, db=db, db_user=db_user)
+        return {"error": f"未知工具：{tool_name}"}
 
     # ============== 辅助方法 ==============
-    def _build_messages(
-        self, message: str, history: Optional[List[Any]] = None
-    ) -> List[Dict[str, Any]]:
+    def _build_messages(self, message: str, history: Optional[list[Any]] = None) -> list[dict[str, Any]]:
         """构造发给模型的 messages，每个 Agent 用自己的 system_prompt"""
-        conversation: List[Dict[str, Any]] = []
-        system_extras: List[str] = []
+        conversation: list[dict[str, Any]] = []
+        system_extras: list[str] = []
 
         for msg in (history or [])[-10:]:
             if isinstance(msg, dict):
@@ -258,7 +249,7 @@ class BaseAgent(ABC):
         if system_extras:
             system_content += "\n\n# 附加上下文\n" + "\n\n".join(system_extras)
 
-        messages: List[Dict[str, Any]] = [{"role": "system", "content": system_content}]
+        messages: list[dict[str, Any]] = [{"role": "system", "content": system_content}]
         messages.extend(conversation)
         messages.append({"role": "user", "content": message})
         return messages
@@ -266,8 +257,14 @@ class BaseAgent(ABC):
     def _looks_like_tools_unsupported(self, exc: Exception) -> bool:
         s = str(exc).lower()
         keywords = (
-            "tool", "function", "not support", "unsupported",
-            "unrecognized", "unknown argument", "unknown parameter", "400",
+            "tool",
+            "function",
+            "not support",
+            "unsupported",
+            "unrecognized",
+            "unknown argument",
+            "unknown parameter",
+            "400",
         )
         return any(k in s for k in keywords) and "401" not in s and "auth" not in s
 
@@ -291,9 +288,7 @@ class BaseAgent(ABC):
             yield sse_event("delta", {"text": chunk, "agent": self.name})
         yield sse_event("done", {"finish_reason": "stop", "agent": self.name})
 
-    async def _fallback_plain_stream(
-        self, client, model: str, messages: List[Dict[str, Any]]
-    ) -> AsyncIterator[str]:
+    async def _fallback_plain_stream(self, client, model: str, messages: list[dict[str, Any]]) -> AsyncIterator[str]:
         try:
             stream = await client.chat.completions.create(
                 model=model,

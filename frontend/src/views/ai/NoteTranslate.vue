@@ -6,7 +6,7 @@
           <span>返回</span>
         </el-button>
         <h2 class="page-heading">
-          <IconTranslate :size="36" color="#409eff" />
+          <IconTranslate :size="36" color="var(--color-blue)" />
           翻译笔记
         </h2>
         <p class="page-subtitle">
@@ -57,13 +57,13 @@
 
                 <div class="doc-preview">
                   <div v-if="!effectiveSource" class="doc-preview-empty">
-                    <IconTranslate :size="40" color="#dcdfe6" />
+                    <IconTranslate :size="40" color="var(--el-text-color-disabled)" />
                     <p>上传、选择笔记或在下方编辑原文</p>
                   </div>
-                  <div
+                  <MarkdownContent
                     v-else
+                    :content="form.sourceText"
                     class="preview-body source-preview-body"
-                    v-html="sourcePreviewHtml"
                   />
                 </div>
 
@@ -90,7 +90,7 @@
               <div class="hub-line hub-line--left" aria-hidden="true" />
               <div class="hub-card">
                 <div class="hub-icon-wrap">
-                  <IconTranslate :size="28" color="#409eff" />
+                  <IconTranslate :size="28" color="var(--color-blue)" />
                 </div>
                 <p class="hub-title">翻译为</p>
                 <el-select v-model="form.targetLang" class="hub-select" size="large">
@@ -137,16 +137,16 @@
               </div>
               <div class="panel-body panel-body--result">
                 <div v-if="!translatedRaw" class="doc-preview doc-preview--empty">
-                  <IconTranslate :size="40" color="#dcdfe6" />
+                  <IconTranslate :size="40" color="var(--el-text-color-disabled)" />
                   <p>翻译结果将显示在这里</p>
                 </div>
                 <div
                   v-else
                   class="doc-preview doc-preview--translation"
                 >
-                  <div
+                  <MarkdownContent
+                    :content="translatedRaw"
                     class="preview-body source-preview-body preview-body--watermarked"
-                    v-html="translatedPreviewHtml"
                   />
                 </div>
               </div>
@@ -166,11 +166,7 @@ import { DArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { noteApi } from '@/api/note'
 import { aiApi } from '@/api/ai'
-import {
-  isLikelyHtmlContent,
-  sanitizeHtml,
-  renderMarkdownToSafeHtml
-} from '@/utils/htmlSanitize'
+import MarkdownContent from '@/components/MarkdownContent.vue'
 
 defineOptions({ name: 'NoteTranslate' })
 
@@ -285,18 +281,6 @@ const truncationHint = computed(() => {
 })
 
 const canTranslate = computed(() => effectiveSource.value.length > 0)
-
-const sourcePreviewHtml = computed(() => {
-  const t = form.value.sourceText || ''
-  if (!t.trim()) return ''
-  if (isLikelyHtmlContent(t)) return sanitizeHtml(t)
-  return renderMarkdownToSafeHtml(t)
-})
-
-const translatedPreviewHtml = computed(() => {
-  if (!translatedRaw.value) return ''
-  return renderMarkdownToSafeHtml(translatedRaw.value)
-})
 
 onMounted(() => {
   void ensureTranslateSessionForCurrentUser()
@@ -565,11 +549,11 @@ async function copyTranslation() {
   left: 0;
   top: 0;
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .back-btn:hover {
-  color: #409eff;
+  color: var(--el-link-color);
 }
 
 .page-heading {
@@ -577,7 +561,7 @@ async function copyTranslation() {
   padding-left: 60px;
   font-size: 28px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -587,7 +571,7 @@ async function copyTranslation() {
   margin: 0;
   padding-left: 60px;
   font-size: 15px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   text-align: center;
   max-width: 640px;
   line-height: 1.6;
@@ -595,10 +579,10 @@ async function copyTranslation() {
 
 /* ---------- 工作区 ---------- */
 .translate-workspace {
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   border-radius: 16px;
   padding: 20px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--el-border-color-lighter);
 }
 
 .translate-row {
@@ -611,9 +595,9 @@ async function copyTranslation() {
   flex-direction: column;
   height: 100%;
   min-height: 520px;
-  background: #fff;
+  background: var(--el-fill-color-blank);
   border-radius: 12px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color-light);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   overflow: hidden;
 }
@@ -624,8 +608,8 @@ async function copyTranslation() {
   justify-content: space-between;
   gap: 12px;
   padding: 16px 20px;
-  border-bottom: 1px solid #ebeef5;
-  background: #fafbfc;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: var(--el-fill-color-lighter);
   flex-shrink: 0;
 }
 
@@ -645,22 +629,22 @@ async function copyTranslation() {
 .panel-label {
   font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
   padding-left: 10px;
-  border-left: 3px solid #dcdfe6;
+  border-left: 3px solid var(--el-border-color);
 }
 
 .panel-label--source {
-  border-left-color: #909399;
+  border-left-color: var(--el-text-color-secondary);
 }
 
 .panel-label--target {
-  border-left-color: #409eff;
+  border-left-color: var(--color-blue);
 }
 
 .panel-hint {
-  font-size: 12px;
-  color: #909399;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .panel-body {
@@ -685,13 +669,13 @@ async function copyTranslation() {
   justify-content: center;
   gap: 12px;
   min-height: min(62vh, 640px);
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 14px;
 }
 
 .doc-preview--empty p {
   margin: 0;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   text-align: center;
 }
 
@@ -714,8 +698,8 @@ async function copyTranslation() {
 
 .toolbar-tip {
   margin: 8px 0 12px;
-  font-size: 12px;
-  color: #a8abb2;
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
   line-height: 1.5;
 }
 
@@ -724,9 +708,9 @@ async function copyTranslation() {
   flex: 1;
   min-height: 280px;
   max-height: min(62vh, 640px);
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color-light);
   border-radius: 10px;
-  background: #fff;
+  background: var(--el-fill-color-blank);
   overflow: auto;
 }
 
@@ -738,7 +722,7 @@ async function copyTranslation() {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 14px;
   padding: 24px;
 }
@@ -750,7 +734,7 @@ async function copyTranslation() {
 .source-preview-body {
   padding: 16px 20px 24px;
   line-height: 1.8;
-  color: #303133;
+  color: var(--el-text-color-primary);
   font-size: 15px;
 }
 
@@ -761,13 +745,13 @@ async function copyTranslation() {
 
 .source-edit-collapse :deep(.el-collapse-item__header) {
   font-size: 13px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .hint {
   margin: 8px 0 0;
-  font-size: 12px;
-  color: #e6a23c;
+  font-size: 13px;
+  color: var(--color-warning-deep);
 }
 
 /* ---------- 中间枢纽 ---------- */
@@ -797,9 +781,9 @@ async function copyTranslation() {
   width: 100%;
   max-width: 200px;
   padding: 24px 18px;
-  background: #fff;
+  background: var(--el-fill-color-blank);
   border-radius: 12px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color-light);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
@@ -812,7 +796,8 @@ async function copyTranslation() {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: #ecf5ff;
+  /* 品牌蓝浅底（与 style.css 输入聚焦 rgba(45,93,161,0.2) 同源） */
+  background: rgba(45, 93, 161, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -820,8 +805,8 @@ async function copyTranslation() {
 
 .hub-title {
   margin: 0;
-  font-size: 13px;
-  color: #909399;
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
   letter-spacing: 0.05em;
 }
 
@@ -836,10 +821,19 @@ async function copyTranslation() {
   font-weight: 500;
 }
 
+/* P1 修复：主按钮 hover 保持 pencil 黑，与全站主行动色一致
+   （全局 .el-button--primary:hover 变红 #ff4d4d + 白字仅 3.27:1，不达 AA） */
+.hub-btn:not(.is-disabled):hover,
+.hub-btn:not(.is-disabled):focus {
+  background: var(--color-pencil) !important;
+  border-color: var(--color-pencil) !important;
+  color: #fff !important;
+}
+
 .hub-tip {
   margin: 0;
-  font-size: 12px;
-  color: #c0c4cc;
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
   line-height: 1.4;
 }
 
@@ -856,18 +850,18 @@ async function copyTranslation() {
     height: 2px;
     width: calc(50% - 108px);
     margin-top: -1px;
-    background: linear-gradient(90deg, #dcdfe6, #c6e2ff);
+    background: linear-gradient(90deg, var(--el-border-color), rgba(45, 93, 161, 0.35));
     pointer-events: none;
   }
 
   .hub-line--left {
     left: 0;
-    background: linear-gradient(90deg, transparent, #c6e2ff);
+    background: linear-gradient(90deg, transparent, rgba(45, 93, 161, 0.35));
   }
 
   .hub-line--right {
     right: 0;
-    background: linear-gradient(270deg, transparent, #c6e2ff);
+    background: linear-gradient(270deg, transparent, rgba(45, 93, 161, 0.35));
   }
 }
 
@@ -903,9 +897,9 @@ async function copyTranslation() {
 
 /* ---------- 富文本 / 译文水印（平铺整篇，随内容增高） ---------- */
 .doc-preview--translation {
-  border-color: #d9ecff;
-  box-shadow: inset 0 0 0 1px rgba(64, 158, 255, 0.06);
-  background: #fff;
+  border-color: rgba(45, 93, 161, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(45, 93, 161, 0.06);
+  background: var(--el-fill-color-blank);
 }
 
 /* 对角平铺「笔记助手」SVG：repeat 覆盖整块预览（含滚动全长），避免 absolute 水印仅盖住可视窗口 */
@@ -913,8 +907,8 @@ async function copyTranslation() {
   position: relative;
   z-index: 0;
   min-height: 200px;
-  background-color: #fcfdff;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='200' viewBox='0 0 260 200'%3E%3Ctext x='130' y='102' fill='%23409eff' fill-opacity='0.085' font-size='17' font-weight='700' font-family='Microsoft YaHei,system-ui,sans-serif' text-anchor='middle' dominant-baseline='middle' transform='rotate(-22 130 100)'%3E%E7%AC%94%E8%AE%B0%E5%8A%A9%E6%89%8B%3C/text%3E%3C/svg%3E");
+  background-color: var(--el-fill-color-extra-light);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='200' viewBox='0 0 260 200'%3E%3Ctext x='130' y='102' fill='%232d5da1' fill-opacity='0.085' font-size='17' font-weight='700' font-family='Microsoft YaHei,system-ui,sans-serif' text-anchor='middle' dominant-baseline='middle' transform='rotate(-22 130 100)'%3E%E7%AC%94%E8%AE%B0%E5%8A%A9%E6%89%8B%3C/text%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 260px 200px;
   background-position: 0 0;
@@ -936,7 +930,7 @@ async function copyTranslation() {
 .source-preview-body :deep(th),
 .preview-body--watermarked :deep(td),
 .preview-body--watermarked :deep(th) {
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color-light);
   padding: 6px 10px;
 }
 
@@ -944,7 +938,7 @@ async function copyTranslation() {
   position: relative;
   z-index: 0;
   line-height: 1.8;
-  color: #303133;
+  color: var(--el-text-color-primary);
   font-size: 15px;
 }
 
@@ -968,7 +962,7 @@ async function copyTranslation() {
 .preview-body :deep(h3) {
   margin-top: 24px;
   margin-bottom: 12px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .preview-body :deep(p) {
@@ -977,10 +971,10 @@ async function copyTranslation() {
 
 .preview-body :deep(pre) {
   overflow-x: auto;
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   border-radius: 8px;
   padding: 12px 14px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--el-border-color-lighter);
 }
 
 .doc-preview::-webkit-scrollbar {
@@ -989,11 +983,11 @@ async function copyTranslation() {
 }
 
 .doc-preview::-webkit-scrollbar-thumb {
-  background: rgba(144, 147, 153, 0.35);
+  background: rgba(102, 102, 102, 0.35);
   border-radius: 4px;
 }
 
 .doc-preview:hover::-webkit-scrollbar-thumb {
-  background: rgba(144, 147, 153, 0.6);
+  background: rgba(102, 102, 102, 0.6);
 }
 </style>

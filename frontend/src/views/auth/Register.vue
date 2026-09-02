@@ -182,7 +182,7 @@ function navigate(path) {
 }
 
 .register-subtitle {
-  color: #888;
+  color: var(--el-text-color-regular);
   font-family: var(--font-body);
   font-size: 15px;
   margin: 0;
@@ -199,7 +199,7 @@ function navigate(path) {
   text-align: center;
   margin-top: 20px;
   font-family: var(--font-body);
-  color: #888;
+  color: var(--el-text-color-regular);
 }
 
 /* ── Decorative blobs ── */

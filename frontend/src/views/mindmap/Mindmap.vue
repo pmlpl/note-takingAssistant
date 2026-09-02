@@ -2,7 +2,7 @@
     <div class="mindmap-page">
       <div class="page-header">
         <h2>
-          <IconMindmap :size="32" color="#4facfe" />
+          <IconMindmap :size="32" color="var(--color-blue)" />
           思维导图（Mermaid）
         </h2>
         <p class="subtitle">
@@ -691,7 +691,7 @@ onUnmounted(() => {
 
 .subtitle {
   margin: 0 auto;
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1.6;
   text-align: center;
@@ -735,12 +735,12 @@ onUnmounted(() => {
 
 .preview-title {
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .preview-hint {
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   line-height: 1.4;
 }
 
@@ -750,6 +750,11 @@ onUnmounted(() => {
   gap: 8px;
   align-items: center;
   flex-shrink: 0;
+}
+
+/* P3 评审 #11：small 按钮默认 24px 高，抬高点击目标至 ≥32px（复位视图/保存为 PNG 同排保持一致） */
+.preview-actions :deep(.el-button) {
+  min-height: 32px;
 }
 
 .preview-card :deep(.el-card__body) {
@@ -769,7 +774,7 @@ onUnmounted(() => {
   overflow: hidden;
   position: relative;
   padding: 8px;
-  background: #fafafa;
+  background: var(--el-fill-color-lighter);
   border-radius: 8px;
   cursor: grab;
 }
@@ -798,7 +803,7 @@ onUnmounted(() => {
 
 .preview-placeholder {
   margin: 0;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 14px;
 }
 </style>

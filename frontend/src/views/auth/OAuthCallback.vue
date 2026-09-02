@@ -66,7 +66,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
 }
 
 .callback-box {
@@ -85,16 +85,16 @@ onMounted(() => {
 }
 
 .loading-icon {
-  color: #409eff;
+  color: var(--color-blue);
   animation: rotate 1s linear infinite;
 }
 
 .success-icon {
-  color: #67c23a;
+  color: var(--color-green);
 }
 
 .error-icon {
-  color: #f56c6c;
+  color: var(--color-accent);
 }
 
 @keyframes rotate {
@@ -104,7 +104,7 @@ onMounted(() => {
 
 p {
   margin: 0 0 16px 0;
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-size: 16px;
 }
 </style>

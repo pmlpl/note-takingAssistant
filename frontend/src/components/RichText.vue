@@ -110,14 +110,14 @@ defineExpose({
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color-light);
   border-radius: 4px;
   overflow: hidden;
   box-sizing: border-box;
 }
 
 .rich-text-toolbar {
-  border-bottom: 1px solid #e4e7ed;
+  border-bottom: 1px solid var(--el-border-color-light);
   flex-wrap: wrap;
 }
 
@@ -126,6 +126,8 @@ defineExpose({
   max-width: 100%;
   min-width: 0;
   height: min(120vh, 800px);
+  /* P3 评审 #14：矮视口下 120vh 可能 <300px，触发 wangEditor hoverbar 定位警告，保证下限 */
+  min-height: 400px;
   overflow: hidden;
   overflow-y: auto;
 }

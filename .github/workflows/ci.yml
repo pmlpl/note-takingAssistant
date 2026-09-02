@@ -70,7 +70,7 @@ jobs:
       - name: Ruff format check (informational)
         run: ruff format --check .
         continue-on-error: true
-      - run: python -m pytest -q --cov=app --cov-report=term-missing --tb=short -x
+      - run: python -m pytest -q --cov=app --cov-report=term-missing --cov-fail-under=40 --tb=short -x
       - name: pip-audit (informational)
         run: |
           python -m pip install pip-audit

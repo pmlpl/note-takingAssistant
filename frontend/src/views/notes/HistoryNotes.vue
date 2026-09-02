@@ -6,7 +6,7 @@
           <el-icon size="16"><DArrowLeft /></el-icon>
           <span>返回</span>
         </el-button>
-        <h2><IconDocument :size="32" color="#409eff" /> 历史笔记</h2>
+        <h2><IconDocument :size="32" color="var(--color-blue)" /> 历史笔记</h2>
         <p>查看所有笔记，共 {{ totalNotes }} 个</p>
       </div>
 
@@ -38,7 +38,7 @@
             @click="viewNote(note)"
           >
             <div class="note-card-header" @click="viewNote(note)">
-              <IconDocument :size="24" color="#409eff" />
+              <IconDocument :size="24" color="var(--color-blue)" />
               <h3 class="note-card-title">{{ note.title }}</h3>
             </div>
             <div class="note-card-content">
@@ -59,7 +59,7 @@
         
         <!-- 空状态 -->
         <div v-else class="empty-state">
-          <IconDocument :size="80" color="#d9d9d9" />
+          <IconDocument :size="80" color="var(--el-text-color-disabled)" />
           <h3>暂无笔记</h3>
           <p>点击右上角"新建笔记"开始创建</p>
         </div>
@@ -254,16 +254,16 @@ function formatDate(dateString) {
   left: 0;
   top: 0;
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .back-btn:hover {
-  color: #409eff;
+  color: var(--el-link-color);
 }
 
 .page-header h2 {
   font-size: 28px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   margin: 0 0 10px 0;
   display: flex;
   align-items: center;
@@ -274,7 +274,7 @@ function formatDate(dateString) {
 
 .page-header p {
   font-size: 15px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin: 0;
   padding-left: 60px;
 }
@@ -306,18 +306,18 @@ function formatDate(dateString) {
 }
 
 .note-card-item {
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color-light);
   border-radius: 12px;
   padding: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: white;
+  background: var(--el-fill-color-blank);
 }
 
 .note-card-item:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
-  border-color: #409eff;
+  border-color: var(--color-blue);
 }
 
 .note-card-header {
@@ -329,7 +329,7 @@ function formatDate(dateString) {
 
 .note-card-title {
   font-size: 16px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   margin: 0;
   font-weight: 600;
   overflow: hidden;
@@ -340,7 +340,7 @@ function formatDate(dateString) {
 
 .note-card-content {
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   line-height: 1.6;
   margin-bottom: 15px;
   height: 60px;
@@ -352,12 +352,13 @@ function formatDate(dateString) {
   justify-content: space-between;
   align-items: center;
   padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
 
+/* P2 评审 #8：历史日期 #909399(2.97:1) 提至 secondary token（#666，AA） */
 .note-date {
-  font-size: 12px;
-  color: #909399;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 /* 分页 */
@@ -366,19 +367,19 @@ function formatDate(dateString) {
   justify-content: center;
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--el-border-color-lighter);
 }
 
 /* 空状态 */
 .empty-state {
   text-align: center;
   padding: 80px 20px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .empty-state h3 {
   font-size: 20px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   margin: 20px 0 10px 0;
 }
 

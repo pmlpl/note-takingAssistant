@@ -104,15 +104,17 @@ const passwordStrength = computed(() => {
   if (/\d/.test(p)) score += 15
   if (/[^a-zA-Z0-9]/.test(p)) score += 20
   score = Math.min(100, score)
+  // 强度条为图形指示器：硬编码 token 值并保持与 CSS 同步
+  // （--color-accent #c62828 / --color-warning-deep #b45309 / --color-green #2e7d32）
   let label = '弱'
-  let color = '#f56c6c'
+  let color = '#c62828'
   if (score >= 45) {
     label = '中'
-    color = '#e6a23c'
+    color = '#b45309'
   }
   if (score >= 75) {
     label = '强'
-    color = '#67c23a'
+    color = '#2e7d32'
   }
   return { score, label, color }
 })
@@ -194,7 +196,7 @@ async function handleChange() {
 .card-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .section-fold-panel {

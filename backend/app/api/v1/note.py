@@ -1,29 +1,30 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Header
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+import hashlib
 import os
 import re
 import tempfile
-import uuid
-import hashlib
-from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
 from app.core.database import get_async_db
-from app.models.note import NoteCreate, NoteUpdate, NoteResponse, NoteDB
+from app.core.logger import app_logger as logger
+from app.core.rate_limit import rate_limit_user
+from app.core.redis_client import (
+    batch_cache_recent_notes_async,
+    cache_recent_note_async,
+    clear_recent_notes_async,
+    get_recent_notes_async,
+    remove_recent_note_by_id_async,
+)
+from app.core.security import get_current_user
 from app.crud import note as crud_note
 from app.crud import user as crud_user
-from app.utils.file_parser import parse_file, extract_title_from_filename
-from app.core.redis_client import (
-    cache_recent_note_async,
-    batch_cache_recent_notes_async,
-    clear_recent_notes_async,
-    remove_recent_note_by_id_async,
-    get_recent_notes_async,
-)
-from app.core.logger import app_logger as logger
-from app.core.security import get_current_user
-from app.core.rate_limit import rate_limit_user
-from app.core.config import settings
+from app.models.note import NoteCreate, NoteDB, NoteResponse, NoteUpdate
+from app.services import note_rag
+from app.utils.file_parser import extract_title_from_filename, parse_file
 
 router = APIRouter()
 
@@ -45,7 +46,7 @@ async def upload_image(
     _: None = _notes_rate_limit,
 ):
     """上传笔记正文配图（做魔数 + 扩展名双重校验）。"""
-    from app.utils.file_upload import validate_image_bytes, safe_image_filename
+    from app.utils.file_upload import safe_image_filename, validate_image_bytes
 
     if file.size is not None and file.size > settings.IMAGE_MAX_BYTES:
         raise HTTPException(
@@ -53,11 +54,11 @@ async def upload_image(
             detail=f"图片超过上限 {settings.IMAGE_MAX_BYTES // 1024 // 1024}MB",
         )
 
-    CHUNK_SIZE = 1024 * 1024
+    chunk_size = 1024 * 1024
     file_bytes = bytearray()
     md5 = hashlib.md5()
     while True:
-        chunk = await file.read(CHUNK_SIZE)
+        chunk = await file.read(chunk_size)
         if not chunk:
             break
         file_bytes.extend(chunk)
@@ -76,9 +77,7 @@ async def upload_image(
                 detail=f"文件MD5校验失败，期望 {x_content_md5}，实际 {computed_md5}",
             )
 
-    ok, ext, err = validate_image_bytes(
-        bytes(file_bytes), file.filename or "", max_bytes=settings.IMAGE_MAX_BYTES
-    )
+    ok, ext, err = validate_image_bytes(bytes(file_bytes), file.filename or "", max_bytes=settings.IMAGE_MAX_BYTES)
     if not ok:
         raise HTTPException(status_code=400, detail=err)
 
@@ -103,7 +102,7 @@ async def _get_db_user(db: AsyncSession, current_user: dict):
 
 def _text_preview(content: str, max_len: int = 200) -> str:
     """提取纯文本预览（去掉HTML标签）"""
-    return re.sub(r'<[^>]+>', '', content)[:max_len] if content else ""
+    return re.sub(r"<[^>]+>", "", content)[:max_len] if content else ""
 
 
 def _note_to_recent_dict(note) -> dict:
@@ -119,9 +118,25 @@ def _note_to_recent_dict(note) -> dict:
     }
 
 
+async def _sync_note_index(db: AsyncSession, db_user, note) -> None:
+    """同步单篇笔记的 RAG 分块索引；索引失败只记日志，不影响笔记 CRUD"""
+    try:
+        await note_rag.index_note_chunks(db, db_user, note)
+    except Exception as e:
+        logger.info(f"⚠️ 笔记索引同步失败 note_id={note.id}: {e}")
+
+
+async def _delete_note_index(db: AsyncSession, user_id: int, note_id: int) -> None:
+    """删除笔记的 RAG 分块索引；失败只记日志，不影响笔记删除"""
+    try:
+        await note_rag.delete_note_chunks(db, user_id=user_id, note_id=note_id)
+    except Exception as e:
+        logger.info(f"⚠️ 笔记索引删除失败 note_id={note_id}: {e}")
+
+
 @router.get("/search", summary="搜索笔记")
 async def search_notes(
-    keyword: str = Query("", description="搜索关键词（仅匹配笔记标题）"),
+    keyword: str = Query("", description="搜索关键词（标题/正文模糊匹配 + 向量语义检索）"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页条数"),
     is_favorite: Optional[bool] = Query(None, description="筛选收藏笔记"),
@@ -129,15 +144,16 @@ async def search_notes(
     current_user: dict = Depends(get_current_user),
     _: None = _notes_rate_limit,
 ):
-    """搜索笔记（仅按标题模糊匹配），支持分页"""
+    """混合检索笔记：标题/正文关键词 + 向量语义（RAG），支持分页"""
     db_user = await _get_db_user(db, current_user)
     skip = (page - 1) * page_size
-    notes = await crud_note.search_notes(
-        db, user_id=db_user.id, keyword=keyword,
-        skip=skip, limit=page_size, is_favorite=is_favorite,
-    )
-    total = await crud_note.count_notes(
-        db, user_id=db_user.id, keyword=keyword, is_favorite=is_favorite,
+    notes, total = await note_rag.hybrid_search_notes(
+        db,
+        db_user=db_user,
+        keyword=keyword,
+        skip=skip,
+        limit=page_size,
+        is_favorite=is_favorite,
     )
     return {
         "items": notes,
@@ -146,6 +162,35 @@ async def search_notes(
         "page_size": page_size,
         "total_pages": (total + page_size - 1) // page_size,
     }
+
+
+@router.get("/rag/context", summary="检索笔记相关片段（RAG 上下文）")
+async def rag_context(
+    query: str = Query("", min_length=1, description="查询文本"),
+    limit: int = Query(5, ge=1, le=10, description="返回片段数量上限"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = _notes_rate_limit,
+):
+    """检索与 query 相关的笔记片段，供 AI 对话上下文注入使用。
+
+    返回按相关度排序的片段列表：note_id / note_title / chunk_index / content / score / source。
+    """
+    db_user = await _get_db_user(db, current_user)
+    items = await note_rag.retrieve_context(db, db_user=db_user, query=query, limit=limit)
+    return {"query": query, "count": len(items), "items": items}
+
+
+@router.post("/rag/rebuild", summary="重建笔记分块索引（RAG）")
+async def rag_rebuild(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user),
+    _: None = _notes_rate_limit,
+):
+    """重建当前用户全部笔记的分块索引（创建/更新/删除时已自动同步，此接口用于存量数据或 embedding 模型变更后重建）。"""
+    db_user = await _get_db_user(db, current_user)
+    stats = await note_rag.rebuild_all_note_chunks(db, db_user=db_user)
+    return {"message": "重建完成", **stats}
 
 
 @router.post("/", summary="创建笔记", response_model=NoteResponse)
@@ -158,28 +203,27 @@ async def create_note(
     """创建新笔记，自动检测标题重复"""
     db_user = await _get_db_user(db, current_user)
     user_id = db_user.id
-    
+
     # 检测是否已存在相同标题的笔记（走 SQL 索引，不再拉取 1000 条）
     existing_note = await crud_note.get_note_by_title(db=db, user_id=user_id, title=note.title)
-    
+
     if existing_note:
-        raise HTTPException(
-            status_code=409,
-            detail=f"笔记 '{note.title}' 已存在"
-        )
-    
+        raise HTTPException(status_code=409, detail=f"笔记 '{note.title}' 已存在")
+
     # crud 层会自动将 bool 转换为数据库的 Integer
-    return await crud_note.create_note(
-        db=db, 
-        user_id=user_id, 
-        title=note.title, 
-        content=note.content, 
+    db_note = await crud_note.create_note(
+        db=db,
+        user_id=user_id,
+        title=note.title,
+        content=note.content,
         tags=note.tags,
         is_favorite=note.is_favorite,
     )
+    await _sync_note_index(db, db_user, db_note)
+    return db_note
 
 
-@router.get("/", summary="获取笔记列表", response_model=List[NoteResponse])
+@router.get("/", summary="获取笔记列表", response_model=list[NoteResponse])
 async def get_notes(
     skip: int = 0,
     limit: int = 100,
@@ -208,16 +252,18 @@ async def list_recent_notes(
             recent_ids = [n["id"] for n in cached if n.get("id") is not None]
             if recent_ids:
                 result_ids = await db.execute(
-                    select(NoteDB.id).where(
-                        NoteDB.user_id == user_id, NoteDB.id.in_(recent_ids)
-                    )
+                    select(NoteDB.id).where(NoteDB.user_id == user_id, NoteDB.id.in_(recent_ids))
                 )
                 valid_ids = set(result_ids.scalars().all())
             else:
                 valid_ids = set()
             pruned = [n for n in cached if n["id"] in valid_ids]
             if len(pruned) != len(cached):
-                (await batch_cache_recent_notes_async(user_id, pruned) if pruned else await clear_recent_notes_async(user_id))
+                (
+                    await batch_cache_recent_notes_async(user_id, pruned)
+                    if pruned
+                    else await clear_recent_notes_async(user_id)
+                )
             return pruned
 
         notes = await crud_note.get_notes(db=db, user_id=user_id, skip=0, limit=20)
@@ -226,6 +272,7 @@ async def list_recent_notes(
     except Exception as e:
         logger.info(f"❌ 获取最近笔记失败: {e}")
         import traceback as tb
+
         tb.print_exc()
         notes = await crud_note.get_notes(db=db, user_id=user_id, skip=0, limit=20)
         notes.sort(key=lambda x: x.created_at, reverse=True)
@@ -234,7 +281,7 @@ async def list_recent_notes(
 
 @router.post("/recent/update", summary="更新最近笔记顺序")
 async def update_recent_notes_order(
-    note_ids: List[int],
+    note_ids: list[int],
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user),
     _: None = _notes_rate_limit,
@@ -254,6 +301,7 @@ async def update_recent_notes_order(
     except Exception as e:
         logger.info(f"❌ 更新最近笔记顺序失败: {e}")
         import traceback as tb
+
         tb.print_exc()
         raise HTTPException(status_code=500, detail=f"更新失败: {str(e)}")
 
@@ -281,15 +329,20 @@ async def update_note(
     current_user: dict = Depends(get_current_user),
     _: None = _notes_rate_limit,
 ):
-    """更新笔记"""
+    """更新笔记，并同步 RAG 分块索引"""
     db_user = await _get_db_user(db, current_user)
     db_note = await crud_note.update_note(
-        db=db, note_id=note_id, user_id=db_user.id,
-        title=note.title, content=note.content, tags=note.tags,
+        db=db,
+        note_id=note_id,
+        user_id=db_user.id,
+        title=note.title,
+        content=note.content,
+        tags=note.tags,
         is_favorite=note.is_favorite,
     )
     if db_note is None:
         raise HTTPException(status_code=404, detail="笔记不存在")
+    await _sync_note_index(db, db_user, db_note)
     return db_note
 
 
@@ -309,7 +362,7 @@ async def delete_note(
 
     if db_note.content:
         image_urls = re.findall(
-            rf'{re.escape(settings.API_BASE_URL)}/uploads/images/([\w]+\.[\w]+)',
+            rf"{re.escape(settings.API_BASE_URL)}/uploads/images/([\w]+\.[\w]+)",
             db_note.content,
         )
         for fn in image_urls:
@@ -321,6 +374,7 @@ async def delete_note(
                     logger.info(f"⚠️ 删除图片失败 {fn}: {e}")
 
     await crud_note.delete_note(db=db, note_id=note_id, user_id=user_id)
+    await _delete_note_index(db, user_id=user_id, note_id=note_id)
     await clear_recent_notes_async(user_id)
     return {"message": "删除成功"}
 
@@ -338,7 +392,7 @@ async def import_note(
     db_user = await _get_db_user(db, current_user)
     user_id = db_user.id
 
-    allowed_extensions = ['.txt', '.md', '.docx']
+    allowed_extensions = [".txt", ".md", ".docx"]
     file_ext = os.path.splitext(os.path.basename(file.filename or ""))[1].lower()
     if file_ext not in allowed_extensions:
         raise HTTPException(
@@ -389,9 +443,13 @@ async def import_note(
             if not overwrite:
                 raise HTTPException(status_code=409, detail=f"笔记 '{title}' 已存在，请选择是否覆盖")
             await crud_note.delete_note(db=db, note_id=dup.id, user_id=user_id)
+            await _delete_note_index(db, user_id=user_id, note_id=dup.id)
             await remove_recent_note_by_id_async(user_id, dup.id)
 
-        db_note = await crud_note.create_note(db=db, user_id=user_id, title=title, content=parsed, tags=f"导入,{file_ext}")
+        db_note = await crud_note.create_note(
+            db=db, user_id=user_id, title=title, content=parsed, tags=f"导入,{file_ext}"
+        )
+        await _sync_note_index(db, db_user, db_note)
         note_data = _note_to_recent_dict(db_note)
         note_data["content"] = _text_preview(parsed)
         await cache_recent_note_async(user_id, note_data)

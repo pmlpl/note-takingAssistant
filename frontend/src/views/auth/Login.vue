@@ -69,6 +69,15 @@
           </el-button>
         </div>
 
+        <!-- 移动端 App 下载文案预留（仅视觉/文案，不实现下载流程） -->
+        <div class="app-download-hint">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+            <path d="M12 18h.01"/>
+          </svg>
+          <span>移动端 App 即将上线，敬请期待</span>
+        </div>
+
         <div class="login-footer">
           <span>还没有账号？</span>
           <el-button link @click="navigate('/register')">立即注册</el-button>
@@ -363,7 +372,7 @@ function navigate(path) {
 }
 
 .login-subtitle {
-  color: #888;
+  color: var(--el-text-color-regular);
   font-family: var(--font-body);
   font-size: 15px;
   margin: 0;
@@ -402,9 +411,10 @@ function navigate(path) {
   width: auto;
 }
 
+/* P2 评审 #8：登录小字 #999(2.85:1) 提至 secondary token（#666，5.74:1 AA） */
 .login-tip {
   text-align: center;
-  color: #999;
+  color: var(--el-text-color-secondary);
   font-size: 12px;
   margin: -5px 0 0 0;
 }
@@ -421,7 +431,7 @@ function navigate(path) {
   background: var(--color-muted);
 }
 .divider-text {
-  color: #999;
+  color: var(--el-text-color-secondary);
   font-size: 13px;
 }
 
@@ -429,6 +439,16 @@ function navigate(path) {
   display: flex;
   gap: 12px;
   margin-bottom: 20px;
+}
+
+.app-download-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: -6px 0 16px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .oauth-btn {
@@ -456,7 +476,7 @@ function navigate(path) {
   text-align: center;
   margin-top: 10px;
   font-family: var(--font-body);
-  color: #888;
+  color: var(--el-text-color-regular);
 }
 
 .deco {

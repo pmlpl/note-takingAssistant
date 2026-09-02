@@ -4,6 +4,8 @@
 > 下面所有命令都标注了在哪台机器上执行。
 >
 > **本指南适用于 v1.1.0+**，使用 Docker Compose V2（`docker compose` 命令）。
+>
+> 📌 部署完成后的**运行期运维**（监控 / 告警 / 日志 / 多实例 / 备份）见 [docs/PRODUCTION_OPS.md](docs/PRODUCTION_OPS.md)。
 
 ---
 

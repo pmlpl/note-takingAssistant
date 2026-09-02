@@ -4,11 +4,7 @@ import { useUserStore } from '@/store'
 import { noteApi } from '@/api/note'
 import { aiApi } from '@/api/ai'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  renderMarkdownToSafeHtml,
-  sanitizeHtml,
-  isLikelyHtmlContent
-} from '@/utils/htmlSanitize'
+import { renderContentToSafeHtml } from '@/utils/htmlSanitize'
 import {
   MESSAGE_DURATION,
   hasMeaningfulNoteText,
@@ -139,18 +135,10 @@ const filteredNotes = computed(() => {
   return allNotes.value
 })
 
-/** 与翻译页一致：富文本 HTML 只消毒；纯 Markdown 再走 marked */
-function noteContentToSafeHtml(content) {
-  if (!content) return ''
-  return isLikelyHtmlContent(content)
-    ? sanitizeHtml(content)
-    : renderMarkdownToSafeHtml(content)
-}
-
-// 渲染当前笔记（HTML 笔记保留表格/图片等 DOM）
+// 渲染当前笔记（HTML 笔记保留表格/图片等 DOM；Markdown 走统一管线）
 const renderedContent = computed(() => {
   if (!currentNote.value?.content) return ''
-  return noteContentToSafeHtml(currentNote.value.content)
+  return renderContentToSafeHtml(currentNote.value.content)
 })
 
 onMounted(async () => {
@@ -1030,11 +1018,6 @@ function sendMessage() {
   // 立即返回，不等待任何操作完成
 }
 
-// 渲染消息内容（HTML / Markdown 与预览区一致）
-function renderMessage(content) {
-  return noteContentToSafeHtml(content)
-}
-
 // 格式化时间
 function formatTime(timestamp) {
   const date = new Date(timestamp)
@@ -1494,7 +1477,6 @@ function getNotePreview(content) {
     clearUploadedNote,
     stopAiChatOutput,
     sendMessage,
-    renderMessage,
     formatTime,
     handleInput,
     closeNoteSelector,

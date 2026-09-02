@@ -207,7 +207,7 @@ async function handleSave() {
 .card-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .section-fold-panel {
@@ -251,11 +251,11 @@ async function handleSave() {
 
 .llm-key-status {
   font-size: 14px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .llm-key-status--muted {
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .llm-switch-row {
@@ -267,7 +267,7 @@ async function handleSave() {
 
 .llm-switch-hint {
   font-size: 13px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   line-height: 1.5;
   flex: 1;
   min-width: 200px;

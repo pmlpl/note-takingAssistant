@@ -256,6 +256,11 @@ function goHistory() {
   margin-bottom: 12px;
 }
 
+/* P3 评审 #11：small 按钮默认 24px 高，抬高点击目标至 ≥32px */
+.user-center-toolbar :deep(.el-button) {
+  min-height: 32px;
+}
+
 .logout-section {
   display: flex;
   justify-content: center;

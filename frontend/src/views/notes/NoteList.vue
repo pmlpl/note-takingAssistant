@@ -179,7 +179,7 @@ async function deleteNote(note) {
 <style scoped>
 .note-list-page {
   min-height: calc(100vh - 60px);
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   padding: 20px;
 }
 

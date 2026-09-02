@@ -5,6 +5,23 @@ import { marked } from 'marked'
 const LIKELY_HTML_RE =
   /<\s*\/?\s*(?:p|div|span|table|tr|td|th|img|br|h[1-6]|ul|ol|li|section|article|blockquote|tbody|thead|tfoot|caption|colgroup|col|figure|figcaption|html|body)\b/i
 
+/**
+ * 行首 Markdown 结构信号（ATX 标题、代码围栏、引用、列表、分隔线、表格行）。
+ * 用于优先识别 Markdown：代码围栏/列表里出现 `<p>` 等标签时不应误判为 HTML。
+ */
+const MARKDOWN_STRUCTURE_RE = new RegExp(
+  [
+    '^\\s*#{1,6}\\s+', // ATX 标题：# 标题
+    '^\\s*(?:```|~~~)', // 代码围栏：```lang / ~~~lang
+    '^\\s*>\\s', // 引用：> text
+    '^\\s*(?:[-*+])\\s', // 无序列表：- item
+    '^\\s*\\d+[.)]\\s', // 有序列表：1. item
+    '^\\s*(?:-{3,}|\\*{3,}|_{3,})\\s*$', // 分隔线：--- / *** / ___
+    '^\\s*\\|.*\\|' // GFM 表格行：| a | b |
+  ].join('|'),
+  'm'
+)
+
 const TEXT_ALIGN_VALUES = new Set(['left', 'right', 'center', 'justify', 'start', 'end'])
 const VERTICAL_ALIGN_VALUES = new Set(['top', 'middle', 'bottom', 'baseline'])
 const ALIGN_ATTR_VALUES = new Set(['left', 'right', 'center', 'justify', 'middle', 'char'])
@@ -243,13 +260,34 @@ function ensureAlignmentSanitizeHooks() {
 ensureAlignmentSanitizeHooks()
 
 /**
+ * 判断内容应作为 HTML 还是 Markdown 渲染（与后端 `looks_like_html_note` 口径一致）。
+ * 边界修正：
+ * - 行首有 Markdown 结构信号（标题/围栏/引用/列表等）时优先按 Markdown，避免
+ *   代码块或正文里出现的 `<p>` 等标签导致整段误判为 HTML；
+ * - `<!DOCTYPE` / `<!--` 开头按 HTML；
+ * - 纯文本比较表达式（如 `1 < 2`）不含已知标签，按 Markdown。
  * @param {unknown} text
  * @returns {boolean}
  */
 export function isLikelyHtmlContent(text) {
   const s = String(text ?? '').trim()
   if (!s.includes('<')) return false
+  if (MARKDOWN_STRUCTURE_RE.test(s)) return false
+  if (/^<!/.test(s)) return true
   return LIKELY_HTML_RE.test(s)
+}
+
+/**
+ * 统一内容渲染入口：HTML 内容仅消毒保留原结构；Markdown / 纯文本经 marked 渲染后消毒。
+ * 笔记预览、AI 聊天/生成/总结/翻译结果都应走此函数，避免各页面判断与渲染不一致。
+ * @param {unknown} content
+ * @returns {string}
+ */
+export function renderContentToSafeHtml(content) {
+  if (content == null || content === '') return ''
+  return isLikelyHtmlContent(content)
+    ? sanitizeHtml(content)
+    : renderMarkdownToSafeHtml(content)
 }
 
 /**
@@ -272,4 +310,71 @@ export function renderMarkdownToSafeHtml(markdown) {
   const raw = marked.parse(String(markdown ?? ''), { async: false })
   const html = typeof raw === 'string' ? raw : String(raw)
   return sanitizeHtml(html)
+}
+
+/**
+ * 动态加载 mermaid（与 Mindmap 页一致按需分包，避免进首包）；加载失败返回 null。
+ * @returns {Promise<object|null>}
+ */
+async function loadMermaidApi() {
+  try {
+    const mod = await import('mermaid')
+    return mod.default ?? mod
+  } catch {
+    return null
+  }
+}
+
+let mermaidSeq = 0
+
+/** 保留源码 <pre> 并标记降级状态（mermaid 解析失败 / 加载失败时调用） */
+function markMermaidFallback(pre) {
+  pre.dataset.mermaidState = 'fallback'
+  pre.classList.add('mermaid-fallback')
+  pre.setAttribute('title', '图表解析失败，已显示源码')
+}
+
+/**
+ * 将容器内 ```mermaid / ```mindmap 代码块渲染为图表（在 Markdown 渲染后对 DOM 做水合）：
+ * - 成功：以 `<div class="mermaid-rendered">` 替换原 `<pre>`，保留可交互的 bindFunctions；
+ * - 失败（语法错误、mermaid 动态加载失败）：保留源码 `<pre>` 并标记 `mermaid-fallback` 降级展示。
+ * v-html 每次重渲染后调用一次即可；调用方（MarkdownContent）已对流式输出做防抖。
+ * @param {Element|null} container
+ * @returns {Promise<void>}
+ */
+export async function hydrateMermaidBlocks(container) {
+  if (!container || typeof container.querySelectorAll !== 'function') return
+  const codeEls = Array.from(
+    container.querySelectorAll('pre code.language-mermaid, pre code.language-mindmap')
+  )
+  if (codeEls.length === 0) return
+
+  const mermaidApi = await loadMermaidApi()
+  if (mermaidApi) {
+    await mermaidApi.initialize({ startOnLoad: false })
+  }
+
+  for (const codeEl of codeEls) {
+    const pre = codeEl.closest('pre')
+    if (!pre || pre.dataset.mermaidState) continue
+    const source = String(codeEl.textContent ?? '').trim()
+    pre.dataset.mermaidState = 'pending'
+    if (!source || !mermaidApi) {
+      markMermaidFallback(pre)
+      continue
+    }
+    try {
+      const id = `mmd-${Date.now().toString(36)}-${mermaidSeq++}`
+      const { svg, bindFunctions } = await mermaidApi.render(id, source)
+      const holder = document.createElement('div')
+      holder.className = 'mermaid-rendered'
+      holder.innerHTML = svg
+      if (typeof bindFunctions === 'function') {
+        bindFunctions(holder)
+      }
+      pre.replaceWith(holder)
+    } catch {
+      markMermaidFallback(pre)
+    }
+  }
 }

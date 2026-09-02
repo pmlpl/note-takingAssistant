@@ -129,7 +129,7 @@
             :class="['message-item', message.role]"
           >
             <div class="message-avatar">
-              <IconAI v-if="message.role === 'assistant'" :size="20" color="#409eff" />
+              <IconAI v-if="message.role === 'assistant'" :size="20" color="var(--color-blue)" />
               <span v-else class="user-avatar">👤</span>
             </div>
             <div class="message-content">
@@ -215,7 +215,7 @@
                 </div>
               </div>
 
-              <div class="message-text" v-html="renderMessage(message.content)"></div>
+              <MarkdownContent :content="message.content" class="message-text" />
               <div
                 v-if="message.role === 'assistant' && extractMindmapDiagramSource(message.content)"
                 class="message-mindmap-actions"
@@ -240,7 +240,7 @@
 
           <div v-if="isAiThinking" class="message-item assistant">
             <div class="message-avatar">
-              <IconAI :size="20" color="#409eff" />
+              <IconAI :size="20" color="var(--color-blue)" />
             </div>
             <div class="message-content">
               <div class="typing-indicator">
@@ -277,7 +277,7 @@
               class="note-option"
               @click="selectNoteForContext(note)"
             >
-              <IconDocument :size="16" color="#409eff" />
+              <IconDocument :size="16" color="var(--color-blue)" />
               <div class="note-info">
                 <div class="note-title">{{ note.title }}</div>
               </div>
@@ -289,7 +289,7 @@
         </div>
 
         <div v-else-if="uploadedNoteContent" class="uploaded-note-banner">
-          <IconDocument :size="16" color="#409eff" />
+          <IconDocument :size="16" color="var(--color-blue)" />
           <span class="note-name">{{ uploadedNoteName }}</span>
           <el-button size="small" link type="danger" @click="clearUploadedNote"> 清除 </el-button>
         </div>
@@ -364,6 +364,7 @@
 <script setup>
 import { ArrowDown, Menu, Edit, Delete } from '@element-plus/icons-vue'
 import { IconAI, IconDocument, IconPlus, IconEdit } from '@/components/icons'
+import MarkdownContent from '@/components/MarkdownContent.vue'
 import { useHomeInject } from '@/composables/home/useHomeInject'
 
 const TOOL_LABELS = {
@@ -415,7 +416,6 @@ const {
   confirmClearChat,
   onChatScroll,
   scrollChatToLatest,
-  renderMessage,
   formatTime,
   extractMindmapDiagramSource,
   openMindmapPreviewFromMessage,

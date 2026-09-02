@@ -73,7 +73,7 @@ watch(privacyVisible, (val) => {
 .legal-dialog .legal-doc-note {
   margin: 0 0 12px;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   line-height: 1.5;
 }
 
@@ -95,14 +95,14 @@ watch(privacyVisible, (val) => {
   margin: 0 0 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .legal-dialog .legal-doc-p {
   margin: 0 0 8px;
   font-size: 13px;
   line-height: 1.65;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .legal-dialog .legal-doc-p:last-child {

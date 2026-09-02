@@ -183,7 +183,7 @@
 
     <!-- 解除邮箱绑定对话框 -->
     <el-dialog v-model="showUnbindEmailDialog" title="解除邮箱绑定" width="400px" destroy-on-close>
-      <p style="color: #606266; margin-bottom: 16px;">解除邮箱绑定后，您需要使用其他方式（GitHub）登录。请确认您的 GitHub 已绑定。</p>
+      <p style="color: var(--el-text-color-regular); margin-bottom: 16px;">解除邮箱绑定后，您需要使用其他方式（GitHub）登录。请确认您的 GitHub 已绑定。</p>
       <el-form :model="unbindEmailForm" label-width="80px">
         <el-form-item label="密码" required>
           <el-input
@@ -536,7 +536,7 @@ async function handleUnbindEmail() {
 .card-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .section-fold-panel {
@@ -596,7 +596,7 @@ async function handleUnbindEmail() {
   height: 40px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #e4e7ed;
+  border: 2px solid var(--el-border-color-light);
 }
 
 .binding-label-row {
@@ -607,18 +607,18 @@ async function handleUnbindEmail() {
 
 .binding-label {
   font-weight: 500;
-  color: #303133;
+  color: var(--el-text-color-primary);
   margin-right: 8px;
 }
 
 .binding-value {
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .binding-sub {
   display: block;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-top: 2px;
 }
 
@@ -626,17 +626,29 @@ async function handleUnbindEmail() {
   font-size: 14px;
 }
 
+/* P1 修复：原 #67c23a 白底 2.24:1，改用 --color-green（#2e7d32 ≈ 5.13:1 AA） */
 .binding-status--bound {
-  color: #67c23a;
+  color: var(--color-green);
 }
 
 .binding-status--unbound {
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .binding-actions {
   display: flex;
   gap: 8px;
+}
+
+/* P1 修复：换绑按钮（warning plain）原 #ff9f43 于浅底 1.9:1 近乎不可读，
+   改用 --color-warning-deep（#b45309 ≈ 5.02:1 AA）并略增字号 */
+.binding-actions :deep(.el-button--warning.is-plain) {
+  color: var(--color-warning-deep);
+  font-size: 13px;
+}
+.binding-actions :deep(.el-button--warning.is-plain:hover),
+.binding-actions :deep(.el-button--warning.is-plain:focus) {
+  color: #fff;
 }
 
 .code-input-row {

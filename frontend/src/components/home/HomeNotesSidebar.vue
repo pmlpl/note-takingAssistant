@@ -24,7 +24,7 @@
     <div class="notes-list">
       <div class="list-title">最近笔记</div>
       <div v-for="note in recentNotes" :key="note.id" class="note-item" @click="viewNote(note)">
-        <IconDocument :size="16" color="#909399" />
+        <IconDocument :size="16" color="var(--el-text-color-secondary)" />
         <span class="note-title">{{ note.title }}</span>
       </div>
       <div v-if="recentNotes.length > 10" class="more-notes" @click="goToHistory">
@@ -32,6 +32,9 @@
       </div>
       <div v-if="recentNotes.length === 0" class="empty-notes">
         <p>暂无笔记</p>
+      </div>
+      <div class="history-notes-link" @click="goToHistory">
+        最近笔记
       </div>
     </div>
   </el-aside>

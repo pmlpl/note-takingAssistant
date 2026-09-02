@@ -7,7 +7,7 @@
             <el-icon size="16"><DArrowLeft /></el-icon>
             <span>返回</span>
           </el-button>
-          <h2><IconTrend :size="36" color="#f5a623" /> AI 笔记总结</h2>
+          <h2><IconTrend :size="36" color="var(--color-warning-deep)" /> AI 笔记总结</h2>
         </div>
         <div class="page-subtitle">
           <p>智能分析笔记内容，提供总结、字数统计和优化建议</p>
@@ -188,7 +188,7 @@
           <!-- 空状态 -->
           <el-card class="empty-card" v-else shadow="hover">
             <div class="empty-state">
-              <IconTrend :size="80" color="#d9d9d9" />
+              <IconTrend :size="80" color="var(--el-text-color-disabled)" />
               <h3>等待分析</h3>
               <p>在左侧选择笔记或输入文本，点击“开始分析”按钮</p>
               <p class="hint">💡 AI 将为您提供内容总结、字数统计和优化建议</p>
@@ -516,6 +516,8 @@ async function renderRadarChart(scores) {
         }
       }
     },
+    // P2 评审 #6/#8：canvas 无法用 var()，此处硬编码 token 值并保持与 CSS 同步
+    // （--color-warning-deep: #b45309 / --color-green: #2e7d32，白底均 ≥4.5:1）
     series: [
       {
         name: '改进前',
@@ -525,14 +527,14 @@ async function renderRadarChart(scores) {
             value: scores.before,
             name: '改进前',
             itemStyle: {
-              color: '#f5a623'
+              color: '#b45309'
             },
             areaStyle: {
-              color: 'rgba(245, 166, 35, 0.3)'
+              color: 'rgba(180, 83, 9, 0.3)'
             },
             lineStyle: {
               width: 2,
-              color: '#f5a623'
+              color: '#b45309'
             }
           }
         ]
@@ -545,15 +547,15 @@ async function renderRadarChart(scores) {
             value: scores.after,
             name: '改进后',
             itemStyle: {
-              color: '#67c23a'
+              color: '#2e7d32'
             },
             areaStyle: {
-              color: 'rgba(103, 194, 58, 0.2)'
+              color: 'rgba(46, 125, 50, 0.2)'
             },
             lineStyle: {
               width: 2,
               type: 'dashed',
-              color: '#67c23a'
+              color: '#2e7d32'
             }
           }
         ]
@@ -623,16 +625,16 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
   left: 0;
   top: 0;
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .back-btn:hover {
-  color: #409eff;
+  color: var(--el-link-color);
 }
 
 .page-header h2 {
   font-size: 28px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   margin: 0 0 10px 0;
   display: flex;
   align-items: center;
@@ -643,7 +645,7 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 
 .page-header p {
   font-size: 15px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin: 0;
   padding-left: 60px;
 }
@@ -653,7 +655,7 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
   align-items: center;
   gap: 10px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .result-header {
@@ -689,7 +691,7 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 .analysis-section {
   margin-bottom: 30px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .analysis-section:last-child {
@@ -698,7 +700,7 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 
 .section-title {
   font-size: 18px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   margin: 0 0 15px 0;
   display: flex;
   align-items: center;
@@ -708,13 +710,13 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 
 .section-title .el-icon {
   font-size: 20px;
-  color: #409eff;
+  color: var(--color-blue);
 }
 
 .section-body {
   font-size: 15px;
   line-height: 1.8;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 /* 雷达图样式 */
@@ -738,7 +740,7 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .legend-color {
@@ -748,12 +750,12 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 }
 
 .legend-color.before {
-  background: #f5a623;
+  background: var(--color-warning-deep);
 }
 
 .legend-color.after {
-  background: #67c23a;
-  border-top: 2px dashed #67c23a;
+  background: var(--color-green);
+  border-top: 2px dashed var(--color-green);
   height: 0;
 }
 
@@ -767,9 +769,10 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 .stat-item {
   text-align: center;
   padding: 20px 15px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* 收敛为品牌蓝（原紫色渐变 #667eea→#764ba2 不在设计体系中） */
+  background: linear-gradient(135deg, var(--color-blue) 0%, #1b3b66 100%);
   border-radius: 12px;
-  color: white;
+  color: #fff;
 }
 
 .stat-value {
@@ -794,28 +797,28 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 .suggestion-group {
   padding: 15px;
   border-radius: 8px;
-  background: #f9fafb;
+  background: var(--el-fill-color-light);
 }
 
 .suggestion-group.good {
-  background: #f0f9ff;
-  border-left: 4px solid #67c23a;
+  background: rgba(46, 125, 50, 0.07);
+  border-left: 4px solid var(--color-green);
 }
 
 .suggestion-group.improve {
-  background: #fff7e6;
-  border-left: 4px solid #f5a623;
+  background: rgba(180, 83, 9, 0.07);
+  border-left: 4px solid var(--color-warning-deep);
 }
 
 .suggestion-group.tips {
-  background: #fef0f0;
-  border-left: 4px solid #f56c6c;
+  background: rgba(198, 40, 40, 0.06);
+  border-left: 4px solid var(--color-accent);
 }
 
 .suggestion-group h4 {
   font-size: 16px;
   margin: 0 0 10px 0;
-  color: #303133;
+  color: var(--el-text-color-primary);
   font-weight: 600;
 }
 
@@ -827,19 +830,19 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 .suggestion-group li {
   margin: 8px 0;
   line-height: 1.6;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 /* 空状态 */
 .empty-state {
   text-align: center;
   padding: 80px 20px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .empty-state h3 {
   font-size: 20px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   margin: 20px 0 10px 0;
 }
 
@@ -849,7 +852,7 @@ ${analysisResult.value.suggestions.map(t => '- ' + t).join('\n')}
 }
 
 .empty-state .hint {
-  color: #f5a623;
+  color: var(--color-warning-deep);
   font-style: italic;
 }
 

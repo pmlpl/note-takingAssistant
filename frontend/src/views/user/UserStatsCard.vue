@@ -36,7 +36,7 @@
               @keydown.enter.prevent="$emit('go-notes')"
             >
               <div class="stat-icon">
-                <IconDocument :size="36" color="#409eff" />
+                <IconDocument :size="36" color="var(--color-blue)" />
               </div>
               <div class="stat-content">
                 <div class="stat-value">{{ noteCount }}</div>
@@ -60,7 +60,7 @@
               @keydown.enter.prevent="$emit('go-home-ai')"
             >
               <div class="stat-icon">
-                <IconMagic :size="36" color="#67c23a" />
+                <IconMagic :size="36" color="var(--color-green)" />
               </div>
               <div class="stat-content">
                 <div class="stat-value">{{ aiUsage }}</div>
@@ -84,7 +84,7 @@
               @keydown.enter.prevent="$emit('go-history')"
             >
               <div class="stat-icon">
-                <IconClock :size="36" color="#f5a623" />
+                <IconClock :size="36" color="var(--color-warning-deep)" />
               </div>
               <div class="stat-content">
                 <div class="stat-value">{{ formatDays(daysActive) }}</div>
@@ -166,7 +166,7 @@ function formatDays(days) {
 .card-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .section-fold-panel {
@@ -206,7 +206,7 @@ function formatDays(days) {
   padding: 24px 16px;
   border-radius: 8px;
   transition: all 0.3s ease;
-  background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+  background: linear-gradient(135deg, var(--el-fill-color-light) 0%, var(--el-fill-color-blank) 100%);
 }
 
 .stat-item--clickable {
@@ -214,7 +214,7 @@ function formatDays(days) {
 }
 
 .stat-item--clickable:focus {
-  outline: 2px solid #409eff;
+  outline: 2px solid var(--color-blue);
   outline-offset: 2px;
 }
 
@@ -224,15 +224,15 @@ function formatDays(days) {
 }
 
 .stat-notes:hover {
-  background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+  background: linear-gradient(135deg, rgba(45, 93, 161, 0.08) 0%, var(--el-fill-color-blank) 100%);
 }
 
 .stat-ai:hover {
-  background: linear-gradient(135deg, #e8f5e9 0%, #ffffff 100%);
+  background: linear-gradient(135deg, rgba(46, 125, 50, 0.07) 0%, var(--el-fill-color-blank) 100%);
 }
 
 .stat-active:hover {
-  background: linear-gradient(135deg, #fff3e0 0%, #ffffff 100%);
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.08) 0%, var(--el-fill-color-blank) 100%);
 }
 
 .stat-icon {
@@ -251,19 +251,19 @@ function formatDays(days) {
 .stat-value {
   font-size: 32px;
   font-weight: 700;
-  color: #303133;
+  color: var(--el-text-color-primary);
   margin-bottom: 4px;
   line-height: 1;
 }
 
 .stat-label {
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 14px;
   font-weight: 500;
 }
 
 .stat-label-inner {
-  border-bottom: 1px dashed #c0c4cc;
+  border-bottom: 1px dashed var(--el-text-color-disabled);
   cursor: help;
 }
 

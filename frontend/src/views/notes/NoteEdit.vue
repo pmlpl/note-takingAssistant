@@ -37,8 +37,8 @@
                 placeholder="支持 Markdown 或 HTML 语法..."
                 class="markdown-input"
               />
-              <!-- 渲染预览（支持 HTML 和 Markdown） -->
-              <div class="markdown-preview" v-html="renderedContent"></div>
+              <!-- 渲染预览（支持 HTML 和 Markdown，统一管线） -->
+              <MarkdownContent :content="form.content" class="markdown-preview" />
             </div>
           </el-form-item>
         </el-form>
@@ -47,13 +47,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, watch } from 'vue'
+import { ref, onMounted, onActivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNoteStore, useUserStore } from '@/store'
 import { noteApi } from '@/api/note'
 import RichText from '@/components/RichText.vue'
+import MarkdownContent from '@/components/MarkdownContent.vue'
 import { IconUpload } from '@/components/icons'
-import { sanitizeHtml, renderMarkdownToSafeHtml } from '@/utils/htmlSanitize'
+import { renderContentToSafeHtml } from '@/utils/htmlSanitize'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
 
@@ -76,18 +77,6 @@ const form = ref({
   content: ''
 })
 
-// 渲染内容预览（支持 HTML 和 Markdown）
-const renderedContent = computed(() => {
-  if (!form.value.content) return ''
-  
-  // 检测是否是 HTML 格式（包含 HTML 标签）
-  const isHtml = /<[a-z][\s\S]*>/i.test(form.value.content)
-  
-  if (isHtml) {
-    return sanitizeHtml(form.value.content)
-  }
-  return renderMarkdownToSafeHtml(form.value.content)
-})
 // 监听路由参数变化，当ID改变时重新加载笔记
 watch(() => route.params.id, async (newId, oldId) => {
   if (newId && newId !== oldId) {
@@ -142,16 +131,10 @@ async function loadNote(id) {
   try {
     const note = await noteApi.getNote(id)
     
-    // 直接使用后端返回的原始内容，不做任何转换
-    // 富文本编辑器会自己处理 HTML/Markdown 格式
+    // 富文本编辑器需要 HTML：用统一管线判断 HTML/Markdown 并转换为安全 HTML
     let content = note.content || ''
-    // 检测是否是 Markdown 格式（不包含 HTML 标签）
-    const isHtml = /<[a-z][\s\S]*>/i.test(content)
-    // 如果不是 HTML 格式，则认为是 Markdown，转换为 HTML
-    if (!isHtml && content.trim()) {
-      content = renderMarkdownToSafeHtml(content)
-    } else if (isHtml && content.trim()) {
-      content = sanitizeHtml(content)
+    if (content.trim()) {
+      content = renderContentToSafeHtml(content)
     }
 
     form.value = {
@@ -250,10 +233,10 @@ function goBack() {
 }
 
 .markdown-preview {
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color-light);
   border-radius: 4px;
   padding: 16px;
-  background-color: #fafafa;
+  background-color: var(--el-fill-color-lighter);
   overflow-y: auto;
   max-height: 600px;
   line-height: 1.6;
@@ -278,7 +261,7 @@ function goBack() {
 }
 
 .markdown-preview :deep(code) {
-  background-color: #f0f0f0;
+  background-color: var(--el-fill-color);
   padding: 2px 6px;
   border-radius: 3px;
   font-family: 'Courier New', monospace;
@@ -286,7 +269,7 @@ function goBack() {
 }
 
 .markdown-preview :deep(pre) {
-  background-color: #f0f0f0;
+  background-color: var(--el-fill-color);
   padding: 12px;
   border-radius: 4px;
   overflow-x: auto;
@@ -299,10 +282,10 @@ function goBack() {
 }
 
 .markdown-preview :deep(blockquote) {
-  border-left: 4px solid #409eff;
+  border-left: 4px solid var(--color-blue);
   padding-left: 16px;
   margin: 12px 0;
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-style: italic;
 }
 
@@ -317,7 +300,7 @@ function goBack() {
 }
 
 .markdown-preview :deep(a) {
-  color: #409eff;
+  color: var(--el-link-color);
   text-decoration: none;
 }
 
@@ -339,13 +322,13 @@ function goBack() {
 
 .markdown-preview :deep(th),
 .markdown-preview :deep(td) {
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color-light);
   padding: 8px 12px;
   text-align: left;
 }
 
 .markdown-preview :deep(th) {
-  background-color: #f5f7fa;
+  background-color: var(--el-fill-color-light);
   font-weight: 600;
 }
 </style>

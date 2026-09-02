@@ -42,7 +42,7 @@ export default defineConfig(({ mode }) => {
       include: ['vue', 'vue-router', 'pinia', 'axios', 'element-plus']
     },
     test: {
-      environment: 'happy-dom',
+      environment: 'jsdom', // jsdom: 与 dompurify 3.4.13+ 完全兼容；happy-dom 20 会破坏其 sanitize 行为,
       globals: true,
       include: ['src/**/*.test.js']
     },

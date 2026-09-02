@@ -133,10 +133,11 @@ function handleClick() {
   white-space: nowrap;
 }
 
+/* P2 评审 #8：笔记日期 #999(2.85:1) 提至 secondary token（#666，5.74:1 AA） */
 .note-date {
   font-family: var(--font-body);
-  font-size: 12px;
-  color: #999;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
   white-space: nowrap;
 }
 
@@ -161,7 +162,7 @@ function handleClick() {
 .tag--more {
   background: #fff;
   border-style: dashed;
-  color: #999;
+  color: var(--el-text-color-secondary);
 }
 
 .card-footer {
@@ -181,6 +182,8 @@ function handleClick() {
 .action-link {
   font-family: var(--font-body) !important;
   font-size: 14px !important;
+  /* P3 评审 #11：link 按钮默认仅文字高度（~22px），抬高点击目标至 ≥32px */
+  min-height: 32px;
 }
 
 .action-link--delete {

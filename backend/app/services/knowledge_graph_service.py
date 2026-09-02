@@ -193,7 +193,10 @@ async def _extract_concepts_with_llm(note: NoteDB, db_user: UserDB) -> List[Tupl
 
 async def build_knowledge_graph(db: AsyncSession, user_id: int, db_user: UserDB) -> Tuple[List[KGNode], List[KGEdge], Dict]:
     result = await db.execute(
-        select(NoteDB).where(NoteDB.user_id == user_id).order_by(NoteDB.updated_at.desc()).limit(MAX_NOTES_FOR_GRAPH)
+        select(NoteDB)
+        .where(NoteDB.user_id == user_id, NoteDB.is_favorite == True)
+        .order_by(NoteDB.updated_at.desc())
+        .limit(MAX_NOTES_FOR_GRAPH)
     )
     notes = result.scalars().all()
     if not notes:
@@ -397,7 +400,9 @@ async def get_kg_from_db(db: AsyncSession, user_id: int) -> Optional[Tuple[List[
     rel_db_list = result_relations.scalars().all()
 
     result_notes = await db.execute(
-        select(NoteDB).where(NoteDB.user_id == user_id).order_by(NoteDB.updated_at.desc())
+        select(NoteDB)
+        .where(NoteDB.user_id == user_id, NoteDB.is_favorite == True)
+        .order_by(NoteDB.updated_at.desc())
     )
     notes = result_notes.scalars().all()
 

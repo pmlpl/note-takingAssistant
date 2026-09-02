@@ -346,18 +346,18 @@ async function fetchStats() {
 
 function animateCounters() {
   const stats = [
-    { label: 'Active Users', targetValue: statsApiData.value.user_count || 0, suffix: '+', decimals: 0, color: 'blue' },
-    { label: 'Notes Created', targetValue: statsApiData.value.note_count || 0, suffix: '+', decimals: 0, color: 'green' },
-    { label: 'AI Generations', targetValue: statsApiData.value.ai_count || 0, suffix: '+', decimals: 0, color: 'accent' },
-    { label: 'Core Features', targetValue: 4, suffix: '', decimals: 0, color: 'yellow' },
+    { label: 'Active Users', targetValue: statsApiData.value.user_count || 0, decimals: 0, color: 'blue' },
+    { label: 'Notes Created', targetValue: statsApiData.value.note_count || 0, decimals: 0, color: 'green' },
+    { label: 'AI Generations', targetValue: statsApiData.value.ai_count || 0, decimals: 0, color: 'accent' },
+    { label: 'Core Features', targetValue: 4, decimals: 0, color: 'yellow' },
   ]
   stats.forEach((stat) => {
     const target = stat.targetValue
-    const suffix = stat.suffix
     const decimals = stat.decimals || 0
     const duration = 2000
     let startTime = null
 
+    // 后缀由模板统一渲染（{{ stat.suffix }}），动画只产出数字，避免出现 289++ 双后缀
     function step(timestamp) {
       if (!startTime) startTime = timestamp
       const progress = Math.min((timestamp - startTime) / duration, 1)
@@ -365,18 +365,18 @@ function animateCounters() {
       const current = eased * target
 
       if (decimals > 0) {
-        statCounters.value[stat.label] = current.toFixed(decimals) + suffix
+        statCounters.value[stat.label] = current.toFixed(decimals)
       } else {
-        statCounters.value[stat.label] = Math.floor(current).toLocaleString() + suffix
+        statCounters.value[stat.label] = Math.floor(current).toLocaleString()
       }
 
       if (progress < 1) {
         requestAnimationFrame(step)
       } else {
         if (decimals > 0) {
-          statCounters.value[stat.label] = target.toFixed(decimals) + suffix
+          statCounters.value[stat.label] = target.toFixed(decimals)
         } else {
-          statCounters.value[stat.label] = target.toLocaleString() + suffix
+          statCounters.value[stat.label] = target.toLocaleString()
         }
       }
     }
@@ -503,25 +503,19 @@ onBeforeUnmount(() => {
   background: var(--color-paper);
   color: var(--color-pencil);
 
-  /* Override global style.css tokens to match design spec */
-  --color-paper: #f7f2e8;
+  /* P2 评审 #7：收敛为单一 token 体系——纸色/字体/阴影/黄等共享 token 全部
+     继承全局 style.css，不再本地覆盖；此处仅保留欢迎页专属扩展 token */
   --color-paper-light: #faf8f3;
   --color-paper-dot: #ddd6c8;
-  --color-yellow: #f0c040;
-  --color-green: #4caf50;
-  --color-accent: #ff4d4d;
-  --color-blue: #2d5da1;
   --color-surface: rgba(255, 255, 255, 0.65);
   --color-surface-solid: #ffffff;
   --color-text-primary: #2d2d2d;
   --color-text-secondary: #555555;
-  --color-text-muted: #888888;
+  /* P2 评审 #8：footer 链接/版权于深底 #2d2d2d 由 #888(3.88:1) 提至 #9a9a9a(4.89:1) AA */
+  --color-text-muted: #9a9a9a;
   --color-text-inverse: #f5f0e6;
   --color-border-light: rgba(45, 45, 45, 0.15);
   --color-border-medium: rgba(45, 45, 45, 0.25);
-  --font-heading: 'Caveat', 'Ma Shan Zheng', cursive;
-  --font-body: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
   --text-hero: clamp(40px, 6vw, 72px);
   --text-h1: clamp(32px, 5vw, 56px);
   --text-h2: clamp(28px, 4vw, 40px);
@@ -529,9 +523,6 @@ onBeforeUnmount(() => {
   --text-body: clamp(15px, 1.6vw, 17px);
   --text-small: clamp(12px, 1.2vw, 14px);
   --text-micro: 12px;
-  --shadow-hard-sm: 2px 2px 0px rgba(45, 45, 45, 0.12);
-  --shadow-hard: 4px 4px 0px rgba(45, 45, 45, 0.12);
-  --shadow-hard-hover: 6px 6px 0px rgba(45, 45, 45, 0.15);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -587,7 +578,7 @@ onBeforeUnmount(() => {
 }
 
 .welcome-nav--scrolled {
-  background: rgba(247, 242, 232, 0.85);
+  background: rgba(253, 251, 247, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 1px 0 var(--color-border-light);
@@ -707,7 +698,7 @@ onBeforeUnmount(() => {
 .hero-banner__scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, var(--color-paper) 0%, var(--color-paper) 45%, rgba(247,242,232,0.4) 65%, transparent 100%);
+  background: linear-gradient(90deg, var(--color-paper) 0%, var(--color-paper) 45%, rgba(253,251,247,0.4) 65%, transparent 100%);
 }
 
 .hero-banner__bottom-fade {
@@ -745,7 +736,7 @@ onBeforeUnmount(() => {
   width: 320px;
   height: 320px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(240,192,64,0.10) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(184,134,11,0.10) 0%, transparent 70%);
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 1;
@@ -1195,7 +1186,8 @@ onBeforeUnmount(() => {
 .stat-number--blue { color: var(--color-blue); }
 .stat-number--green { color: var(--color-green); }
 .stat-number--accent { color: var(--color-accent); }
-.stat-number--yellow { color: var(--color-yellow); }
+/* P2 评审 #9：黄色统计数字原 #f0c040 白底仅 1.7:1，改深金 --color-yellow-deep（3.25:1，大字号 ≥3:1） */
+.stat-number--yellow { color: var(--color-yellow-deep); }
 
 .stat-label-wrap {
   position: relative;
@@ -1216,7 +1208,7 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   width: 48px;
   height: 2px;
-  background: var(--color-yellow);
+  background: var(--color-yellow-deep);
 }
 
 /* ==================== CTA SECTION ==================== */
@@ -1414,7 +1406,7 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--color-border-medium);
   text-align: center;
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-text-muted);
 }
 

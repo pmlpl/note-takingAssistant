@@ -7,7 +7,7 @@
           <el-icon size="16"><DArrowLeft /></el-icon>
             <span>返回</span>
         </el-button>
-        <h2><IconMagic :size="36" color="#67c23a" /> AI 笔记生成</h2>
+        <h2><IconMagic :size="36" color="var(--color-green)" /> AI 笔记生成</h2>
         </div>
         <div class="page-subtitle">
           <p>输入主题和关键词，AI 将为您自动生成专业笔记</p>
@@ -194,8 +194,12 @@
                     
             <!-- 内容显示区域 -->
             <div v-else-if="noteContent" class="note-content-wrapper">
-              <!-- 富文本模式（默认） -->
-              <div v-if="displayMode === 'rich'" v-html="sanitizedNoteHtml" class="note-content prose" />
+              <!-- 富文本模式（默认）：统一管线渲染（含 mermaid 图表） -->
+              <MarkdownContent
+                v-if="displayMode === 'rich'"
+                :content="rawMarkdown"
+                class="note-content prose"
+              />
               <!-- Markdown 原始模式 -->
               <div v-else class="note-content markdown-raw">
                 <pre>{{ rawMarkdown }}</pre>
@@ -204,7 +208,7 @@
                     
             <!-- 空状态 -->
             <div v-else class="empty-state">
-              <IconMagic :size="80" color="#d9d9d9" />
+              <IconMagic :size="80" color="var(--el-text-color-disabled)" />
               <h3>等待生成</h3>
               <p>在左侧输入主题和关键词，点击“开始生成”按钮</p>
               <p class="hint">💡 提示：上传参考笔记和图片可以让 AI 更好地理解您的需求</p>
@@ -224,8 +228,9 @@ import { noteApi } from '@/api/note'
 import { IconMagic, IconPlus, IconEdit, IconUpload, IconDocument } from '@/components/icons'
 import { ElMessage } from 'element-plus'
 import {IconNotebook} from "@/components/icons/index.js";
-import { Loading } from '@element-plus/icons-vue'
-import { sanitizeHtml, renderMarkdownToSafeHtml } from '@/utils/htmlSanitize'
+import { Loading, DArrowLeft } from '@element-plus/icons-vue'
+import MarkdownContent from '@/components/MarkdownContent.vue'
+import { renderContentToSafeHtml } from '@/utils/htmlSanitize'
 
 defineOptions({
   name: 'AiGenerate'
@@ -246,8 +251,8 @@ const form = ref({
 const loading = ref(false)
 const saving = ref(false)
 const rawMarkdown = ref('')
-const noteContent = computed(() => rawMarkdown.value ? renderMarkdownToSafeHtml(rawMarkdown.value) : '')
-const sanitizedNoteHtml = computed(() => rawMarkdown.value ? sanitizeHtml(noteContent.value) : '')
+// 保存/复制/下载用的安全 HTML（统一管线：HTML 只消毒，Markdown 渲染后消毒）
+const noteContent = computed(() => rawMarkdown.value ? renderContentToSafeHtml(rawMarkdown.value) : '')
 const displayMode = ref('rich')
 
 const STREAM_MS = Number(import.meta.env.VITE_AI_REQUEST_TIMEOUT_MS) || 600_000
@@ -588,16 +593,16 @@ ${htmlContent}
   left: 0;
   top: 0;
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .back-btn:hover {
-  color: #409eff;
+  color: var(--el-link-color);
 }
 
 .page-header h2 {
   font-size: 28px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   margin: 0 0 10px 0;
   display: flex;
   align-items: center;
@@ -608,7 +613,7 @@ ${htmlContent}
 
 .page-header p {
   font-size: 15px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin: 0;
   padding-left: 60px;
 }
@@ -618,7 +623,7 @@ ${htmlContent}
   align-items: center;
   gap: 10px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 
 }
 
@@ -683,7 +688,7 @@ ${htmlContent}
 
 .note-content {
   line-height: 1.8;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .note-content :deep(h1),
@@ -691,7 +696,7 @@ ${htmlContent}
 .note-content :deep(h3) {
   margin-top: 20px;
   margin-bottom: 10px;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .note-content :deep(p) {
@@ -709,15 +714,15 @@ ${htmlContent}
 }
 
 .note-content :deep(code) {
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   padding: 2px 6px;
   border-radius: 4px;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
 }
 
 .note-content :deep(pre) {
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   padding: 15px;
   border-radius: 6px;
   overflow-x: auto;
@@ -733,7 +738,7 @@ ${htmlContent}
 
 /* 原始 Markdown 显示样式 */
 .note-content.markdown-raw {
-  background: #f6f8fa;
+  background: var(--el-fill-color-light);
   padding: 20px;
   border-radius: 8px;
   overflow-x: auto;
@@ -743,22 +748,22 @@ ${htmlContent}
   margin: 0;
   white-space: pre-wrap;
   word-wrap: break-word;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.6;
-  color: #24292e;
+  color: var(--el-text-color-primary);
 }
 
 .empty-state {
   text-align: center;
   padding: 80px 20px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin: 100px 0;
 }
 
 .empty-state h3 {
   font-size: 20px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   margin: 20px 0 10px 0;
 }
 
@@ -768,7 +773,7 @@ ${htmlContent}
 }
 
 .empty-state .hint {
-  color: #409eff;
+  color: var(--color-blue);
   font-style: italic;
 }
 
@@ -776,7 +781,7 @@ ${htmlContent}
 .loading-state {
   text-align: center;
   padding: 80px 20px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .loading-state p {
@@ -786,7 +791,7 @@ ${htmlContent}
 
 .loading-state .hint {
   font-size: 14px;
-  color: #409eff;
+  color: var(--color-blue);
 }
 
 /* 响应式 */

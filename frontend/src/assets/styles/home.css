@@ -50,7 +50,7 @@
 .list-title {
   font-family: var(--font-body);
   font-size: 14px;
-  color: #999;
+  color: var(--el-text-color-secondary);
   margin-bottom: 12px;
   font-weight: 600;
 }
@@ -103,12 +103,28 @@
 .empty-notes {
   text-align: center;
   padding: 40px 20px;
-  color: #999;
+  color: var(--el-text-color-secondary);
 }
 
 .empty-notes p {
   margin: 0;
   font-size: 14px;
+}
+
+.history-notes-link {
+  padding: 8px 10px;
+  margin-top: 8px;
+  text-align: center;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--color-blue);
+  border-radius: var(--radius-wobbly-sm);
+  transition: all 0.15s ease;
+}
+
+.history-notes-link:hover {
+  background: var(--color-muted);
 }
 
 /* ── Center Preview ── */
@@ -184,7 +200,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #999;
+  color: var(--el-text-color-secondary);
   padding: 30px;
 }
 
@@ -347,8 +363,8 @@
   transform: rotate(-0.3deg);
 }
 .conversation-item.active {
-  background: rgba(64, 158, 255, 0.08);
-  border-color: #409eff;
+  background: rgba(45, 93, 161, 0.08);
+  border-color: var(--color-blue);
 }
 
 .conversation-item-main {
@@ -370,8 +386,8 @@
 }
 
 .conversation-item-time {
-  font-size: 11px;
-  color: #999;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .conversation-item-actions {
@@ -388,7 +404,7 @@
 .conversation-empty {
   text-align: center;
   padding: 40px 16px;
-  color: #999;
+  color: var(--el-text-color-secondary);
 }
 .conversation-empty p {
   margin: 0;
@@ -397,13 +413,13 @@
 .conversation-empty-hint {
   margin-top: 4px;
   font-size: 12px;
-  color: #bbb;
+  color: var(--el-text-color-placeholder);
 }
 
 .ai-header p {
   font-family: var(--font-body);
   font-size: 12px;
-  color: #999;
+  color: var(--el-text-color-secondary);
   margin: 0;
 }
 
@@ -472,7 +488,7 @@
 
 .welcome-message p {
   font-size: 14px;
-  color: #888;
+  color: var(--el-text-color-regular);
   margin: 0 0 10px;
   font-family: var(--font-body);
 }
@@ -562,7 +578,7 @@
 
 .message-item.user .message-context-note {
   font-size: 12px;
-  color: #999;
+  color: var(--el-text-color-secondary);
   line-height: 1.4;
   max-width: 100%;
   text-align: right;
@@ -618,18 +634,18 @@
 
 .message-time {
   font-size: 12px;
-  color: #999;
+  color: var(--el-text-color-secondary);
   padding: 0 4px;
 }
 
 /* Agent 思考过程 */
 .message-thinking {
-  background: rgba(64, 158, 255, 0.06);
-  border-left: 3px solid rgba(64, 158, 255, 0.5);
+  background: rgba(45, 93, 161, 0.06);
+  border-left: 3px solid rgba(45, 93, 161, 0.5);
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--el-text-color-regular);
   font-style: italic;
   line-height: 1.6;
   max-width: 100%;
@@ -637,7 +653,7 @@
 
 .message-thinking-label {
   font-size: 12px;
-  color: #409eff;
+  color: var(--color-blue);
   font-weight: 600;
   margin-bottom: 4px;
   font-style: normal;
@@ -649,11 +665,11 @@
 .thinking-toggle-btn {
   padding: 0 !important;
   font-size: 11px !important;
-  color: #909399 !important;
+  color: var(--el-text-color-secondary) !important;
   min-height: auto !important;
 }
 .thinking-toggle-btn:hover {
-  color: #409eff !important;
+  color: var(--color-blue) !important;
 }
 
 .message-thinking-text {
@@ -678,23 +694,23 @@
   border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
-  background: #f0f9eb;
-  color: #67c23a;
-  border: 1px solid #c2e7b0;
+  background: rgba(46, 125, 50, 0.08);
+  color: var(--color-green);
+  border: 1px solid rgba(46, 125, 50, 0.3);
   font-family: var(--font-body);
 }
 
 .message-agent-chip.running {
-  background: #ecf5ff;
-  color: #409eff;
-  border-color: #b3d8ff;
+  background: rgba(45, 93, 161, 0.08);
+  color: var(--color-blue);
+  border-color: rgba(45, 93, 161, 0.3);
   animation: agent-bounce 1.6s ease-in-out infinite;
 }
 
 .message-agent-chip.error {
-  background: #fef0f0;
-  color: #f56c6c;
-  border-color: #fbc4c4;
+  background: rgba(198, 40, 40, 0.07);
+  color: var(--color-accent);
+  border-color: rgba(198, 40, 40, 0.28);
 }
 
 @keyframes agent-bounce {
@@ -707,7 +723,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #409eff;
+  background: var(--color-blue);
   animation: agent-dot-pulse 1.2s ease-in-out infinite;
   margin-left: 2px;
 }
@@ -729,7 +745,7 @@
 
 .sub-agents-label {
   font-size: 14px;
-  color: #c0c4cc;
+  color: var(--el-text-color-placeholder);
   margin-right: 2px;
 }
 
@@ -741,23 +757,23 @@
   border-radius: 12px;
   font-size: 11px;
   font-weight: 500;
-  background: #fafafa;
-  color: #909399;
-  border: 1px solid #ebeef5;
+  background: var(--el-fill-color-lighter);
+  color: var(--el-text-color-secondary);
+  border: 1px solid var(--el-border-color-lighter);
   font-family: var(--font-body);
 }
 
 .message-sub-agent-chip.running {
-  background: #f0f5ff;
-  color: #667eea;
-  border-color: #d9e2ff;
+  background: rgba(45, 93, 161, 0.08);
+  color: var(--color-blue);
+  border-color: rgba(45, 93, 161, 0.25);
   animation: agent-bounce 1.6s ease-in-out infinite;
 }
 
 .message-sub-agent-chip.done {
-  background: #f0f9eb;
-  color: #67c23a;
-  border-color: #e1f3d8;
+  background: rgba(46, 125, 50, 0.08);
+  color: var(--color-green);
+  border-color: rgba(46, 125, 50, 0.22);
 }
 
 /* Agent 工具调用过程 */
@@ -769,12 +785,12 @@
 }
 
 .message-tool-card {
-  background: #f5f7fa;
-  border: 1px dashed #c0c4cc;
+  background: var(--el-fill-color-light);
+  border: 1px dashed var(--el-text-color-disabled);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 12px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .message-tool-header {
@@ -786,26 +802,26 @@
 
 .message-tool-name {
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .message-tool-status {
   font-size: 11px;
   padding: 1px 6px;
   border-radius: 8px;
-  background: #e4e7ed;
-  color: #909399;
+  background: var(--el-border-color-light);
+  color: var(--el-text-color-secondary);
 }
 
 .message-tool-status.running {
-  background: #ecf5ff;
-  color: #409eff;
+  background: rgba(45, 93, 161, 0.08);
+  color: var(--color-blue);
   animation: tool-pulse 1.2s ease-in-out infinite;
 }
 
 .message-tool-status.done {
-  background: #f0f9eb;
-  color: #67c23a;
+  background: rgba(46, 125, 50, 0.08);
+  color: var(--color-green);
 }
 
 @keyframes tool-pulse {
@@ -821,27 +837,27 @@
 }
 
 .message-tool-arg {
-  background: #ffffff;
+  background: var(--el-fill-color-blank);
   padding: 1px 6px;
   border-radius: 4px;
   font-family: var(--font-mono);
   font-size: 11px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid var(--el-border-color-light);
 }
 
 .message-tool-arg-key {
-  color: #909399;
+  color: var(--el-text-color-secondary);
   margin-right: 2px;
 }
 
 .message-tool-arg-val {
-  color: #303133;
+  color: var(--el-text-color-primary);
   word-break: break-all;
 }
 
 .message-tool-error {
   margin-top: 4px;
-  color: #f56c6c;
+  color: var(--color-accent);
   font-size: 11px;
 }
 
@@ -1045,7 +1061,7 @@
 
 .note-preview {
   font-size: 12px;
-  color: #999;
+  color: var(--el-text-color-secondary);
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1054,5 +1070,5 @@
   -webkit-box-orient: vertical;
 }
 
-.empty-note-list { padding: 40px 20px; text-align: center; color: #999; }
+.empty-note-list { padding: 40px 20px; text-align: center; color: var(--el-text-color-secondary); }
 .empty-note-list p { margin: 0; font-size: 14px; }

@@ -161,7 +161,7 @@ async function copyUserAgent() {
 .card-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .section-fold-panel {
@@ -200,7 +200,7 @@ async function copyUserAgent() {
   max-width: 100%;
   word-break: break-all;
   font-size: 12px;
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .ua-row {
@@ -223,7 +223,7 @@ async function copyUserAgent() {
 }
 
 .link-sep {
-  color: #dcdfe6;
+  color: var(--el-border-color);
   user-select: none;
 }
 </style>

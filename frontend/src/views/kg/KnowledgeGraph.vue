@@ -764,7 +764,7 @@ function buildGraph() {
     labelDiv.className = 'kg-node-label'
     labelDiv.textContent = node.label
     labelDiv.style.cssText = `
-      color: #303133;
+      color: var(--el-text-color-primary);
       font-size: 12px;
       padding: 2px 8px;
       background: rgba(255,255,255,0.85);
@@ -1177,7 +1177,7 @@ onUnmounted(() => {
   justify-content: center;
   gap: 12px;
   background: rgba(250, 250, 250, 0.9);
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .kg-empty {
@@ -1228,12 +1228,12 @@ onUnmounted(() => {
 .detail-title {
   margin: 0 0 12px 0;
   font-size: 18px;
-  color: #303133;
+  color: var(--el-text-color-primary);
   word-break: break-all;
 }
 
 .detail-preview {
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-size: 14px;
   line-height: 1.6;
   margin: 0 0 16px 0;
@@ -1249,7 +1249,7 @@ onUnmounted(() => {
 
 .detail-stats p {
   margin: 0;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 13px;
 }
 
@@ -1262,7 +1262,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   margin-bottom: 8px;
   font-weight: 500;
 }
@@ -1283,7 +1283,7 @@ onUnmounted(() => {
   justify-content: space-between;
   padding: 8px 12px;
   border-radius: 8px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 13px;
@@ -1316,35 +1316,36 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .relation-weight {
   flex-shrink: 0;
   margin-left: 8px;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   background: rgba(0, 0, 0, 0.05);
   padding: 2px 6px;
   border-radius: 4px;
 }
 
 .relation-empty {
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 13px;
   text-align: center;
   padding: 16px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   border-radius: 8px;
 }
 
+/* P2 评审 #8：图谱统计 #909399(3.06:1) 提至 secondary token（#666，AA） */
 .kg-stats {
   flex-shrink: 0;
   display: flex;
   gap: 20px;
   justify-content: center;
   padding: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 13px;
 }
 

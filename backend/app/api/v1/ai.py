@@ -1,27 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from app.services import (
-    generate_note_stream,
-    analyze_note,
-    chat_with_ai,
-    chat_with_ai_stream,
-    translate_note_stream,
-    agent_chat_stream,
-)
-from app.core.field_crypto import SecretCryptoError
-from app.core.security import get_current_user
-from app.core.rate_limit import rate_limit_user
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_async_db
-from app.crud import user as crud_user
-from app.crud import ai_usage as crud_ai_usage
+from app.core.field_crypto import SecretCryptoError
+from app.core.rate_limit import rate_limit_user
+from app.core.security import get_current_user
 from app.crud import ai_conversation as crud_ai_conversation
+from app.crud import ai_usage as crud_ai_usage
+from app.crud import user as crud_user
 from app.models.ai import (
+    AgentChatRequest,
+    ChatRequest,
     GenerateNoteRequest,
     SummarizeNoteRequest,
     TranslateNoteRequest,
-    ChatRequest,
-    AgentChatRequest,
 )
 from app.models.ai_conversation import (
     AIConversationCreateRequest,
@@ -29,11 +22,42 @@ from app.models.ai_conversation import (
     AIConversationOut,
     AIMessageOut,
 )
+from app.services import (
+    agent_chat_stream,
+    analyze_note,
+    chat_with_ai,
+    chat_with_ai_stream,
+    generate_note_stream,
+    note_rag,
+    translate_note_stream,
+)
 
 router = APIRouter()
 
 # 共享依赖：所有 AI 接口都用同一 rate_limit_user("ai") 策略
 _ai_rate_limit = Depends(rate_limit_user("ai"))
+
+# RAG 自动上下文注入上限
+_RAG_CONTEXT_CHUNKS = 5
+
+
+async def _inject_note_context(db, db_user, message: str, history):
+    """后端检索用户笔记相关片段，注入对话上下文（替代前端整篇塞入）。
+
+    检索失败或无相关片段时不注入，保持对话可用。
+    """
+    try:
+        items = await note_rag.retrieve_context(db, db_user=db_user, query=message, limit=_RAG_CONTEXT_CHUNKS)
+    except Exception:
+        return history
+    if not items:
+        return history
+    lines = [f"- 【{it['note_title']}】{it['content']}" for it in items]
+    context = "\n".join(lines)
+    system_extra = (
+        "以下内容来自用户笔记的自动检索结果，仅在回答相关问题时参考，不要声称是用户直接提供的原文：\n" + context
+    )
+    return list(history or []) + [{"role": "system", "content": system_extra}]
 
 
 @router.post("/generate-note", summary="AI生成笔记")
@@ -49,7 +73,7 @@ async def generate_note_endpoint(
         db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
-        
+
         # 仅保留流式实现：在服务端聚合为完整正文后返回 JSON（与现有前端契约一致）
         parts: list[str] = []
         async for chunk in generate_note_stream(
@@ -62,10 +86,10 @@ async def generate_note_endpoint(
         ):
             parts.append(chunk)
         note_content = "".join(parts).strip()
-        
+
         # 记录AI使用
         await crud_ai_usage.log_ai_usage(db, db_user.id, "generate")
-        
+
         return {"code": 200, "message": "生成成功", "data": {"content": note_content}}
     except HTTPException:
         raise
@@ -146,23 +170,19 @@ async def translate_note_stream_endpoint(
 ):
     """流式翻译笔记：HTML/富文本会先转为 Markdown 再翻译，响应体为纯文本流。"""
     try:
-        db_user = await crud_user.get_user_by_email(
-            db, email=current_user["email"]
-        )
+        db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
 
         async def stream_generator():
-            async for chunk in translate_note_stream(
-                req.content, req.targetLang, db_user=db_user
-            ):
+            async for chunk in translate_note_stream(req.content, req.targetLang, db_user=db_user):
                 yield chunk
-            
+
             # 记录AI使用
             await crud_ai_usage.log_ai_usage(db, db_user.id, "translate")
 
         return StreamingResponse(stream_generator(), media_type="text/plain")
-        
+
     except HTTPException:
         raise
     except ValueError as e:
@@ -178,18 +198,19 @@ async def chat_endpoint(
     current_user: dict = Depends(get_current_user),
     _: None = _ai_rate_limit,
 ):
-    """AI 对话接口，支持上下文聊天"""
+    """AI 对话接口，支持上下文聊天；自动注入用户笔记的相关片段（RAG）"""
     try:
         # 获取用户ID
         db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
-        
-        reply = await chat_with_ai(req.message, req.history, db_user=db_user)
-        
+
+        history = await _inject_note_context(db, db_user, req.message, req.history)
+        reply = await chat_with_ai(req.message, history, db_user=db_user)
+
         # 记录AI使用
         await crud_ai_usage.log_ai_usage(db, db_user.id, "chat")
-        
+
         return {"code": 200, "message": "回复成功", "data": {"reply": reply}}
     except HTTPException:
         raise
@@ -206,16 +227,16 @@ async def chat_stream_endpoint(
     current_user: dict = Depends(get_current_user),
     _: None = _ai_rate_limit,
 ):
-    """流式对话：响应体为纯文本增量（assistant 全文），与翻译/生成笔记流式用法一致。"""
+    """流式对话：响应体为纯文本增量（assistant 全文），与翻译/生成笔记流式用法一致；自动注入用户笔记的相关片段（RAG）"""
     try:
         db_user = await crud_user.get_user_by_email(db, email=current_user["email"])
         if not db_user:
             raise HTTPException(status_code=404, detail="用户不存在")
 
+        history = await _inject_note_context(db, db_user, req.message, req.history)
+
         async def stream_generator():
-            async for chunk in chat_with_ai_stream(
-                req.message, req.history, db_user=db_user
-            ):
+            async for chunk in chat_with_ai_stream(req.message, history, db_user=db_user):
                 yield chunk
             await crud_ai_usage.log_ai_usage(db, db_user.id, "chat")
 
@@ -360,9 +381,7 @@ async def rename_conversation_endpoint(
     title = (req.title or "").strip()
     if not title:
         raise HTTPException(status_code=400, detail="标题不能为空")
-    conv = await crud_ai_conversation.rename_conversation(
-        db, conversation_id, db_user.id, title
-    )
+    conv = await crud_ai_conversation.rename_conversation(db, conversation_id, db_user.id, title)
     if not conv:
         raise HTTPException(status_code=404, detail="对话不存在")
     return conv
@@ -380,9 +399,7 @@ async def delete_conversation_endpoint(
 ):
     """删除指定对话及其全部消息。"""
     db_user = await _get_db_user_or_404(db, current_user)
-    ok = await crud_ai_conversation.delete_conversation(
-        db, conversation_id, db_user.id
-    )
+    ok = await crud_ai_conversation.delete_conversation(db, conversation_id, db_user.id)
     if not ok:
         raise HTTPException(status_code=404, detail="对话不存在")
     return {"message": "删除成功", "id": conversation_id}

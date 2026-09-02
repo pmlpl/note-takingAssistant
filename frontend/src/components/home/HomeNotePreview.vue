@@ -18,10 +18,10 @@
           </el-button>
         </div>
       </div>
-      <div class="preview-body" v-html="renderedContent"></div>
+      <MarkdownContent :content="currentNote?.content" class="preview-body" />
     </div>
     <div v-else class="empty-preview">
-      <IconDocument :size="80" color="#d9d9d9" />
+      <IconDocument :size="80" color="var(--el-text-color-disabled)" />
       <h3>选择一个笔记开始预览</h3>
       <p>从左侧选择笔记，或创建新笔记</p>
     </div>
@@ -30,7 +30,8 @@
 
 <script setup>
 import { IconDocument, IconEdit } from '@/components/icons'
+import MarkdownContent from '@/components/MarkdownContent.vue'
 import { useHomeInject } from '@/composables/home/useHomeInject'
 
-const { currentNote, renderedContent, addToMyNotes, editNote } = useHomeInject()
+const { currentNote, addToMyNotes, editNote } = useHomeInject()
 </script>

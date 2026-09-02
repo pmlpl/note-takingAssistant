@@ -207,14 +207,14 @@ defineExpose({ setAvatarFromPath })
   margin: 0 0 12px 0;
   font-size: 28px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
   line-height: 1.2;
 }
 
 .user-email,
 .join-date {
   margin: 0 0 8px 0;
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-size: 14px;
   display: flex;
   align-items: center;
@@ -223,13 +223,13 @@ defineExpose({ setAvatarFromPath })
 
 .user-email :deep(.el-icon),
 .join-date :deep(.el-icon) {
-  color: #909399;
+  color: var(--el-text-color-secondary);
   font-size: 16px;
 }
 
 .join-date {
   margin: 0;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .user-card :deep(.el-card__body) {
@@ -255,7 +255,7 @@ defineExpose({ setAvatarFromPath })
 .card-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 @media (max-width: 768px) {

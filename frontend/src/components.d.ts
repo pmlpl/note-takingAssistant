@@ -70,6 +70,7 @@ declare module 'vue' {
     IconUpload: typeof import('./components/icons/IconUpload.vue')['default']
     IconUser: typeof import('./components/icons/IconUser.vue')['default']
     Layout: typeof import('./components/Layout.vue')['default']
+    MarkdownContent: typeof import('./components/MarkdownContent.vue')['default']
     NoteCard: typeof import('./components/NoteCard.vue')['default']
     RichText: typeof import('./components/RichText.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

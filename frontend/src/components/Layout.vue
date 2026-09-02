@@ -151,7 +151,7 @@ async function handleLogout() {
 }
 
 .nav-menu :deep(.el-menu-item) {
-  color: #2d2d2d;
+  color: var(--color-pencil);
   font-family: var(--font-body);
   font-size: 16px;
   border-bottom: none !important;
@@ -160,7 +160,7 @@ async function handleLogout() {
 }
 
 .nav-menu :deep(.el-menu-item svg) {
-  color: #2d2d2d;
+  color: var(--color-pencil);
 }
 
 .nav-menu :deep(.el-menu-item:hover) {
@@ -188,13 +188,13 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #2d2d2d;
+  color: var(--color-pencil);
   font-family: var(--font-body);
   font-size: 15px;
 }
 
 .user-name svg {
-  color: #2d2d2d;
+  color: var(--color-pencil);
 }
 
 .auth-buttons {

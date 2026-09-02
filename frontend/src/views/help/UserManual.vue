@@ -730,8 +730,8 @@ function selectSection(id) {
   min-height: 100%;
   box-sizing: border-box;
   padding: 12px 14px;
-  background: #f9fafb;
-  border: 1px solid #ebeef5;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 10px;
 }
 
@@ -755,10 +755,11 @@ function selectSection(id) {
   width: 100%;
 }
 
+/* P2 评审 #10：目录字号 ≥14px */
 .manual-toc-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   letter-spacing: 0.02em;
 }
 
@@ -774,8 +775,9 @@ function selectSection(id) {
   padding-right: 2px;
 }
 
+/* P2 评审 #10：目录字号 ≥14px */
 .toc-tree {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.45;
   user-select: none;
 }
@@ -793,7 +795,7 @@ function selectSection(id) {
 }
 
 .toc-row:hover {
-  background: rgba(64, 158, 255, 0.06);
+  background: rgba(45, 93, 161, 0.06);
 }
 
 .toc-caret-btn {
@@ -809,12 +811,12 @@ function selectSection(id) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .toc-caret-btn:hover {
   background: rgba(0, 0, 0, 0.06);
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 .toc-caret {
@@ -837,7 +839,7 @@ function selectSection(id) {
   flex: 1;
   min-width: 0;
   padding: 1px 4px 1px 0;
-  color: #606266;
+  color: var(--el-text-color-regular);
   text-decoration: none;
   cursor: pointer;
   text-align: left;
@@ -848,28 +850,28 @@ function selectSection(id) {
 }
 
 .toc-link:hover {
-  color: #409eff;
+  color: var(--el-link-color);
 }
 
 .toc-link--active {
-  color: #409eff;
+  color: var(--el-link-color);
   font-weight: 600;
-  background: rgba(64, 158, 255, 0.12);
+  background: rgba(45, 93, 161, 0.12);
 }
 
 .toc-link--child {
-  font-size: 12px;
-  color: #606266;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
 }
 
 .toc-link--child.toc-link--active {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .toc-tree-children {
   margin: 2px 0 4px 10px;
   padding: 2px 0 2px 10px;
-  border-left: 1px solid #dcdfe6;
+  border-left: 1px solid var(--el-border-color);
 }
 
 .toc-row--child {
@@ -886,14 +888,14 @@ function selectSection(id) {
   border-radius: 8px;
   background: transparent;
   cursor: pointer;
-  color: #909399;
-  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
   font-family: inherit;
 }
 
 .manual-toc-collapsed-hit:hover {
-  background: rgba(64, 158, 255, 0.08);
-  color: #409eff;
+  background: rgba(45, 93, 161, 0.08);
+  color: var(--el-link-color);
 }
 
 .manual-toc-collapsed-text {
@@ -916,8 +918,8 @@ function selectSection(id) {
   min-height: min(70vh, 640px);
   overflow-y: auto;
   padding: 20px 22px 28px;
-  background: #fff;
-  border: 1px solid #ebeef5;
+  background: var(--el-fill-color-blank);
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 10px;
   box-sizing: border-box;
 }
@@ -930,17 +932,18 @@ function selectSection(id) {
   max-width: 720px;
 }
 
+/* P2 评审 #10：页面 h1 ≥28px（对齐 AI 页 h2 层级） */
 .manual-intro-block h1 {
   margin: 0 0 8px;
-  font-size: 22px;
+  font-size: 28px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .manual-lead {
   margin: 0 0 16px;
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   line-height: 1.6;
 }
 
@@ -956,21 +959,21 @@ function selectSection(id) {
   margin: 0 0 12px;
   font-size: 17px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .manual-footer-title {
   margin: 0 0 10px;
   font-size: 17px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .manual-h3 {
   margin: 20px 0 8px;
   font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .manual-h3:first-of-type {
@@ -983,15 +986,15 @@ function selectSection(id) {
 
 .manual-crumb {
   margin: 0 0 10px;
-  font-size: 12px;
-  color: #909399;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
   letter-spacing: 0.02em;
 }
 
 .manual-route-hint {
   margin: -4px 0 12px;
   font-size: 13px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
 }
 
 .manual-route-hint code {
@@ -1002,7 +1005,7 @@ function selectSection(id) {
   margin: 8px 0 0;
   padding-left: 20px;
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   line-height: 1.65;
 }
 
@@ -1017,14 +1020,14 @@ function selectSection(id) {
 .manual-list code {
   font-size: 12px;
   padding: 1px 6px;
-  background: #f5f7fa;
+  background: var(--el-fill-color-light);
   border-radius: 4px;
 }
 
 .manual-p {
   margin: 0 0 8px;
   font-size: 14px;
-  color: #606266;
+  color: var(--el-text-color-regular);
   line-height: 1.65;
 }
 
@@ -1036,7 +1039,7 @@ function selectSection(id) {
 .manual-muted {
   margin: 12px 0 0;
   font-size: 13px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   line-height: 1.6;
 }
 
@@ -1047,23 +1050,23 @@ function selectSection(id) {
 .manual-mailto {
   font-size: 15px;
   font-weight: 600;
-  color: #409eff;
+  color: var(--el-link-color);
   word-break: break-all;
 }
 
 .manual-inline-link {
-  color: #409eff;
+  color: var(--el-link-color);
   word-break: break-all;
 }
 
 .manual-footer {
   font-size: 13px;
-  color: #909399;
+  color: var(--el-text-color-secondary);
   line-height: 1.6;
 }
 
 .manual-footer .manual-p {
-  color: #606266;
+  color: var(--el-text-color-regular);
 }
 
 @media (max-width: 900px) {

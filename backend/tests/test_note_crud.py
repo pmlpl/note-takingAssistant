@@ -26,7 +26,8 @@ async def test_search_notes_by_title(async_db_session, test_user_id):
     assert results[0].title == "Python笔记"
 
 
-async def test_search_notes_ignores_content(async_db_session, test_user_id):
+async def test_search_notes_matches_content(async_db_session, test_user_id):
+    """RAG 化后正文关键词可命中（原行为：仅标题可搜）"""
     await _create_test_note(
         async_db_session,
         test_user_id,
@@ -34,7 +35,8 @@ async def test_search_notes_ignores_content(async_db_session, test_user_id):
         content="这是一个关于机器学习的笔记",
     )
     results = await crud_note.search_notes(async_db_session, test_user_id, keyword="机器学习")
-    assert len(results) == 0
+    assert len(results) == 1
+    assert results[0].title == "普通标题"
 
 
 async def test_search_notes_favorite_filter(async_db_session, test_user_id):

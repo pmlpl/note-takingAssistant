@@ -1,7 +1,7 @@
 FROM nginx:alpine
 
 # 前端静态资源（需要本机先 npm run build 生成 dist 目录）
-COPY dist /usr/share/nginx/html
+COPY dist /var/www/note-app
 
 # 两套 nginx 配置（entrypoint.sh 会选择一份启用）
 COPY nginx.http.conf  /etc/nginx/conf.d/nginx.http.conf
