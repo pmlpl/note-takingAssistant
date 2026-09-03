@@ -1072,3 +1072,58 @@
 
 .empty-note-list { padding: 40px 20px; text-align: center; color: var(--el-text-color-secondary); }
 .empty-note-list p { margin: 0; font-size: 14px; }
+
+
+/* ═══ Responsive — 移动端小屏适配（≤768px）═══ */
+@media (max-width: 768px) {
+  .home-container {
+    height: calc(100dvh - 60px);
+    height: calc(100vh - 60px); /* fallback */
+    overflow: hidden;
+  }
+
+  /* 三栏 → 纵向堆叠：上方笔记列表、下方 AI 助手 */
+  .main-layout {
+    flex-direction: column;
+  }
+
+  .left-sidebar {
+    width: 100% !important;
+    flex: 0 0 42%;
+    min-height: 0;
+    border-right: none;
+    border-bottom: 3px dashed var(--color-pencil);
+    padding: 16px;
+  }
+
+  /* 小屏隐藏中间预览，点笔记直接走编辑/详情流程 */
+  .center-preview {
+    display: none;
+  }
+
+  .right-ai-panel {
+    width: 100% !important;
+    flex: 1;
+    min-height: 0;
+    border-left: none;
+    border-top: 3px dashed var(--color-pencil);
+  }
+
+  /* 仅聊天模式：AI 面板独占剩余空间 */
+  .view-mode-chat .right-ai-panel {
+    max-width: none;
+    flex: 1;
+  }
+
+  /* 仅笔记模式：列表独占全屏 */
+  .view-mode-note .left-sidebar {
+    width: 100% !important;
+    flex: 1;
+  }
+
+  /* 小屏压缩内边距，为内容让出空间 */
+  .sidebar-header h3 { font-size: 16px; margin-bottom: 12px; }
+  .ai-header,
+  .input-wrapper,
+  .sidebar-actions { padding: 12px 16px; }
+}
