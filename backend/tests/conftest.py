@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+from unittest.mock import MagicMock
 
 import pytest
 import pytest_asyncio
@@ -14,8 +15,8 @@ os.environ.setdefault("RATE_LIMIT_DISABLED", "1")
 os.environ.setdefault("DB_HOST", "127.0.0.1")
 os.environ.setdefault("DB_PORT", "3306")
 os.environ.setdefault("DB_USER", "root")
-os.environ.setdefault("DB_PASSWORD", "note_db_password")
-os.environ.setdefault("DB_NAME", "note_db")
+os.environ.setdefault("DB_PASSWORD", "123456")
+os.environ.setdefault("DB_NAME", "note_db_test")
 os.environ.setdefault("ENCRYPTION_KEY", Fernet.generate_key().decode())
 os.environ.setdefault("SECRET_KEY", "test-secret-key-at-least-32-characters!!")
 os.environ.setdefault("ALGORITHM", "HS256")
@@ -39,6 +40,28 @@ def event_loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.fixture(autouse=True)
+def mock_redis_client():
+    """测试环境 Mock Redis，避免依赖真实 Redis 连接。
+
+    is_token_blacklisted 的安全策略是 Redis 不可用时保守拒绝（返回 True），
+    导致所有带 token 的请求 401。这里注入一个 mock client，让黑名单查询返回 False、
+    tgen 查询返回 None（放行），使测试不依赖真实 Redis。
+    """
+    from app.core.redis_client import redis_client
+
+    original_client = redis_client._client
+    mock_client = MagicMock()
+    mock_client.exists.return_value = 0  # token 不在黑名单
+    mock_client.get.return_value = None  # tgen 无最小记录，放行
+    mock_client.set.return_value = True
+    mock_client.delete.return_value = 1
+    mock_client.keys.return_value = []
+    redis_client._client = mock_client
+    yield
+    redis_client._client = original_client
 
 
 @pytest_asyncio.fixture(scope="function")

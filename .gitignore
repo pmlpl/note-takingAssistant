@@ -91,3 +91,9 @@ coverage/
 
 # Local documentation drafts (end-user guide lives in-app at /manual)
 # Project docs/ (architecture, ER) are tracked; in-app manual is at /manual
+
+# Database dump
+*.sql
+
+# Test output / temp files
+backend/*.txt
